@@ -1,0 +1,102 @@
+{
+  "name": "complex-data-pipeline",
+  "description": "Demonstrates a complex data processing pipeline combining multiple operations",
+  "context": {
+    "minConfidence": 0.8,
+    "batchSize": 50
+  },
+  "steps": [
+    {
+      "name": "getRawData",
+      "request": {
+        "method": "data.fetch",
+        "params": {
+          "source": "sensors",
+          "timeRange": "1h"
+        }
+      }
+    },
+    {
+      "name": "cleanData",
+      "transform": {
+        "input": "${getRawData}",
+        "operations": [
+          {
+            "type": "filter",
+            "using": "${item.confidence >= context.minConfidence}"
+          },
+          {
+            "type": "map",
+            "using": "{...item, timestamp: new Date(item.timestamp).toISOString()}"
+          }
+        ]
+      }
+    },
+    {
+      "name": "processBatches",
+      "transform": {
+        "input": "${cleanData}",
+        "operations": [
+          {
+            "type": "reduce",
+            "using": "${acc.length < context.batchSize ? [...acc, item] : acc}",
+            "initial": []
+          }
+        ]
+      }
+    },
+    {
+      "name": "analyzeBatches",
+      "loop": {
+        "over": "${processBatches}",
+        "as": "batch",
+        "step": {
+          "name": "analyzeBatch",
+          "condition": {
+            "if": "${batch.length > 0}",
+            "then": {
+              "name": "runAnalysis",
+              "request": {
+                "method": "analysis.process",
+                "params": {
+                  "data": "${batch}",
+                  "type": "timeseries"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "aggregateResults",
+      "transform": {
+        "input": "${analyzeBatches}",
+        "operations": [
+          {
+            "type": "filter",
+            "using": "${item != null}"
+          },
+          {
+            "type": "reduce",
+            "using": "${acc.concat(item.results)}",
+            "initial": []
+          }
+        ]
+      }
+    },
+    {
+      "name": "storeResults",
+      "request": {
+        "method": "results.store",
+        "params": {
+          "data": "${aggregateResults}",
+          "metadata": {
+            "processedAt": "${new Date().toISOString()}",
+            "recordCount": "${aggregateResults.length}"
+          }
+        }
+      }
+    }
+  ]
+} 

@@ -1,0 +1,60 @@
+{
+  "name": "conditional-branching",
+  "description": "Demonstrates conditional execution with nested transforms and requests",
+  "steps": [
+    {
+      "name": "checkInventory",
+      "request": {
+        "method": "inventory.check",
+        "params": {
+          "productId": 123
+        }
+      }
+    },
+    {
+      "name": "processOrder",
+      "condition": {
+        "if": "${checkInventory.inStock && checkInventory.quantity >= 10}",
+        "then": {
+          "name": "createBulkOrder",
+          "transform": {
+            "input": "${checkInventory}",
+            "operations": [
+              {
+                "type": "map",
+                "using": "{orderId: null, quantity: Math.min(item.quantity, 100)}"
+              }
+            ]
+          }
+        },
+        "else": {
+          "name": "createRegularOrder",
+          "request": {
+            "method": "orders.create",
+            "params": {
+              "productId": 123,
+              "quantity": "${checkInventory.quantity}",
+              "backorderAllowed": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "notifyResult",
+      "condition": {
+        "if": "${processOrder.orderId != null}",
+        "then": {
+          "name": "sendConfirmation",
+          "request": {
+            "method": "notification.send",
+            "params": {
+              "type": "order_confirmation",
+              "orderId": "${processOrder.orderId}"
+            }
+          }
+        }
+      }
+    }
+  ]
+} 

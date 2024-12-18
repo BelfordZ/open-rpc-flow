@@ -1,0 +1,177 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "JSON-RPC Flow Schema",
+  "description": "A schema for defining JSON-RPC workflows as a series of composable, nestable operations. Each flow consists of a sequence of steps that can be executed based on their data dependencies and control flow structures.",
+  "type": "object",
+  "required": ["name", "description", "steps"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "A unique identifier for the flow. Should be descriptive and follow kebab-case naming convention.",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "description": {
+      "type": "string",
+      "description": "A detailed description of what the flow does, its purpose, and expected outcomes."
+    },
+    "context": {
+      "type": "object",
+      "description": "Optional global context variables available throughout the flow execution.",
+      "additionalProperties": true
+    },
+    "steps": {
+      "type": "array",
+      "description": "An ordered sequence of steps to execute. While the order provides a visual guide, actual execution order is determined by data dependencies between steps.",
+      "items": {
+        "$ref": "#/definitions/Step"
+      },
+      "minItems": 1
+    }
+  },
+  "definitions": {
+    "Step": {
+      "type": "object",
+      "description": "A single step in the flow. Each step must have exactly one of the primitive operations: request, transform, loop, or condition.",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "A unique identifier for the step within the flow. Used for referencing step results in expressions.",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+        }
+      },
+      "oneOf": [
+        { "$ref": "#/definitions/RequestStep" },
+        { "$ref": "#/definitions/TransformStep" },
+        { "$ref": "#/definitions/LoopStep" },
+        { "$ref": "#/definitions/ConditionStep" }
+      ]
+    },
+    "RequestStep": {
+      "type": "object",
+      "description": "A step that makes a JSON-RPC request. This is the primary mechanism for external interactions.",
+      "required": ["name", "request"],
+      "properties": {
+        "request": {
+          "type": "object",
+          "required": ["method", "params"],
+          "properties": {
+            "method": {
+              "type": "string",
+              "description": "The JSON-RPC method to call."
+            },
+            "params": {
+              "type": "object",
+              "description": "Parameters for the JSON-RPC method. Values can contain template expressions using ${...} syntax to reference other step results or context variables.",
+              "additionalProperties": true
+            }
+          }
+        }
+      }
+    },
+    "TransformStep": {
+      "type": "object",
+      "description": "A step that performs data transformations using a series of operations.",
+      "required": ["name", "transform"],
+      "properties": {
+        "transform": {
+          "type": "object",
+          "required": ["input", "operations"],
+          "properties": {
+            "input": {
+              "type": "string",
+              "description": "Expression that evaluates to the input data for transformation."
+            },
+            "operations": {
+              "type": "array",
+              "description": "Sequence of operations to apply to the input data.",
+              "items": {
+                "type": "object",
+                "required": ["type", "using"],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["map", "filter", "reduce", "flatten", "sort", "unique", "group", "join"],
+                    "description": "The type of transformation operation to perform."
+                  },
+                  "using": {
+                    "type": "string",
+                    "description": "Expression defining the operation. For map/filter, this is evaluated for each item. For reduce, this combines items."
+                  },
+                  "as": {
+                    "type": "string",
+                    "description": "Optional variable name for the current item in the operation expression."
+                  },
+                  "initial": {
+                    "description": "Initial value for reduce operations."
+                  }
+                }
+              },
+              "minItems": 1
+            }
+          }
+        }
+      }
+    },
+    "LoopStep": {
+      "type": "object",
+      "description": "A step that iterates over a collection and executes a nested step for each item.",
+      "required": ["name", "loop"],
+      "properties": {
+        "loop": {
+          "type": "object",
+          "required": ["over", "as", "step"],
+          "properties": {
+            "over": {
+              "type": "string",
+              "description": "Expression that evaluates to the array to iterate over."
+            },
+            "as": {
+              "type": "string",
+              "description": "Variable name to use for the current item in the iteration.",
+              "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+            },
+            "condition": {
+              "type": "string",
+              "description": "Optional condition to determine whether to execute the step for each item."
+            },
+            "maxIterations": {
+              "type": "number",
+              "description": "Optional maximum number of iterations to perform."
+            },
+            "step": {
+              "$ref": "#/definitions/Step",
+              "description": "The step to execute for each item in the iteration. Can be any primitive step type."
+            }
+          }
+        }
+      }
+    },
+    "ConditionStep": {
+      "type": "object",
+      "description": "A step that conditionally executes one of two possible steps based on a condition.",
+      "required": ["name", "condition"],
+      "properties": {
+        "condition": {
+          "type": "object",
+          "required": ["if", "then"],
+          "properties": {
+            "if": {
+              "type": "string",
+              "description": "Expression that evaluates to a boolean determining which step to execute."
+            },
+            "then": {
+              "$ref": "#/definitions/Step",
+              "description": "Step to execute if the condition is true."
+            },
+            "else": {
+              "$ref": "#/definitions/Step",
+              "description": "Optional step to execute if the condition is false."
+            }
+          }
+        }
+      }
+    }
+  }
+}
+  

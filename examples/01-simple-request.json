@@ -1,0 +1,28 @@
+{
+  "name": "simple-request",
+  "description": "Demonstrates a basic request flow with parameter substitution",
+  "context": {
+    "userId": 1
+  },
+  "steps": [
+    {
+      "name": "getUser",
+      "request": {
+        "method": "user.get",
+        "params": {
+          "id": "${context.userId}"
+        }
+      }
+    },
+    {
+      "name": "getPermissions",
+      "request": {
+        "method": "permissions.get",
+        "params": {
+          "userId": "${getUser.id}",
+          "role": "${getUser.role}"
+        }
+      }
+    }
+  ]
+} 

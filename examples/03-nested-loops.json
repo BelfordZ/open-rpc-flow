@@ -1,0 +1,40 @@
+{
+  "name": "nested-loops",
+  "description": "Demonstrates nested loop operations for complex iteration patterns",
+  "steps": [
+    {
+      "name": "getTeams",
+      "request": {
+        "method": "teams.list",
+        "params": {
+          "organizationId": 1
+        }
+      }
+    },
+    {
+      "name": "processTeams",
+      "loop": {
+        "over": "${getTeams}",
+        "as": "team",
+        "step": {
+          "name": "processTeamMembers",
+          "loop": {
+            "over": "${team.members}",
+            "as": "member",
+            "step": {
+              "name": "sendTeamNotification",
+              "request": {
+                "method": "notification.send",
+                "params": {
+                  "userId": "${member.id}",
+                  "teamId": "${team.id}",
+                  "message": "You have new tasks in team ${team.name}"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+} 

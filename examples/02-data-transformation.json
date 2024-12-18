@@ -1,0 +1,48 @@
+{
+  "name": "data-transformation",
+  "description": "Demonstrates various data transformation operations on an array of items",
+  "steps": [
+    {
+      "name": "getOrders",
+      "request": {
+        "method": "orders.list",
+        "params": {
+          "status": "pending"
+        }
+      }
+    },
+    {
+      "name": "filterHighValue",
+      "transform": {
+        "input": "${getOrders}",
+        "operations": [
+          {
+            "type": "filter",
+            "using": "${item.total > 1000}"
+          },
+          {
+            "type": "map",
+            "using": "{ id: item.id, total: item.total, priority: 'high' }"
+          },
+          {
+            "type": "sort",
+            "using": "${a.total - b.total}"
+          }
+        ]
+      }
+    },
+    {
+      "name": "calculateTotal",
+      "transform": {
+        "input": "${filterHighValue}",
+        "operations": [
+          {
+            "type": "reduce",
+            "using": "${acc + item.total}",
+            "initial": 0
+          }
+        ]
+      }
+    }
+  ]
+} 

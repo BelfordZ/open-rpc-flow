@@ -1,5 +1,7 @@
 import { ConditionStepExecutor } from '../../step-executors';
 import { StepExecutionContext, ConditionStep } from '../../step-executors/types';
+import { StepExecutionResult } from '../../step-executors';
+import { noLogger } from '../../util/logger';
 import { createMockContext } from '../test-utils';
 
 describe('ConditionStepExecutor', () => {
@@ -9,7 +11,7 @@ describe('ConditionStepExecutor', () => {
 
   beforeEach(() => {
     executeStep = jest.fn();
-    executor = new ConditionStepExecutor(executeStep);
+    executor = new ConditionStepExecutor(executeStep, noLogger);
     context = createMockContext();
   });
 
@@ -25,19 +27,29 @@ describe('ConditionStepExecutor', () => {
           request: {
             method: 'notification.send',
             params: {
-              message: 'Admin action performed'
-            }
-          }
-        }
-      }
+              message: 'Admin action performed',
+            },
+          },
+        },
+      },
     };
 
     executeStep.mockResolvedValue({ result: { success: true }, type: 'request' });
-    const result = await executor.execute(step, context);
+    const result = (await executor.execute(step, context)) as StepExecutionResult & {
+      metadata: {
+        branchTaken: 'then' | 'else';
+        conditionValue: boolean;
+        condition: string;
+        timestamp: string;
+      };
+    };
 
     expect(result.type).toBe('condition');
-    expect(result.result.branchTaken).toBe('then');
-    expect(result.result.conditionValue).toBe(true);
+    expect(result.metadata.branchTaken).toBe('then');
+    expect(result.metadata.conditionValue).toBe(true);
+    expect(result.metadata.condition).toBe("${user.role} === 'admin'");
+    expect(result.metadata.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+    expect(result.result).toEqual({ success: true });
     expect(executeStep).toHaveBeenCalledTimes(1);
   });
 
@@ -53,28 +65,38 @@ describe('ConditionStepExecutor', () => {
           request: {
             method: 'notification.send',
             params: {
-              message: 'Admin action performed'
-            }
-          }
+              message: 'Admin action performed',
+            },
+          },
         },
         else: {
           name: 'sendUserNotification',
           request: {
             method: 'notification.send',
             params: {
-              message: 'User action performed'
-            }
-          }
-        }
-      }
+              message: 'User action performed',
+            },
+          },
+        },
+      },
     };
 
     executeStep.mockResolvedValue({ result: { success: true }, type: 'request' });
-    const result = await executor.execute(step, context);
+    const result = (await executor.execute(step, context)) as StepExecutionResult & {
+      metadata: {
+        branchTaken: 'then' | 'else';
+        conditionValue: boolean;
+        condition: string;
+        timestamp: string;
+      };
+    };
 
     expect(result.type).toBe('condition');
-    expect(result.result.branchTaken).toBe('else');
-    expect(result.result.conditionValue).toBe(false);
+    expect(result.metadata.branchTaken).toBe('else');
+    expect(result.metadata.conditionValue).toBe(false);
+    expect(result.metadata.condition).toBe("${user.role} === 'admin'");
+    expect(result.metadata.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+    expect(result.result).toEqual({ success: true });
     expect(executeStep).toHaveBeenCalledTimes(1);
   });
 
@@ -90,19 +112,28 @@ describe('ConditionStepExecutor', () => {
           request: {
             method: 'notification.send',
             params: {
-              message: 'Admin action performed'
-            }
-          }
-        }
-      }
+              message: 'Admin action performed',
+            },
+          },
+        },
+      },
     };
 
-    const result = await executor.execute(step, context);
+    const result = (await executor.execute(step, context)) as StepExecutionResult & {
+      metadata: {
+        branchTaken: 'then' | 'else';
+        conditionValue: boolean;
+        condition: string;
+        timestamp: string;
+      };
+    };
 
     expect(result.type).toBe('condition');
-    expect(result.result.branchTaken).toBe('else');
-    expect(result.result.conditionValue).toBe(false);
-    expect(result.result.value).toBeUndefined();
+    expect(result.metadata.branchTaken).toBe('else');
+    expect(result.metadata.conditionValue).toBe(false);
+    expect(result.metadata.condition).toBe("${user.role} === 'admin'");
+    expect(result.metadata.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+    expect(result.result).toBeUndefined();
     expect(executeStep).not.toHaveBeenCalled();
   });
 
@@ -122,26 +153,36 @@ describe('ConditionStepExecutor', () => {
               request: {
                 method: 'notification.send',
                 params: {
-                  message: 'Active admin action'
-                }
-              }
-            }
-          }
-        }
-      }
+                  message: 'Active admin action',
+                },
+              },
+            },
+          },
+        },
+      },
     };
 
-    executeStep.mockResolvedValue({ 
-      result: { success: true }, 
+    executeStep.mockResolvedValue({
+      result: { success: true },
       type: 'request',
-      metadata: { method: 'notification.send' }
+      metadata: { method: 'notification.send' },
     });
 
-    const result = await executor.execute(step, context);
+    const result = (await executor.execute(step, context)) as StepExecutionResult & {
+      metadata: {
+        branchTaken: 'then' | 'else';
+        conditionValue: boolean;
+        condition: string;
+        timestamp: string;
+      };
+    };
 
     expect(result.type).toBe('condition');
-    expect(result.result.branchTaken).toBe('then');
-    expect(result.result.conditionValue).toBe(true);
+    expect(result.metadata.branchTaken).toBe('then');
+    expect(result.metadata.conditionValue).toBe(true);
+    expect(result.metadata.condition).toBe("${user.role} === 'admin'");
+    expect(result.metadata.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+    expect(result.result).toEqual({ success: true });
     expect(executeStep).toHaveBeenCalledTimes(1);
   });
 
@@ -158,19 +199,29 @@ describe('ConditionStepExecutor', () => {
           request: {
             method: 'notification.send',
             params: {
-              message: 'Complex condition met'
-            }
-          }
-        }
-      }
+              message: 'Complex condition met',
+            },
+          },
+        },
+      },
     };
 
     executeStep.mockResolvedValue({ result: { success: true }, type: 'request' });
-    const result = await executor.execute(step, context);
+    const result = (await executor.execute(step, context)) as StepExecutionResult & {
+      metadata: {
+        branchTaken: 'then' | 'else';
+        conditionValue: boolean;
+        condition: string;
+        timestamp: string;
+      };
+    };
 
     expect(result.type).toBe('condition');
-    expect(result.result.branchTaken).toBe('then');
-    expect(result.result.conditionValue).toBe(true);
+    expect(result.metadata.branchTaken).toBe('then');
+    expect(result.metadata.conditionValue).toBe(true);
+    expect(result.metadata.condition).toBe("${user.role} === 'admin' && ${user.active} && ${user.loginCount} > ${context.minLoginCount}");
+    expect(result.metadata.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+    expect(result.result).toEqual({ success: true });
     expect(executeStep).toHaveBeenCalledTimes(1);
   });
-}); 
+});

@@ -1,11 +1,7 @@
-import { 
-  PathAccessor, 
-  PathSyntaxError, 
-  PropertyAccessError, 
-  InvalidPathError,
-  PathAccessorError
-} from '../path-accessor';
 import { ReferenceResolver } from '../reference-resolver';
+import { ExpressionEvaluator } from '../expression-evaluator';
+import { UnknownReferenceError } from '../reference-resolver';
+import { noLogger } from '../util/logger';
 
 describe('ReferenceResolver', () => {
   let resolver: ReferenceResolver;
@@ -17,10 +13,10 @@ describe('ReferenceResolver', () => {
     context = {
       config: {
         enabled: true,
-        threshold: 100
-      }
+        threshold: 100,
+      },
     };
-    resolver = new ReferenceResolver(stepResults, context);
+    resolver = new ReferenceResolver(stepResults, context, noLogger);
   });
 
   describe('resolveReference', () => {
@@ -29,9 +25,9 @@ describe('ReferenceResolver', () => {
         result: {
           id: 1,
           name: 'test',
-          nested: { value: 42 }
+          nested: { value: 42 },
         },
-        type: 'request'
+        type: 'request',
       });
     });
 
@@ -59,9 +55,9 @@ describe('ReferenceResolver', () => {
       stepResults.set('items', {
         result: [
           { id: 1, name: 'first' },
-          { id: 2, name: 'second' }
+          { id: 2, name: 'second' },
         ],
-        type: 'request'
+        type: 'request',
       });
 
       expect(resolver.resolveReference('${items.result[0].name}')).toBe('first');
@@ -72,9 +68,9 @@ describe('ReferenceResolver', () => {
       stepResults.set('data', {
         result: {
           'special-key': 'value',
-          'another.key': 42
+          'another.key': 42,
         },
-        type: 'request'
+        type: 'request',
       });
 
       expect(resolver.resolveReference('${data.result["special-key"]}')).toBe('value');
@@ -82,20 +78,25 @@ describe('ReferenceResolver', () => {
     });
 
     it('throws on unknown references', () => {
-      expect(() => resolver.resolveReference('${unknown.value}'))
-        .toThrow('Unknown reference: unknown');
+      expect(() => resolver.resolveReference('${unknown.value}')).toThrow(
+        'Unknown reference: unknown',
+      );
     });
 
     it('throws on invalid property access', () => {
-      expect(() => resolver.resolveReference('${step1.result.nonexistent}'))
-        .toThrow('Cannot access property');
-      expect(() => resolver.resolveReference('${step1.result.id.invalid}'))
-        .toThrow('Cannot access property');
+      expect(() => resolver.resolveReference('${step1.result.nonexistent}')).toThrow(
+        'Cannot access property',
+      );
+      expect(() => resolver.resolveReference('${step1.result.id.invalid}')).toThrow(
+        'Cannot access property',
+      );
     });
 
     it('throws on invalid path syntax', () => {
-        expect(() => resolver.resolveReference('${step1[result]}')).toThrow('Property names in brackets must be quoted or numeric at position 12');
-        expect(() => resolver.resolveReference('${step1.result[0}')).toThrow('Unclosed [');
+      expect(() => resolver.resolveReference('${step1[result]}')).toThrow(
+        'Property names in brackets must be quoted or numeric at position 12',
+      );
+      expect(() => resolver.resolveReference('${step1.result[0}')).toThrow('Unclosed [');
     });
   });
 
@@ -104,16 +105,16 @@ describe('ReferenceResolver', () => {
       stepResults.set('user', {
         result: {
           id: 1,
-          name: 'test'
+          name: 'test',
         },
-        type: 'request'
+        type: 'request',
       });
       stepResults.set('items', {
         result: [
           { id: 1, value: 'first' },
-          { id: 2, value: 'second' }
+          { id: 2, value: 'second' },
         ],
-        type: 'request'
+        type: 'request',
       });
     });
 
@@ -122,16 +123,16 @@ describe('ReferenceResolver', () => {
         userId: '${user.result.id}',
         userName: '${user.result.name}',
         config: {
-          enabled: '${context.config.enabled}'
-        }
+          enabled: '${context.config.enabled}',
+        },
       };
 
       expect(resolver.resolveReferences(obj)).toEqual({
         userId: 1,
         userName: 'test',
         config: {
-          enabled: true
-        }
+          enabled: true,
+        },
       });
     });
 
@@ -140,16 +141,16 @@ describe('ReferenceResolver', () => {
         '${user.result.id}',
         {
           name: '${user.result.name}',
-          items: ['${items.result[0].value}', '${items.result[1].value}']
-        }
+          items: ['${items.result[0].value}', '${items.result[1].value}'],
+        },
       ];
 
       expect(resolver.resolveReferences(arr)).toEqual([
         1,
         {
           name: 'test',
-          items: ['first', 'second']
-        }
+          items: ['first', 'second'],
+        },
       ]);
     });
 
@@ -159,7 +160,7 @@ describe('ReferenceResolver', () => {
         str: 'plain text',
         bool: true,
         null: null,
-        undefined: undefined
+        undefined: undefined,
       };
 
       expect(resolver.resolveReferences(obj)).toEqual(obj);
@@ -167,11 +168,10 @@ describe('ReferenceResolver', () => {
 
     it('propagates errors from invalid references', () => {
       const obj = {
-        invalid: '${unknown.value}'
+        invalid: '${unknown.value}',
       };
 
-      expect(() => resolver.resolveReferences(obj))
-        .toThrow('Unknown reference: unknown');
+      expect(() => resolver.resolveReferences(obj)).toThrow('Unknown reference: unknown');
     });
   });
 
@@ -181,9 +181,9 @@ describe('ReferenceResolver', () => {
         result: {
           id: 1,
           name: 'test',
-          nested: { value: 42 }
+          nested: { value: 42 },
         },
-        type: 'request'
+        type: 'request',
       });
     });
 
@@ -196,9 +196,9 @@ describe('ReferenceResolver', () => {
       stepResults.set('items', {
         result: [
           { id: 1, name: 'first' },
-          { id: 2, name: 'second' }
+          { id: 2, name: 'second' },
         ],
-        type: 'request'
+        type: 'request',
       });
 
       expect(resolver.resolvePath('items.result[0].name')).toBe('first');
@@ -209,9 +209,9 @@ describe('ReferenceResolver', () => {
       stepResults.set('data', {
         result: {
           'special-key': 'value',
-          'another.key': 42
+          'another.key': 42,
         },
-        type: 'request'
+        type: 'request',
       });
 
       expect(resolver.resolvePath('data.result["special-key"]')).toBe('value');
@@ -220,7 +220,7 @@ describe('ReferenceResolver', () => {
 
     it('resolves paths with extra context', () => {
       const extraContext = {
-        item: { id: 1, value: 'test' }
+        item: { id: 1, value: 'test' },
       };
 
       expect(resolver.resolvePath('item.id', extraContext)).toBe(1);
@@ -228,20 +228,21 @@ describe('ReferenceResolver', () => {
     });
 
     it('throws on unknown references', () => {
-      expect(() => resolver.resolvePath('unknown.value'))
-        .toThrow('Unknown reference: unknown');
+      expect(() => resolver.resolvePath('unknown.value')).toThrow('Unknown reference: unknown');
     });
 
     it('throws on invalid property access', () => {
-      expect(() => resolver.resolvePath('step1.result.nonexistent'))
-        .toThrow('Cannot access property');
-      expect(() => resolver.resolvePath('step1.result.id.invalid'))
-        .toThrow('Cannot access property');
+      expect(() => resolver.resolvePath('step1.result.nonexistent')).toThrow(
+        'Cannot access property',
+      );
+      expect(() => resolver.resolvePath('step1.result.id.invalid')).toThrow(
+        'Cannot access property',
+      );
     });
 
     it('throws on invalid path syntax', () => {
-        expect(() => resolver.resolvePath('step1[result]')).toThrow('Path cannot start with [');
-        expect(() => resolver.resolvePath('step1.result[0')).toThrow('Unclosed [');
+      expect(() => resolver.resolvePath('step1[result]')).toThrow('Path cannot start with [');
+      expect(() => resolver.resolvePath('step1.result[0')).toThrow('Unclosed [');
     });
   });
-}); 
+});

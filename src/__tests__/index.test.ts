@@ -1,4 +1,6 @@
 import { Flow, FlowExecutor, JsonRpcRequest } from '../index';
+import { StepType } from '../step-executors/types';
+import { noLogger } from '../util/logger';
 
 describe('FlowExecutor', () => {
   // Mock JSON-RPC handler that simulates different responses based on method
@@ -10,13 +12,12 @@ describe('FlowExecutor', () => {
             { id: 1, name: 'Item 1', value: 100 },
             { id: 2, name: 'Item 2', value: 200 },
             { id: 3, name: 'Item 3', value: 300 },
-          ]
+          ],
         };
       case 'processItem':
-        const params = request.params as { id: number };
         return {
           processed: true,
-          itemId: params.id
+          itemId: (request.params as { id: number }).id,
         };
       default:
         return { result: 'default' };
@@ -36,10 +37,10 @@ describe('FlowExecutor', () => {
           name: 'get_data',
           request: {
             method: 'getData',
-            params: {}
-          }
-        }
-      ]
+            params: {},
+          },
+        },
+      ],
     };
 
     const executor = new FlowExecutor(flow, mockJsonRpcHandler);
@@ -47,11 +48,15 @@ describe('FlowExecutor', () => {
 
     expect(mockJsonRpcHandler).toHaveBeenCalledTimes(1);
     expect(results.get('get_data')).toEqual({
-      items: [
-        { id: 1, name: 'Item 1', value: 100 },
-        { id: 2, name: 'Item 2', value: 200 },
-        { id: 3, name: 'Item 3', value: 300 },
-      ]
+      result: {
+        items: [
+          { id: 1, name: 'Item 1', value: 100 },
+          { id: 2, name: 'Item 2', value: 200 },
+          { id: 3, name: 'Item 3', value: 300 },
+        ],
+      },
+      type: 'request',
+      metadata: expect.any(Object),
     });
   });
 
@@ -64,37 +69,46 @@ describe('FlowExecutor', () => {
           name: 'get_data',
           request: {
             method: 'getData',
-            params: {}
-          }
+            params: {},
+          },
         },
         {
           name: 'process_items',
           loop: {
-            over: '${get_data.items}',
+            over: '${get_data.result.items}',
             as: 'item',
             maxIterations: 2,
             step: {
               name: 'process_item',
               request: {
                 method: 'processItem',
-                params: { id: '${item.id}' }
-              }
-            }
-          }
-        }
-      ]
+                params: { id: '${item.id}' },
+              },
+            },
+          },
+        },
+      ],
     };
 
     const executor = new FlowExecutor(flow, mockJsonRpcHandler);
     const results = await executor.execute();
 
-    expect(mockJsonRpcHandler).toHaveBeenCalledTimes(4); // 1 getData + 3 processItem (limited by maxIterations)
+    expect(mockJsonRpcHandler).toHaveBeenCalledTimes(3); // 1 getData + 2 processItem (limited by maxIterations)
     const processResults = results.get('process_items');
-    expect(Array.isArray(processResults.value)).toBeTruthy();
-    expect(processResults.value).toHaveLength(2);
-    expect(processResults.value).toEqual([
-      { processed: true, itemId: undefined },
-      { processed: true, itemId: undefined }
+    expect(Array.isArray(processResults.result.value)).toBeTruthy();
+    expect(processResults.result.value).toHaveLength(2);
+    expect(processResults.type).toBe(StepType.Loop);
+    expect(processResults.result.value).toEqual([
+      {
+        type: 'request',
+        result: { processed: true, itemId: 1 },
+        metadata: expect.any(Object),
+      },
+      {
+        type: 'request',
+        result: { processed: true, itemId: 2 },
+        metadata: expect.any(Object),
+      },
     ]);
   });
 
@@ -107,30 +121,30 @@ describe('FlowExecutor', () => {
           name: 'get_data',
           request: {
             method: 'getData',
-            params: {}
-          }
+            params: {},
+          },
         },
         {
           name: 'check_items',
           condition: {
-            if: '${get_data.items.length > 2}',
+            if: '${get_data.result.items.length > 0}',
             then: {
               name: 'process_success',
               request: {
                 method: 'success',
-                params: {}
-              }
+                params: {},
+              },
             },
             else: {
               name: 'process_failure',
               request: {
                 method: 'failure',
-                params: {}
-              }
-            }
-          }
-        }
-      ]
+                params: {},
+              },
+            },
+          },
+        },
+      ],
     };
 
     const executor = new FlowExecutor(flow, mockJsonRpcHandler);
@@ -152,52 +166,63 @@ describe('FlowExecutor', () => {
           name: 'get_data',
           request: {
             method: 'getData',
-            params: {}
-          }
+            params: {},
+          },
         },
         {
           name: 'select_fields',
           transform: {
-            input: '${get_data.items}',
+            input: '${get_data.result.items}',
             operations: [
               {
                 type: 'map',
-                using: '{ id: item.id, value: item.value }'
-              }
-            ]
-          }
+                using: '{ id: item.id, value: item.value }',
+              },
+            ],
+          },
         },
         {
           name: 'group_by_value',
           transform: {
-            input: '${get_data.items}',
+            input: '${get_data.result.items}',
             operations: [
               {
                 type: 'group',
-                using: 'item.value'
+                using: 'item.value',
               },
               {
-                type: 'filter',
-                using: 'group.length >= 1'
-              }
-            ]
-          }
-        }
-      ]
+                type: 'sort',
+                using: 'a.key - b.key',
+              },
+            ],
+          },
+        },
+      ],
     };
 
     const executor = new FlowExecutor(flow, mockJsonRpcHandler);
     const results = await executor.execute();
 
-    expect(results.get('select_fields').value).toEqual([
+    expect(results.get('select_fields').result).toEqual([
       { id: 1, value: 100 },
       { id: 2, value: 200 },
-      { id: 3, value: 300 }
+      { id: 3, value: 300 },
     ]);
 
-    const groupedResults = results.get('group_by_value').value;
-    expect(Object.keys(groupedResults)).toHaveLength(3);
-    expect(groupedResults['100']).toHaveLength(1);
+    const groupedResults = results.get('group_by_value').result;
+    expect(groupedResults).toHaveLength(3);
+    expect(groupedResults[0]).toEqual({
+      key: 100,
+      items: [{ id: 1, name: 'Item 1', value: 100 }]
+    });
+    expect(groupedResults[1]).toEqual({
+      key: 200,
+      items: [{ id: 2, name: 'Item 2', value: 200 }]
+    });
+    expect(groupedResults[2]).toEqual({
+      key: 300,
+      items: [{ id: 3, name: 'Item 3', value: 300 }]
+    });
   });
 
   test('executes transform operations', async () => {
@@ -209,39 +234,40 @@ describe('FlowExecutor', () => {
           name: 'get_data',
           request: {
             method: 'getData',
-            params: {}
-          }
+            params: {},
+          },
         },
         {
           name: 'transform_data',
           transform: {
-            input: '${get_data.items}',
+            input: '${get_data.result.items}',
             operations: [
               {
                 type: 'filter',
-                using: 'item.value > 150'
+                using: 'item.value > 150',
               },
               {
                 type: 'map',
-                using: '{ id: item.id, doubled: item.value * 2 }'
+                using: '{ id: item.id, doubled: item.value * 2 }',
               },
               {
                 type: 'sort',
-                using: 'a.doubled - b.doubled'
-              }
-            ]
-          }
-        }
-      ]
+                using: 'a.doubled - b.doubled',
+              },
+            ],
+          },
+        },
+      ],
     };
 
     const executor = new FlowExecutor(flow, mockJsonRpcHandler);
     const results = await executor.execute();
 
     const transformedData = results.get('transform_data');
-    expect(transformedData).toHaveLength(2);
-    expect(transformedData[0].doubled).toBeLessThan(transformedData[1].doubled);
-    expect(transformedData.every((item: any) => item.doubled > 300)).toBeTruthy();
+    expect(transformedData.result).toHaveLength(2);
+    expect(transformedData.result[0].doubled).toBeLessThan(transformedData.result[1].doubled);
+    expect(transformedData.result.every((item: any) => item.doubled > 300)).toBeTruthy();
+    expect(transformedData.type).toBe(StepType.Transform);
   });
 
   test('handles context variables', async () => {
@@ -249,37 +275,38 @@ describe('FlowExecutor', () => {
       name: 'Context Test',
       description: 'Test context usage',
       context: {
-        threshold: 150
+        threshold: 150,
       },
       steps: [
         {
           name: 'get_data',
           request: {
             method: 'getData',
-            params: {}
-          }
+            params: {},
+          },
         },
         {
           name: 'filter_by_context',
           transform: {
-            input: '${get_data.items}',
+            input: '${get_data.result.items}',
             operations: [
               {
                 type: 'filter',
-                using: 'item.value > ${context.threshold}'
-              }
-            ]
-          }
-        }
-      ]
+                using: 'item.value > ${context.threshold}',
+              },
+            ],
+          },
+        },
+      ],
     };
 
     const executor = new FlowExecutor(flow, mockJsonRpcHandler);
     const results = await executor.execute();
 
     const filteredData = results.get('filter_by_context');
-    expect(filteredData).toHaveLength(2);
-    expect(filteredData.every((item: any) => item.value > 150)).toBeTruthy();
+    expect(filteredData.result).toHaveLength(2);
+    expect(filteredData.result.every((item: any) => item.value > 150)).toBeTruthy();
+    expect(filteredData.type).toBe(StepType.Transform);
   });
 
   test('handles reference resolution errors', async () => {
@@ -291,8 +318,8 @@ describe('FlowExecutor', () => {
           name: 'get_data',
           request: {
             method: 'getData',
-            params: {}
-          }
+            params: {},
+          },
         },
         {
           name: 'invalid_reference',
@@ -301,16 +328,16 @@ describe('FlowExecutor', () => {
             operations: [
               {
                 type: 'map',
-                using: 'item'
-              }
-            ]
-          }
-        }
-      ]
+                using: 'item',
+              },
+            ],
+          },
+        },
+      ],
     };
 
     const executor = new FlowExecutor(flow, mockJsonRpcHandler);
-    await expect(executor.execute()).rejects.toThrow('Invalid reference: get_data.nonexistent');
+    await expect(executor.execute()).rejects.toThrow('Cannot access property');
   });
 
   test('executes nested loops', async () => {
@@ -322,36 +349,36 @@ describe('FlowExecutor', () => {
           name: 'get_data',
           request: {
             method: 'getData',
-            params: {}
-          }
+            params: {},
+          },
         },
         {
           name: 'nested_process',
           loop: {
-            over: '${get_data.items}',
+            over: '${get_data.result.items}',
             as: 'outer_item',
             maxIterations: 2,
             step: {
               name: 'inner_loop',
               loop: {
-                over: '${get_data.items}',
+                over: '${get_data.result.items}',
                 as: 'inner_item',
                 maxIterations: 2,
                 step: {
                   name: 'process_pair',
                   request: {
                     method: 'processItem',
-                    params: { 
+                    params: {
                       outer_id: '${outer_item.id}',
-                      inner_id: '${inner_item.id}'
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      ]
+                      inner_id: '${inner_item.id}',
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      ],
     };
 
     const executor = new FlowExecutor(flow, mockJsonRpcHandler);
@@ -359,9 +386,10 @@ describe('FlowExecutor', () => {
 
     expect(mockJsonRpcHandler).toHaveBeenCalledTimes(5); // 1 getData + (2 outer * 2 inner)
     const nestedResults = results.get('nested_process');
-    expect(nestedResults.value).toHaveLength(2); // Limited by outer maxIterations
-    expect(nestedResults.value[0].value).toHaveLength(2); // Limited by inner maxIterations
-    expect(nestedResults.value[1].value).toHaveLength(2);
+    expect(nestedResults.result.value).toHaveLength(2); // Limited by outer maxIterations
+    expect(nestedResults.result.value[0].result.value).toHaveLength(2); // Limited by inner maxIterations
+    expect(nestedResults.result.value[1].result.value).toHaveLength(2);
+    expect(nestedResults.type).toBe(StepType.Loop);
   });
 
   test('handles complex conditional nesting', async () => {
@@ -373,43 +401,43 @@ describe('FlowExecutor', () => {
           name: 'get_data',
           request: {
             method: 'getData',
-            params: {}
-          }
+            params: {},
+          },
         },
         {
           name: 'nested_condition',
           condition: {
-            if: '${get_data.items.length > 0}',
+            if: '${get_data.result.items.length > 0}',
             then: {
               name: 'inner_condition',
               condition: {
-                if: '${get_data.items[0].value > 150}',
+                if: '${get_data.result.items[0].value > 150}',
                 then: {
                   name: 'high_value_process',
                   request: {
                     method: 'processItem',
-                    params: { id: '${get_data.items[0].id}' }
-                  }
+                    params: { id: '${get_data.result.items[0].id}' },
+                  },
                 },
                 else: {
                   name: 'low_value_process',
                   request: {
                     method: 'processItem',
-                    params: { id: -1 }
-                  }
-                }
-              }
+                    params: { id: -1 },
+                  },
+                },
+              },
             },
             else: {
               name: 'no_data_process',
               request: {
                 method: 'processItem',
-                params: { id: 0 }
-              }
-            }
-          }
-        }
-      ]
+                params: { id: 0 },
+              },
+            },
+          },
+        },
+      ],
     };
 
     const executor = new FlowExecutor(flow, mockJsonRpcHandler);
@@ -432,25 +460,25 @@ describe('FlowExecutor', () => {
           name: 'get_data',
           request: {
             method: 'getData',
-            params: {}
-          }
+            params: {},
+          },
         },
         {
           name: 'transform_with_error',
           transform: {
-            input: '${get_data.items}',
+            input: '${get_data.result.items}',
             operations: [
               {
                 type: 'map',
-                using: 'item.nonexistent.property'
-              }
-            ]
-          }
-        }
-      ]
+                using: 'item.nonexistent.property',
+              },
+            ],
+          },
+        },
+      ],
     };
 
     const executor = new FlowExecutor(flow, mockJsonRpcHandler);
     await expect(executor.execute()).rejects.toThrow();
   });
-}); 
+});

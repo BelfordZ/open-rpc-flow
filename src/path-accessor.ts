@@ -25,7 +25,7 @@ export class PathSyntaxError extends PathAccessorError {
   constructor(
     message: string,
     public readonly path: string,
-    public readonly position?: number
+    public readonly position?: number,
   ) {
     super(message);
   }
@@ -39,7 +39,7 @@ export class PropertyAccessError extends PathAccessorError {
     message: string,
     public readonly path: string,
     public readonly segment: PathSegment,
-    public readonly target: any
+    public readonly target: any,
   ) {
     super(message);
   }
@@ -51,7 +51,7 @@ export class PropertyAccessError extends PathAccessorError {
 export class InvalidPathError extends PathAccessorError {
   constructor(
     message: string,
-    public readonly path: string
+    public readonly path: string,
   ) {
     super(message);
   }
@@ -189,7 +189,11 @@ export class PathAccessor {
       } else {
         // Check for invalid characters in property names
         if (!/[a-zA-Z0-9_$]/.test(char)) {
-          throw new PathSyntaxError(`Invalid character '${char}' in property name at position ${i}`, path, i);
+          throw new PathSyntaxError(
+            `Invalid character '${char}' in property name at position ${i}`,
+            path,
+            i,
+          );
         }
         current += char;
       }
@@ -226,7 +230,7 @@ export class PathAccessor {
           `Cannot access property '${segment.value}' of ${current}`,
           path,
           segment,
-          current
+          current,
         );
       }
 
@@ -239,12 +243,12 @@ export class PathAccessor {
         }
       }
 
-      if (!current.hasOwnProperty(key)) {
+      if (!Object.prototype.hasOwnProperty.call(current, key)) {
         throw new PropertyAccessError(
           `Cannot access property '${key}' of ${JSON.stringify(current)}`,
           path,
           segment,
-          current
+          current,
         );
       }
       return current[key];
@@ -285,8 +289,8 @@ export class PathAccessor {
     if (segment.type === 'index') {
       return `[${segment.value}]`;
     }
-    return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(segment.value) 
-      ? segment.value 
+    return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(segment.value)
+      ? segment.value
       : `[${JSON.stringify(segment.value)}]`;
   }
 
@@ -294,12 +298,14 @@ export class PathAccessor {
    * Format a full path for use in error messages
    */
   static formatPath(segments: PathSegment[]): string {
-    return segments.map((segment, i) => {
-      const formatted = this.formatSegment(segment);
-      if (i === 0) return formatted;
-      return segment.type === 'property' && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(segment.value)
-        ? `.${formatted}`
-        : formatted;
-    }).join('');
+    return segments
+      .map((segment, i) => {
+        const formatted = this.formatSegment(segment);
+        if (i === 0) return formatted;
+        return segment.type === 'property' && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(segment.value)
+          ? `.${formatted}`
+          : formatted;
+      })
+      .join('');
   }
-} 
+}

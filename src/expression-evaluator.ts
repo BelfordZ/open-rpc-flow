@@ -1,5 +1,6 @@
 import { ReferenceResolver, UnknownReferenceError } from './reference-resolver';
 import { PathAccessor, PathSyntaxError, PropertyAccessError } from './path-accessor';
+import { Logger } from './util/logger';
 
 /**
  * Base class for expression evaluator errors
@@ -7,7 +8,7 @@ import { PathAccessor, PathSyntaxError, PropertyAccessError } from './path-acces
 export class ExpressionError extends Error {
   constructor(
     message: string,
-    public readonly cause?: Error
+    public readonly cause?: Error,
   ) {
     super(message);
     this.name = this.constructor.name;
@@ -22,7 +23,7 @@ export class ExpressionEvaluationError extends ExpressionError {
   constructor(
     message: string,
     public readonly expression: string,
-    cause?: Error
+    cause?: Error,
   ) {
     super(message, cause);
   }
@@ -35,7 +36,7 @@ export class ReferenceResolutionError extends ExpressionError {
   constructor(
     message: string,
     public readonly path: string,
-    cause?: Error
+    cause?: Error,
   ) {
     super(message, cause);
   }
@@ -48,7 +49,7 @@ export class ArrayAccessError extends ExpressionError {
   constructor(
     message: string,
     public readonly expression: string,
-    cause?: Error
+    cause?: Error,
   ) {
     super(message, cause);
   }
@@ -61,17 +62,22 @@ export class ComparisonError extends ExpressionError {
   constructor(
     message: string,
     public readonly expression: string,
-    cause?: Error
+    cause?: Error,
   ) {
     super(message, cause);
   }
 }
 
 export class ExpressionEvaluator {
+  private logger: Logger;
+
   constructor(
     private referenceResolver: ReferenceResolver,
-    private context: Record<string, any>
-  ) {}
+    private context: Record<string, any>,
+    logger: Logger,
+  ) {
+    this.logger = logger.createNested('ExpressionEvaluator');
+  }
 
   evaluateCondition(condition: string, extraContext: Record<string, any> = {}): boolean {
     const result = this.evaluateExpression(condition, extraContext);
@@ -79,41 +85,49 @@ export class ExpressionEvaluator {
   }
 
   evaluateExpression(expression: string, extraContext: Record<string, any> = {}): any {
-    console.log('\n[evaluateExpression] Input:', expression);
+    this.logger.debug('Input:', expression);
     const context = { ...this.stepResults(), ...extraContext, context: this.context };
     try {
       // If it's a template literal (starts with backtick), preserve the template syntax
       if (expression.startsWith('`')) {
-        console.log('[evaluateExpression] Handling template literal');
+        this.logger.debug('Handling template literal');
         return this.evaluateTemplateString(expression, extraContext);
       }
 
       // If it's a reference (${...}), evaluate it
       if (expression.startsWith('${') && expression.endsWith('}')) {
-        console.log('[evaluateExpression] Checking for reference pattern');
+        this.logger.debug('Checking for reference pattern');
         // Check if there's only one ${...} pattern
         const matches = expression.match(/\$\{[^}]+\}/g) || [];
-        console.log('[evaluateExpression] Found matches:', matches);
+        this.logger.debug('Found matches:', matches);
         if (matches.length === 1 && matches[0] === expression) {
-          console.log('[evaluateExpression] Single reference detected, evaluating path:', expression.slice(2, -1));
+          this.logger.debug(
+            'Single reference detected, evaluating path:',
+            expression.slice(2, -1),
+          );
           const path = expression.slice(2, -1);
           try {
             return this.evaluateReference(path, extraContext);
           } catch (error) {
-            if (error instanceof ExpressionError || error instanceof PathSyntaxError || error instanceof PropertyAccessError || error instanceof UnknownReferenceError) {
+            if (
+              error instanceof ExpressionError ||
+              error instanceof PathSyntaxError ||
+              error instanceof PropertyAccessError ||
+              error instanceof UnknownReferenceError
+            ) {
               throw error;
             }
             throw new ExpressionEvaluationError(
               `Failed to evaluate reference: ${path}`,
               expression,
-              error instanceof Error ? error : undefined
+              error instanceof Error ? error : undefined,
             );
           }
         }
       }
 
       // For all other expressions, replace ${...} with resolved values
-      console.log('[evaluateExpression] Replacing references in expression');
+      this.logger.debug('Replacing references in expression');
       let resolvedExpression = expression;
       let lastIndex = 0;
       let processedExpression = '';
@@ -155,23 +169,29 @@ export class ExpressionEvaluator {
           if (foundEnd) {
             const fullMatch = expression.slice(i, j + 1);
             const path = expression.slice(i + 2, j);
-            console.log('[evaluateExpression] Found reference:', path);
+            this.logger.debug('Found reference:', path);
             try {
               const value = this.evaluateReference(path, extraContext);
-              console.log('[evaluateExpression] Resolved value:', value);
-              processedExpression += expression.slice(lastIndex, i) + (typeof value === 'string' ? `"${value}"` : value);
+              this.logger.debug('Resolved value:', value);
+              processedExpression +=
+                expression.slice(lastIndex, i) + (typeof value === 'string' ? `"${value}"` : value);
               lastIndex = j + 1;
               i = j;
               continue;
             } catch (error) {
-              console.log('[evaluateExpression] Error resolving reference:', error);
-              if (error instanceof ExpressionError || error instanceof PathSyntaxError || error instanceof PropertyAccessError || error instanceof UnknownReferenceError) {
+              this.logger.debug('Error resolving reference:', error);
+              if (
+                error instanceof ExpressionError ||
+                error instanceof PathSyntaxError ||
+                error instanceof PropertyAccessError ||
+                error instanceof UnknownReferenceError
+              ) {
                 throw error;
               }
               throw new ExpressionEvaluationError(
                 `Failed to evaluate reference: ${path}`,
                 expression,
-                error instanceof Error ? error : undefined
+                error instanceof Error ? error : undefined,
               );
             }
           }
@@ -183,11 +203,11 @@ export class ExpressionEvaluator {
       }
 
       resolvedExpression = processedExpression || expression;
-      console.log('[evaluateExpression] After replacing references:', resolvedExpression);
+      this.logger.debug('After replacing references:', resolvedExpression);
 
       // If it's an object literal, evaluate it
       if (resolvedExpression.trim().startsWith('{') && resolvedExpression.trim().endsWith('}')) {
-        console.log('[evaluateExpression] Evaluating object literal');
+        this.logger.debug('Evaluating object literal');
         const func = new Function(...Object.keys(context), `return (${resolvedExpression})`);
         return func(...Object.values(context));
       }
@@ -195,71 +215,81 @@ export class ExpressionEvaluator {
       // Convert dot notation to bracket notation for property access
       const normalizedExpression = resolvedExpression.replace(
         /([a-zA-Z_$][a-zA-Z0-9_$]*)\.([\w$]+)/g,
-        (_, obj, prop) => `${obj}["${prop}"]`
+        (_, obj, prop) => `${obj}["${prop}"]`,
       );
-      console.log('[evaluateExpression] Normalized expression:', normalizedExpression);
+      this.logger.debug('Normalized expression:', normalizedExpression);
 
       // Evaluate the expression
       const func = new Function(...Object.keys(context), `return ${normalizedExpression}`);
       const finalResult = func(...Object.values(context));
-      console.log('[evaluateExpression] Final result:', finalResult);
+      this.logger.debug('Final result:', finalResult);
       return finalResult;
     } catch (error) {
-      if (error instanceof ExpressionError || error instanceof PathSyntaxError || error instanceof PropertyAccessError || error instanceof UnknownReferenceError) {
+      if (
+        error instanceof ExpressionError ||
+        error instanceof PathSyntaxError ||
+        error instanceof PropertyAccessError ||
+        error instanceof UnknownReferenceError
+      ) {
         throw error;
       }
       throw new ExpressionEvaluationError(
         `Failed to evaluate expression: ${expression}`,
         expression,
-        error instanceof Error ? error : undefined
+        error instanceof Error ? error : undefined,
       );
     }
   }
 
   private evaluateReference(path: string, extraContext: Record<string, any>): any {
-    console.log('\n[evaluateReference] Input path:', path);
+    this.logger.debug('Input path:', path);
     const context = { ...this.stepResults(), ...extraContext, context: this.context };
 
     // Check if it's a comparison expression
     if (path.includes('>') || path.includes('<') || path.includes('===') || path.includes('!==')) {
-      console.log('[evaluateReference] Handling comparison expression');
+      this.logger.debug('Handling comparison expression');
       try {
         // Replace references with their values
         const resolvedExpression = path.replace(
-          /([a-zA-Z_$][a-zA-Z0-9_$]*(?:\.[a-zA-Z_$][a-zA-Z0-9_$]*)*(?:\[[^\]]+\])*)/g,
+          /([a-zA-Z_$][a-zA-Z0-9_$]*(?:\.[a-zA-Z_$][a-zA-Z0-9_$]*)*(?:\[[^\]]+\])*(?:\.[a-zA-Z_$][a-zA-Z0-9_$]*)*)/g,
           (match) => {
-            console.log('[evaluateReference] Resolving comparison reference:', match);
+            this.logger.debug('Resolving comparison reference:', match);
             try {
               const value = this.referenceResolver.resolvePath(match, extraContext);
-              console.log('[evaluateReference] Resolved comparison value:', value);
+              this.logger.debug('Resolved comparison value:', value);
               return typeof value === 'string' ? `"${value}"` : value;
             } catch (error) {
-              if (error instanceof PathSyntaxError || error instanceof PropertyAccessError || error instanceof UnknownReferenceError) {
-                throw new ComparisonError(
-                  `Invalid reference in comparison: ${match}`,
-                  path,
-                  error
-                );
+              if (
+                error instanceof PathSyntaxError ||
+                error instanceof PropertyAccessError ||
+                error instanceof UnknownReferenceError
+              ) {
+                throw new ComparisonError(`Invalid reference in comparison: ${match}`, path, error);
               }
               return match;
             }
-          }
+          },
         );
-        console.log('[evaluateReference] Resolved comparison expression:', resolvedExpression);
+        this.logger.debug('Resolved comparison expression:', resolvedExpression);
 
         // Evaluate the comparison
         const func = new Function(...Object.keys(context), `return ${resolvedExpression}`);
         const result = func(...Object.values(context));
-        console.log('[evaluateReference] Comparison result:', result);
+        this.logger.debug('Comparison result:', result);
         return result;
       } catch (error) {
-        if (error instanceof ExpressionError || error instanceof PathSyntaxError || error instanceof PropertyAccessError || error instanceof UnknownReferenceError) {
+        if (
+          error instanceof ExpressionError ||
+          error instanceof PathSyntaxError ||
+          error instanceof PropertyAccessError ||
+          error instanceof UnknownReferenceError
+        ) {
           throw error;
         }
         throw new ComparisonError(
           `Failed to evaluate comparison: ${path}`,
           path,
-          error instanceof Error ? error : undefined
+          error instanceof Error ? error : undefined,
         );
       }
     }
@@ -267,12 +297,12 @@ export class ExpressionEvaluator {
     try {
       // Parse the path into segments
       const segments = PathAccessor.parsePath(path);
-      
+
       // Process each segment
       let resolvedPath = '';
       for (let i = 0; i < segments.length; i++) {
         const segment = segments[i];
-        
+
         if (segment.type === 'expression' || segment.type === 'index') {
           // For expression segments and index segments, evaluate the expression
           try {
@@ -293,7 +323,11 @@ export class ExpressionEvaluator {
                     const value = this.referenceResolver.resolvePath(match, extraContext);
                     return typeof value === 'string' ? `"${value}"` : value;
                   } catch (error) {
-                    if (error instanceof PathSyntaxError || error instanceof PropertyAccessError || error instanceof UnknownReferenceError) {
+                    if (
+                      error instanceof PathSyntaxError ||
+                      error instanceof PropertyAccessError ||
+                      error instanceof UnknownReferenceError
+                    ) {
                       // Skip if it's part of a template literal
                       if (match.startsWith('$') && segment.value.includes('`')) {
                         return match;
@@ -301,12 +335,12 @@ export class ExpressionEvaluator {
                       throw new ExpressionEvaluationError(
                         `Invalid reference in expression: ${match}`,
                         path,
-                        error
+                        error,
                       );
                     }
                     return match;
                   }
-                }
+                },
               );
 
               try {
@@ -316,7 +350,7 @@ export class ExpressionEvaluator {
                 throw new ExpressionEvaluationError(
                   `Failed to evaluate expression: ${segment.value}`,
                   path,
-                  error instanceof Error ? error : undefined
+                  error instanceof Error ? error : undefined,
                 );
               }
             }
@@ -324,7 +358,7 @@ export class ExpressionEvaluator {
             if (typeof value !== 'string' && typeof value !== 'number') {
               throw new ExpressionEvaluationError(
                 `Array index must evaluate to a string or number, got ${typeof value}`,
-                path
+                path,
               );
             }
             resolvedPath += `[${JSON.stringify(value)}]`;
@@ -332,14 +366,15 @@ export class ExpressionEvaluator {
             throw new ExpressionEvaluationError(
               `Failed to evaluate expression: ${segment.value}`,
               path,
-              error instanceof Error ? error : undefined
+              error instanceof Error ? error : undefined,
             );
           }
         } else {
           // For property segments, use their raw value
-          resolvedPath += i === 0 || !/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(segment.value)
-            ? segment.raw
-            : `.${segment.raw}`;
+          resolvedPath +=
+            i === 0 || !/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(segment.value)
+              ? segment.raw
+              : `.${segment.raw}`;
         }
       }
 
@@ -352,7 +387,7 @@ export class ExpressionEvaluator {
           throw new ExpressionEvaluationError(
             `Failed to evaluate expression: ${path}`,
             path,
-            error
+            error,
           );
         } else if (error instanceof PropertyAccessError) {
           // If it's a property access error, preserve the error type
@@ -361,41 +396,47 @@ export class ExpressionEvaluator {
         throw error;
       }
     } catch (error) {
-      if (error instanceof ExpressionError || error instanceof PathSyntaxError || error instanceof PropertyAccessError || error instanceof UnknownReferenceError) {
+      if (
+        error instanceof ExpressionError ||
+        error instanceof PathSyntaxError ||
+        error instanceof PropertyAccessError ||
+        error instanceof UnknownReferenceError
+      ) {
         throw error;
       }
       throw new ReferenceResolutionError(
         `Failed to resolve reference: ${path}`,
         path,
-        error instanceof Error ? error : undefined
+        error instanceof Error ? error : undefined,
       );
     }
   }
 
   private evaluateTemplateString(template: string, extraContext: Record<string, any>): string {
     const context = { ...this.stepResults(), ...extraContext, context: this.context };
-    
+
     try {
       // Replace ${...} with resolved values but keep the template syntax
-      const resolvedTemplate = template.replace(
-        /\$\{([^}]+)\}/g,
-        (_, path) => {
-          const value = this.evaluateReference(path, extraContext);
-          return `\${${JSON.stringify(value)}}`;
-        }
-      );
+      const resolvedTemplate = template.replace(/\$\{([^}]+)\}/g, (_, path) => {
+        const value = this.evaluateReference(path, extraContext);
+        return `\${${JSON.stringify(value)}}`;
+      });
 
       // Evaluate as a template literal
       const func = new Function(...Object.keys(context), `return ${resolvedTemplate}`);
       return func(...Object.values(context));
     } catch (error) {
-      if (error instanceof ExpressionError || error instanceof PathSyntaxError || error instanceof PropertyAccessError) {
+      if (
+        error instanceof ExpressionError ||
+        error instanceof PathSyntaxError ||
+        error instanceof PropertyAccessError
+      ) {
         throw error;
       }
       throw new ExpressionEvaluationError(
         `Failed to evaluate template string: ${template}`,
         template,
-        error instanceof Error ? error : undefined
+        error instanceof Error ? error : undefined,
       );
     }
   }

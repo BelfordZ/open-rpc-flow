@@ -1,9 +1,8 @@
-import { 
-  PathAccessor, 
-  PathSyntaxError, 
-  PropertyAccessError, 
+import {
+  PathAccessor,
   InvalidPathError,
-  PathAccessorError
+  PropertyAccessError,
+  PathSyntaxError,
 } from '../path-accessor';
 
 describe('PathAccessor', () => {
@@ -13,7 +12,7 @@ describe('PathAccessor', () => {
       expect(result).toEqual([
         { type: 'property', value: 'foo', raw: 'foo' },
         { type: 'property', value: 'bar', raw: 'bar' },
-        { type: 'property', value: 'baz', raw: 'baz' }
+        { type: 'property', value: 'baz', raw: 'baz' },
       ]);
     });
 
@@ -23,7 +22,7 @@ describe('PathAccessor', () => {
         { type: 'property', value: 'foo', raw: 'foo' },
         { type: 'index', value: '0', raw: '[0]' },
         { type: 'property', value: 'bar', raw: 'bar' },
-        { type: 'index', value: '1', raw: '[1]' }
+        { type: 'index', value: '1', raw: '[1]' },
       ]);
     });
 
@@ -32,7 +31,7 @@ describe('PathAccessor', () => {
       expect(result).toEqual([
         { type: 'property', value: 'foo', raw: 'foo' },
         { type: 'property', value: 'bar-baz', raw: '["bar-baz"]' },
-        { type: 'property', value: 'qux', raw: 'qux' }
+        { type: 'property', value: 'qux', raw: 'qux' },
       ]);
     });
 
@@ -41,7 +40,7 @@ describe('PathAccessor', () => {
       expect(result).toEqual([
         { type: 'property', value: 'foo', raw: 'foo' },
         { type: 'property', value: 'bar', raw: "['bar']" },
-        { type: 'property', value: 'baz', raw: 'baz' }
+        { type: 'property', value: 'baz', raw: 'baz' },
       ]);
     });
 
@@ -49,18 +48,15 @@ describe('PathAccessor', () => {
       const result = PathAccessor.parsePath('.foo.bar');
       expect(result).toEqual([
         { type: 'property', value: 'foo', raw: 'foo' },
-        { type: 'property', value: 'bar', raw: 'bar' }
+        { type: 'property', value: 'bar', raw: 'bar' },
       ]);
     });
 
     describe('error handling', () => {
       it('should throw PathSyntaxError on invalid bracket syntax', () => {
-        expect(() => PathAccessor.parsePath('foo[bar'))
-          .toThrow(PathSyntaxError);
-        expect(() => PathAccessor.parsePath('foo]'))
-          .toThrow(PathSyntaxError);
-        expect(() => PathAccessor.parsePath('foo[[bar]]'))
-          .toThrow(PathSyntaxError);
+        expect(() => PathAccessor.parsePath('foo[bar')).toThrow(PathSyntaxError);
+        expect(() => PathAccessor.parsePath('foo]')).toThrow(PathSyntaxError);
+        expect(() => PathAccessor.parsePath('foo[[bar]]')).toThrow(PathSyntaxError);
       });
 
       it('should include position in PathSyntaxError', () => {
@@ -81,12 +77,9 @@ describe('PathAccessor', () => {
       });
 
       it('should throw PathSyntaxError on invalid quote syntax', () => {
-        expect(() => PathAccessor.parsePath('foo["bar'))
-          .toThrow(PathSyntaxError);
-        expect(() => PathAccessor.parsePath("foo['bar"))
-          .toThrow(PathSyntaxError);
-        expect(() => PathAccessor.parsePath("foo.'bar'"))
-          .toThrow(PathSyntaxError);
+        expect(() => PathAccessor.parsePath('foo["bar')).toThrow(PathSyntaxError);
+        expect(() => PathAccessor.parsePath("foo['bar")).toThrow(PathSyntaxError);
+        expect(() => PathAccessor.parsePath("foo.'bar'")).toThrow(PathSyntaxError);
       });
     });
 
@@ -96,7 +89,7 @@ describe('PathAccessor', () => {
         expect(result).toEqual([
           { type: 'property', value: 'foo', raw: 'foo' },
           { type: 'expression', value: 'bar[0]', raw: '[bar[0]]' },
-          { type: 'property', value: 'baz', raw: 'baz' }
+          { type: 'property', value: 'baz', raw: 'baz' },
         ]);
       });
 
@@ -105,7 +98,7 @@ describe('PathAccessor', () => {
         expect(result).toEqual([
           { type: 'property', value: 'foo', raw: 'foo' },
           { type: 'expression', value: 'bar[baz[0]]', raw: '[bar[baz[0]]]' },
-          { type: 'property', value: 'qux', raw: 'qux' }
+          { type: 'property', value: 'qux', raw: 'qux' },
         ]);
       });
 
@@ -114,7 +107,7 @@ describe('PathAccessor', () => {
         expect(result).toEqual([
           { type: 'property', value: 'foo', raw: 'foo' },
           { type: 'expression', value: 'bar.baz', raw: '[bar.baz]' },
-          { type: 'property', value: 'qux', raw: 'qux' }
+          { type: 'property', value: 'qux', raw: 'qux' },
         ]);
       });
 
@@ -124,7 +117,7 @@ describe('PathAccessor', () => {
           { type: 'property', value: 'foo', raw: 'foo' },
           { type: 'expression', value: 'bar[0]', raw: '[bar[0]]' },
           { type: 'property', value: 'qux', raw: '["qux"]' },
-          { type: 'index', value: '2', raw: '[2]' }
+          { type: 'index', value: '2', raw: '[2]' },
         ]);
       });
     });
@@ -135,7 +128,7 @@ describe('PathAccessor', () => {
         expect(result).toEqual([
           { type: 'property', value: 'foo', raw: 'foo' },
           { type: 'property', value: 'bar', raw: '["bar"]' },
-          { type: 'property', value: 'baz', raw: '["baz"]' }
+          { type: 'property', value: 'baz', raw: '["baz"]' },
         ]);
       });
 
@@ -145,7 +138,7 @@ describe('PathAccessor', () => {
           { type: 'property', value: 'foo', raw: 'foo' },
           { type: 'property', value: 'bar', raw: '["bar"]' },
           { type: 'property', value: 'baz', raw: 'baz' },
-          { type: 'property', value: 'qux', raw: '["qux"]' }
+          { type: 'property', value: 'qux', raw: '["qux"]' },
         ]);
       });
 
@@ -154,7 +147,7 @@ describe('PathAccessor', () => {
         expect(result).toEqual([
           { type: 'property', value: 'foo', raw: 'foo' },
           { type: 'property', value: 'bar', raw: '["bar"]' },
-          { type: 'property', value: 'baz', raw: '[\'baz\']' }
+          { type: 'property', value: 'baz', raw: "['baz']" },
         ]);
       });
 
@@ -165,7 +158,7 @@ describe('PathAccessor', () => {
           { type: 'property', value: 'bar', raw: '["bar"]' },
           { type: 'index', value: '0', raw: '[0]' },
           { type: 'property', value: 'baz', raw: '["baz"]' },
-          { type: 'index', value: '1', raw: '[1]' }
+          { type: 'index', value: '1', raw: '[1]' },
         ]);
       });
     });
@@ -175,13 +168,13 @@ describe('PathAccessor', () => {
         foo: {
           bar: {
             baz: {
-              qux: 'value'
+              qux: 'value',
             },
             'special-key': {
-              'nested-key': 'nested-value'
-            }
-          }
-        }
+              'nested-key': 'nested-value',
+            },
+          },
+        },
       };
 
       it('should get values using consecutive array notation', () => {
@@ -193,7 +186,9 @@ describe('PathAccessor', () => {
       });
 
       it('should get values with special characters in keys', () => {
-        expect(PathAccessor.get(obj, 'foo["bar"]["special-key"]["nested-key"]')).toBe('nested-value');
+        expect(PathAccessor.get(obj, 'foo["bar"]["special-key"]["nested-key"]')).toBe(
+          'nested-value',
+        );
       });
 
       it('should handle array notation at root', () => {
@@ -206,11 +201,8 @@ describe('PathAccessor', () => {
   describe('get', () => {
     const obj = {
       foo: {
-        bar: [
-          { baz: 'qux' },
-          { 'special-key': 'value' }
-        ]
-      }
+        bar: [{ baz: 'qux' }, { 'special-key': 'value' }],
+      },
     };
 
     it('should get nested properties using dot notation', () => {
@@ -234,7 +226,7 @@ describe('PathAccessor', () => {
           expect(error.segment).toEqual({
             type: 'property',
             value: 'nonexistent',
-            raw: 'nonexistent'
+            raw: 'nonexistent',
           });
           expect(error.target).toEqual(obj.foo);
         }
@@ -252,15 +244,14 @@ describe('PathAccessor', () => {
           expect(error.segment).toEqual({
             type: 'property',
             value: 'invalid',
-            raw: 'invalid'
+            raw: 'invalid',
           });
           expect(error.target).toBe('qux');
         }
       });
 
       it('should propagate PathSyntaxError from parsePath', () => {
-        expect(() => PathAccessor.get(obj, 'foo[bar'))
-          .toThrow(PathSyntaxError);
+        expect(() => PathAccessor.get(obj, 'foo[bar')).toThrow(PathSyntaxError);
       });
     });
   });
@@ -268,11 +259,8 @@ describe('PathAccessor', () => {
   describe('has', () => {
     const obj = {
       foo: {
-        bar: [
-          { baz: 'qux' },
-          { 'special-key': 'value' }
-        ]
-      }
+        bar: [{ baz: 'qux' }, { 'special-key': 'value' }],
+      },
     };
 
     it('should return true for existing paths', () => {
@@ -286,8 +274,7 @@ describe('PathAccessor', () => {
     });
 
     it('should propagate PathSyntaxError', () => {
-      expect(() => PathAccessor.has(obj, 'foo[bar'))
-        .toThrow(PathSyntaxError);
+      expect(() => PathAccessor.has(obj, 'foo[bar')).toThrow(PathSyntaxError);
     });
   });
 
@@ -298,12 +285,9 @@ describe('PathAccessor', () => {
     });
 
     it('should throw InvalidPathError on invalid paths', () => {
-      expect(() => PathAccessor.getRoot(''))
-        .toThrow(InvalidPathError);
-      expect(() => PathAccessor.getRoot('.'))
-        .toThrow(InvalidPathError);
-      expect(() => PathAccessor.getRoot('[0]'))
-        .toThrow(InvalidPathError);
+      expect(() => PathAccessor.getRoot('')).toThrow(InvalidPathError);
+      expect(() => PathAccessor.getRoot('.')).toThrow(InvalidPathError);
+      expect(() => PathAccessor.getRoot('[0]')).toThrow(InvalidPathError);
     });
   });
 
@@ -327,9 +311,9 @@ describe('PathAccessor', () => {
       const segments = [
         { type: 'property' as const, value: 'foo', raw: 'foo' },
         { type: 'index' as const, value: '0', raw: '0' },
-        { type: 'property' as const, value: 'bar-baz', raw: '"bar-baz"' }
+        { type: 'property' as const, value: 'bar-baz', raw: '"bar-baz"' },
       ];
       expect(PathAccessor.formatPath(segments)).toBe('foo[0]["bar-baz"]');
     });
   });
-}); 
+});

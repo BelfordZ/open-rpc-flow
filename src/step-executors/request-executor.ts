@@ -1,148 +1,114 @@
-import { JsonRpcRequest } from '../types';
-import { 
-  StepExecutor, 
-  StepExecutionContext, 
-  StepExecutionResult, 
-  RequestStep, 
-  isRequestStep,
-  StepType
-} from './types';
+import { Step, StepExecutionContext, JsonRpcRequest } from '../types';
+import { StepExecutor, StepExecutionResult, JsonRpcRequestError, StepType } from './types';
+import { Logger } from '../util/logger';
+import { RequestStep } from './types';
 
-/**
- * JSON-RPC 2.0 error object
- */
-export interface JsonRpcError {
-  code: number;
-  message: string;
-  data?: any;
-}
-
-/**
- * Custom error class for JSON-RPC errors
- */
-export class JsonRpcRequestError extends Error {
-  constructor(public error: JsonRpcError) {
-    super(error.message);
-    this.name = 'JsonRpcRequestError';
-  }
-}
-
-/**
- * Request step execution result metadata
- */
-export interface RequestStepMetadata {
-  method: string;
-  requestId: number;
-  timestamp: string;
-}
-
-/**
- * Executor for JSON-RPC request steps with improved typing and error handling
- */
-export class RequestStepExecutor<T = any> implements StepExecutor<RequestStep, T> {
-  private requestId: number = 1;
-  private readonly MAX_REQUEST_ID = Number.MAX_SAFE_INTEGER;
+export class RequestStepExecutor implements StepExecutor {
+  private requestId: number = 0;
 
   constructor(
-    private jsonRpcHandler: (request: JsonRpcRequest) => Promise<T>
+    private jsonRpcHandler: (request: JsonRpcRequest) => Promise<any>,
+    private logger: Logger
   ) {}
 
-  canExecute = isRequestStep;
-
   private getNextRequestId(): number {
-    const currentId = this.requestId;
-    this.requestId = (this.requestId % this.MAX_REQUEST_ID) + 1;
-    return currentId;
+    if (this.requestId >= Number.MAX_SAFE_INTEGER) {
+      this.requestId = 0;
+    }
+    this.requestId += 1;
+    return this.requestId;
   }
 
-  private validateMethod(method: string): void {
-    if (typeof method !== 'string' || method.trim().length === 0) {
-      throw new Error('Invalid method name: must be a non-empty string');
-    }
-  }
-
-  private validateParams(params: any): void {
-    if (params !== undefined && 
-        params !== null && 
-        typeof params !== 'object') {
-      throw new Error('Invalid params: must be an object, array, or null');
-    }
+  canExecute(step: Step): step is RequestStep {
+    return 'request' in step;
   }
 
   async execute(
-    step: RequestStep, 
+    step: Step,
     context: StepExecutionContext,
-    extraContext: Record<string, any> = {}
-  ): Promise<StepExecutionResult<T> & { metadata: RequestStepMetadata }> {
-    const { referenceResolver } = context;
-    
+    extraContext: Record<string, any> = {},
+  ): Promise<StepExecutionResult> {
+    if (!this.canExecute(step)) {
+      throw new Error('Invalid step type for RequestStepExecutor');
+    }
+
+    const requestStep = step as RequestStep;
+    const requestId = this.getNextRequestId();
+
+    this.logger.debug('Executing request step', {
+      stepName: step.name,
+      method: requestStep.request.method,
+      requestId,
+    });
+
     try {
-      // Validate request components
-      this.validateMethod(step.request.method);
-      this.validateParams(step.request.params);
-
-      // Resolve references in parameters
-      const resolvedParams = referenceResolver.resolveReferences(
-        step.request.params, 
-        extraContext
-      );
-
-      // Prepare request
-      const request: JsonRpcRequest = {
-        jsonrpc: '2.0',
-        method: step.request.method,
-        params: resolvedParams,
-        id: this.getNextRequestId()
-      };
-
-      console.log('Executing request:', {
-        stepName: step.name,
-        request,
-        extraContext
-      });
-
-      // Execute request
-      const result = await this.jsonRpcHandler(request);
-
-      // Handle potential error response
-      if (result && typeof result === 'object' && 'error' in result) {
-        const error = result.error as JsonRpcError;
-        throw new JsonRpcRequestError(error);
+      // Validate method name
+      if (typeof requestStep.request.method !== 'string' || !requestStep.request.method.trim()) {
+        throw new Error('Invalid method name: must be a non-empty string');
       }
 
-      console.log('Request completed successfully:', {
+      // Validate params
+      if (requestStep.request.params !== null && 
+          typeof requestStep.request.params !== 'object') {
+        throw new Error('Invalid params: must be an object, array, or null');
+      }
+
+      // Resolve references in params
+      const resolvedParams = context.referenceResolver.resolveReferences(
+        requestStep.request.params,
+        extraContext,
+      );
+
+      this.logger.debug('Resolved request parameters', {
         stepName: step.name,
-        result
+        params: resolvedParams,
+        requestId,
+      });
+
+      const result = await this.jsonRpcHandler({
+        jsonrpc: '2.0',
+        method: requestStep.request.method,
+        params: resolvedParams,
+        id: requestId,
+      });
+
+      // Check if the response contains an error
+      if (result && 'error' in result) {
+        throw new JsonRpcRequestError(
+          `JSON-RPC request failed: ${result.error.message}`,
+          result.error
+        );
+      }
+
+      this.logger.debug('Request completed successfully', {
+        stepName: step.name,
+        requestId,
       });
 
       return {
-        result: result as T,
+        result,
         type: StepType.Request,
         metadata: {
-          method: step.request.method,
-          requestId: request.id,
-          timestamp: new Date().toISOString()
-        }
+          method: requestStep.request.method,
+          requestId,
+          timestamp: new Date().toISOString(),
+        },
       };
-    } catch (error: unknown) {
-      console.error('Request execution failed:', {
+    } catch (error: any) {
+      const errorMessage = error instanceof JsonRpcRequestError
+        ? error.message
+        : `Failed to execute request step "${step.name}": ${error?.message || 'Unknown error'}`;
+
+      this.logger.error('Request failed', {
         stepName: step.name,
-        error
+        requestId,
+        error: errorMessage,
       });
 
       if (error instanceof JsonRpcRequestError) {
         throw error;
       }
-
-      if (error instanceof Error) {
-        throw new Error(
-          `Failed to execute request step "${step.name}": ${error.message}`
-        );
-      }
-
-      throw new Error(
-        `Failed to execute request step "${step.name}": Unknown error`
-      );
+      throw new Error(errorMessage);
     }
   }
-} 
+}

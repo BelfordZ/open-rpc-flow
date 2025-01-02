@@ -2,16 +2,18 @@ import { ReferenceResolver } from './reference-resolver';
 import { ExpressionEvaluator } from './expression-evaluator';
 import { TransformExecutor } from './transform-executor';
 import { DependencyResolver } from './dependency-resolver';
-import { Flow, Step, JsonRpcRequest } from './types';
+import { Flow, Step, JsonRpcRequest, StepExecutionContext } from './types';
 import {
   StepExecutor,
-  StepExecutionContext,
   StepExecutionResult,
   RequestStepExecutor,
   LoopStepExecutor,
   ConditionStepExecutor,
-  TransformStepExecutor
+  TransformStepExecutor,
+  JsonRpcRequestError,
 } from './step-executors';
+import { StepType } from './step-executors/types';
+import { Logger, defaultLogger } from './util/logger';
 
 /**
  * Main executor for JSON-RPC flows
@@ -22,34 +24,51 @@ export class FlowExecutor {
   private executionContext: StepExecutionContext;
   private stepExecutors: StepExecutor[];
   private dependencyResolver: DependencyResolver;
+  private logger: Logger;
 
   constructor(
     private flow: Flow,
-    private jsonRpcHandler: (request: JsonRpcRequest) => Promise<any>
+    private jsonRpcHandler: (request: JsonRpcRequest) => Promise<any>,
+    logger?: Logger,
   ) {
+    this.logger = logger || defaultLogger;
     this.context = flow.context || {};
     this.stepResults = new Map();
-    this.dependencyResolver = new DependencyResolver(flow);
+    this.dependencyResolver = new DependencyResolver(flow, this.logger);
 
     // Initialize shared execution context
-    const referenceResolver = new ReferenceResolver(this.stepResults, this.context);
-    const expressionEvaluator = new ExpressionEvaluator(referenceResolver, this.context);
-    const transformExecutor = new TransformExecutor(expressionEvaluator, referenceResolver, this.context);
+    const referenceResolver = new ReferenceResolver(
+      this.stepResults,
+      this.context,
+      this.logger.createNested('ReferenceResolver')
+    );
+    const expressionEvaluator = new ExpressionEvaluator(
+      referenceResolver,
+      this.context,
+      this.logger.createNested('ExpressionEvaluator')
+    );
+    const transformExecutor = new TransformExecutor(
+      expressionEvaluator,
+      referenceResolver,
+      this.context,
+      this.logger.createNested('TransformExecutor')
+    );
 
     this.executionContext = {
       referenceResolver,
       expressionEvaluator,
       transformExecutor,
       stepResults: this.stepResults,
-      context: this.context
+      context: this.context,
+      logger: this.logger,
     };
 
     // Initialize step executors in order of specificity
     this.stepExecutors = [
-      new RequestStepExecutor(jsonRpcHandler),
-      new LoopStepExecutor(this.executeStep.bind(this)),
-      new ConditionStepExecutor(this.executeStep.bind(this)),
-      new TransformStepExecutor(transformExecutor)
+      new RequestStepExecutor(jsonRpcHandler, this.logger.createNested('RequestExecutor')),
+      new LoopStepExecutor(this.executeStep.bind(this), this.logger.createNested('LoopExecutor')),
+      new ConditionStepExecutor(this.executeStep.bind(this), this.logger.createNested('ConditionExecutor')),
+      new TransformStepExecutor(transformExecutor, this.logger.createNested('TransformStepExecutor')),
     ];
   }
 
@@ -59,11 +78,14 @@ export class FlowExecutor {
   async execute(): Promise<Map<string, any>> {
     // Get steps in dependency order
     const orderedSteps = this.dependencyResolver.getExecutionOrder();
-    console.log('Executing steps in order:', orderedSteps.map(s => s.name));
+    this.logger.log(
+      'Executing steps in order:',
+      orderedSteps.map((s) => s.name),
+    );
 
     for (const step of orderedSteps) {
       const result = await this.executeStep(step);
-      this.stepResults.set(step.name, result.result);
+      this.stepResults.set(step.name, result);
     }
     return this.stepResults;
   }
@@ -73,13 +95,13 @@ export class FlowExecutor {
    */
   private async executeStep(
     step: Step,
-    extraContext: Record<string, any> = {}
+    extraContext: Record<string, any> = {},
   ): Promise<StepExecutionResult> {
     try {
-      console.log('Executing step:', {
+      this.logger.debug('Executing step:', {
         stepName: step.name,
-        stepType: Object.keys(step).find(k => k !== 'name'),
-        availableExecutors: this.stepExecutors.map(e => e.constructor.name)
+        stepType: Object.keys(step).find((k) => k !== 'name'),
+        availableExecutors: this.stepExecutors.map((e) => e.constructor.name),
       });
 
       const executor = this.findExecutor(step);
@@ -87,16 +109,27 @@ export class FlowExecutor {
         throw new Error(`No executor found for step ${step.name}`);
       }
 
-      console.log('Selected executor:', {
+      this.logger.debug('Selected executor:', {
         stepName: step.name,
-        executor: executor.constructor.name
+        executor: executor.constructor.name,
       });
 
       return await executor.execute(step, this.executionContext, extraContext);
     } catch (error: any) {
-      throw new Error(
-        `Failed to execute step ${step.name}: ${error.message || String(error)}`
-      );
+      const errorMessage = error.message || String(error);
+      this.logger.error(`Step execution failed: ${step.name}`, { error: errorMessage });
+
+      if (error instanceof JsonRpcRequestError) {
+        return {
+          error: error.error,
+          type: StepType.Request,
+          metadata: {
+            timestamp: new Date().toISOString(),
+          },
+        };
+      }
+
+      throw new Error(`Failed to execute step ${step.name}: ${errorMessage}`);
     }
   }
 
@@ -107,9 +140,9 @@ export class FlowExecutor {
     // Try each executor in order of registration (most specific first)
     for (const executor of this.stepExecutors) {
       const canExecute = executor.canExecute(step);
-      console.log('Checking executor:', {
+      this.logger.debug('Checking executor:', {
         executor: executor.constructor.name,
-        canExecute
+        canExecute,
       });
       if (canExecute) {
         return executor;
@@ -117,4 +150,4 @@ export class FlowExecutor {
     }
     return undefined;
   }
-} 
+}

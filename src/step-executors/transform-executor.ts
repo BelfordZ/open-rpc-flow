@@ -1,53 +1,78 @@
+import { Step, StepExecutionContext } from '../types';
+import { StepExecutor, StepExecutionResult, StepType, TransformStep } from './types';
+import { Logger } from '../util/logger';
 import { TransformExecutor } from '../transform-executor';
-import {
-  StepExecutor,
-  StepExecutionContext,
-  StepExecutionResult,
-  TransformStep,
-  isTransformStep,
-  StepType
-} from './types';
 
-/**
- * Metadata about the transform operations
- */
-export interface TransformMetadata {
-  operationCount: number;
-  operations: Array<{
-    type: string;
-    contextVariable?: string;
-  }>;
-  inputSource?: string;
-}
+export class TransformStepExecutor implements StepExecutor {
+  constructor(
+    private transformExecutor: TransformExecutor,
+    private logger: Logger
+  ) {}
 
-/**
- * Executor for transform steps
- */
-export class TransformStepExecutor implements StepExecutor<TransformStep> {
-  constructor(private transformExecutor: TransformExecutor) {}
-
-  canExecute = isTransformStep;
+  canExecute(step: Step): step is TransformStep {
+    return 'transform' in step;
+  }
 
   async execute(
-    step: TransformStep,
+    step: Step,
     context: StepExecutionContext,
-    extraContext: Record<string, any> = {}
+    extraContext: Record<string, any> = {},
   ): Promise<StepExecutionResult> {
-    // Evaluate the input expression
-    let input;
-    if (step.transform.input) {
-      input = context.expressionEvaluator.evaluateExpression(step.transform.input, extraContext);
+    if (!this.canExecute(step)) {
+      throw new Error('Invalid step type for TransformStepExecutor');
     }
 
-    const result = await this.transformExecutor.execute(step.transform.operations, input);
+    const transformStep = step as TransformStep;
+    
+    this.logger.debug('Executing transform step', {
+      stepName: step.name,
+      operations: transformStep.transform.operations.map(op => op.type),
+    });
 
-    return {
-      result,
-      type: StepType.Transform,
-      metadata: {
-        operations: step.transform.operations.map(op => op.type),
-        inputSource: step.transform.input
-      }
-    };
+    try {
+      // Resolve input references
+      const resolvedInput = context.referenceResolver.resolveReferences(
+        transformStep.transform.input,
+        extraContext,
+      );
+
+      this.logger.debug('Resolved transform input', {
+        stepName: step.name,
+        inputType: typeof resolvedInput,
+        isArray: Array.isArray(resolvedInput),
+      });
+
+      const result = await this.transformExecutor.execute(
+        transformStep.transform.operations,
+        resolvedInput,
+      );
+
+      this.logger.debug('Transform completed successfully', {
+        stepName: step.name,
+        resultType: typeof result,
+        isArray: Array.isArray(result),
+      });
+
+      return {
+        result,
+        type: StepType.Transform,
+        metadata: {
+          operations: transformStep.transform.operations.map(op => ({
+            type: op.type,
+            using: op.using,
+            initial: 'initial' in op ? op.initial : undefined,
+          })),
+          inputType: Array.isArray(resolvedInput) ? 'array' : typeof resolvedInput,
+          resultType: Array.isArray(result) ? 'array' : typeof result,
+          timestamp: new Date().toISOString(),
+        },
+      };
+    } catch (error: any) {
+      this.logger.error('Transform failed', {
+        stepName: step.name,
+        error: error.message || String(error),
+      });
+      throw error;
+    }
   }
-} 
+}

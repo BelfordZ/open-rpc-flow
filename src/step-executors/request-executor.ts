@@ -8,7 +8,7 @@ export class RequestStepExecutor implements StepExecutor {
 
   constructor(
     private jsonRpcHandler: (request: JsonRpcRequest) => Promise<any>,
-    private logger: Logger
+    private logger: Logger,
   ) {}
 
   private getNextRequestId(): number {
@@ -48,8 +48,7 @@ export class RequestStepExecutor implements StepExecutor {
       }
 
       // Validate params
-      if (requestStep.request.params !== null && 
-          typeof requestStep.request.params !== 'object') {
+      if (requestStep.request.params !== null && typeof requestStep.request.params !== 'object') {
         throw new Error('Invalid params: must be an object, array, or null');
       }
 
@@ -76,7 +75,7 @@ export class RequestStepExecutor implements StepExecutor {
       if (result && 'error' in result) {
         throw new JsonRpcRequestError(
           `JSON-RPC request failed: ${result.error.message}`,
-          result.error
+          result.error,
         );
       }
 
@@ -95,9 +94,10 @@ export class RequestStepExecutor implements StepExecutor {
         },
       };
     } catch (error: any) {
-      const errorMessage = error instanceof JsonRpcRequestError
-        ? error.message
-        : `Failed to execute request step "${step.name}": ${error?.message || 'Unknown error'}`;
+      const errorMessage =
+        error instanceof JsonRpcRequestError
+          ? error.message
+          : `Failed to execute request step "${step.name}": ${error?.message || 'Unknown error'}`;
 
       this.logger.error('Request failed', {
         stepName: step.name,

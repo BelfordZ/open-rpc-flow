@@ -4,8 +4,11 @@ import { Logger } from '../util/logger';
 
 export class LoopStepExecutor implements StepExecutor {
   constructor(
-    private executeStep: (step: Step, extraContext?: Record<string, any>) => Promise<StepExecutionResult>,
-    private logger: Logger
+    private executeStep: (
+      step: Step,
+      extraContext?: Record<string, any>,
+    ) => Promise<StepExecutionResult>,
+    private logger: Logger,
   ) {}
 
   canExecute(step: Step): step is LoopStep {
@@ -22,7 +25,7 @@ export class LoopStepExecutor implements StepExecutor {
     }
 
     const loopStep = step as LoopStep;
-    
+
     if (!loopStep.loop.step && !loopStep.loop.steps) {
       throw new Error('Loop must have either step or steps defined');
     }
@@ -41,7 +44,17 @@ export class LoopStepExecutor implements StepExecutor {
       );
 
       if (!Array.isArray(collection)) {
-        throw new Error('Loop "over" value must resolve to an array');
+        throw new Error(
+          `Loop "over" value must resolve to an array. ${JSON.stringify(
+            {
+              over: loopStep.loop.over,
+              resolvedValue: collection,
+              contextKeys: Object.keys(extraContext),
+            },
+            null,
+            2,
+          )}`,
+        );
       }
 
       this.logger.debug('Resolved loop collection', {
@@ -54,6 +67,9 @@ export class LoopStepExecutor implements StepExecutor {
       let executedCount = 0;
       let skippedCount = 0;
       const maxIterations = loopStep.loop.maxIterations || collection.length;
+
+      // Add this line to maintain iteration history
+      const iterationHistory: any[] = [];
 
       for (const item of collection) {
         // Check if we've reached maxIterations
@@ -76,20 +92,27 @@ export class LoopStepExecutor implements StepExecutor {
           maxIterations,
           isFirst: iterationCount === 1,
           isLast: iterationCount === maxIterations || iterationCount === collection.length,
-          value: item
+          value: item,
         };
+
+        // Add current iteration to history
+        iterationHistory.push(currentIteration);
 
         const iterationContext = {
           ...extraContext,
           [loopStep.loop.as]: item,
           metadata: {
-            iteration: [
-              ...(extraContext.metadata?.iteration || []),
-              currentIteration
-            ],
-            current: currentIteration
-          }
+            iteration: [...iterationHistory], // copy of iterationHistory so that it get changed by later iterations
+            current: currentIteration,
+          },
         };
+
+        this.logger.debug('Creating iteration context', {
+          iterationCount,
+          currentItem: item,
+          iterationHistoryLength: iterationHistory.length,
+          context: iterationContext,
+        });
 
         // Check condition if present
         if (loopStep.loop.condition) {

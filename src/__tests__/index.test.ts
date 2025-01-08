@@ -3,32 +3,31 @@ import { StepType } from '../step-executors/types';
 import { noLogger } from '../util/logger';
 
 describe('FlowExecutor', () => {
-  // Mock JSON-RPC handler that simulates different responses based on method
-  const mockJsonRpcHandler = jest.fn(async (request: JsonRpcRequest) => {
-    switch (request.method) {
-      case 'getData':
-        return {
-          items: [
-            { id: 1, name: 'Item 1', value: 100 },
-            { id: 2, name: 'Item 2', value: 200 },
-            { id: 3, name: 'Item 3', value: 300 },
-          ],
-        };
-      case 'processItem':
-        return {
-          processed: true,
-          itemId: (request.params as { id: number }).id,
-        };
-      default:
-        return { result: 'default' };
-    }
-  });
+  let mockJsonRpcHandler: jest.Mock;
 
   beforeEach(() => {
-    mockJsonRpcHandler.mockClear();
+    mockJsonRpcHandler = jest.fn(async (request: JsonRpcRequest) => {
+      switch (request.method) {
+        case 'getData':
+          return {
+            items: [
+              { id: 1, name: 'Item 1', value: 100 },
+              { id: 2, name: 'Item 2', value: 200 },
+              { id: 3, name: 'Item 3', value: 300 },
+            ],
+          };
+        case 'processItem':
+          return {
+            processed: true,
+            itemId: (request.params as { id: number }).id,
+          };
+        default:
+          return { result: 'default' };
+      }
+    });
   });
 
-  test('executes a simple request step', async () => {
+  it('executes a simple request step', async () => {
     const flow: Flow = {
       name: 'Simple Request',
       description: 'Test simple request execution',
@@ -43,7 +42,7 @@ describe('FlowExecutor', () => {
       ],
     };
 
-    const executor = new FlowExecutor(flow, mockJsonRpcHandler);
+    const executor = new FlowExecutor(flow, mockJsonRpcHandler, noLogger);
     const results = await executor.execute();
 
     expect(mockJsonRpcHandler).toHaveBeenCalledTimes(1);
@@ -60,7 +59,7 @@ describe('FlowExecutor', () => {
     });
   });
 
-  test('executes a loop with request', async () => {
+  it('executes a loop with request', async () => {
     const flow: Flow = {
       name: 'Loop Test',
       description: 'Test loop execution with requests',
@@ -90,7 +89,7 @@ describe('FlowExecutor', () => {
       ],
     };
 
-    const executor = new FlowExecutor(flow, mockJsonRpcHandler);
+    const executor = new FlowExecutor(flow, mockJsonRpcHandler, noLogger);
     const results = await executor.execute();
 
     expect(mockJsonRpcHandler).toHaveBeenCalledTimes(3); // 1 getData + 2 processItem (limited by maxIterations)
@@ -112,7 +111,7 @@ describe('FlowExecutor', () => {
     ]);
   });
 
-  test('executes conditional steps', async () => {
+  it('executes conditional steps', async () => {
     const flow: Flow = {
       name: 'Conditional Test',
       description: 'Test conditional execution',
@@ -147,7 +146,7 @@ describe('FlowExecutor', () => {
       ],
     };
 
-    const executor = new FlowExecutor(flow, mockJsonRpcHandler);
+    const executor = new FlowExecutor(flow, mockJsonRpcHandler, noLogger);
     const results = await executor.execute();
 
     expect(mockJsonRpcHandler).toHaveBeenCalledTimes(2);
@@ -157,11 +156,11 @@ describe('FlowExecutor', () => {
     expect(conditionResult.result).toEqual({
       type: 'request',
       result: { result: 'default' },
-      metadata: expect.any(Object)
+      metadata: expect.any(Object),
     });
   });
 
-  test('executes aggregate operations', async () => {
+  it('executes aggregate operations', async () => {
     const flow: Flow = {
       name: 'Aggregate Test',
       description: 'Test aggregation operations',
@@ -204,7 +203,7 @@ describe('FlowExecutor', () => {
       ],
     };
 
-    const executor = new FlowExecutor(flow, mockJsonRpcHandler);
+    const executor = new FlowExecutor(flow, mockJsonRpcHandler, noLogger);
     const results = await executor.execute();
 
     expect(results.get('select_fields').result).toEqual([
@@ -217,19 +216,19 @@ describe('FlowExecutor', () => {
     expect(groupedResults).toHaveLength(3);
     expect(groupedResults[0]).toEqual({
       key: 100,
-      items: [{ id: 1, name: 'Item 1', value: 100 }]
+      items: [{ id: 1, name: 'Item 1', value: 100 }],
     });
     expect(groupedResults[1]).toEqual({
       key: 200,
-      items: [{ id: 2, name: 'Item 2', value: 200 }]
+      items: [{ id: 2, name: 'Item 2', value: 200 }],
     });
     expect(groupedResults[2]).toEqual({
       key: 300,
-      items: [{ id: 3, name: 'Item 3', value: 300 }]
+      items: [{ id: 3, name: 'Item 3', value: 300 }],
     });
   });
 
-  test('executes transform operations', async () => {
+  it('executes transform operations', async () => {
     const flow: Flow = {
       name: 'Transform Test',
       description: 'Test transform operations',
@@ -264,7 +263,7 @@ describe('FlowExecutor', () => {
       ],
     };
 
-    const executor = new FlowExecutor(flow, mockJsonRpcHandler);
+    const executor = new FlowExecutor(flow, mockJsonRpcHandler, noLogger);
     const results = await executor.execute();
 
     const transformedData = results.get('transform_data');
@@ -274,7 +273,7 @@ describe('FlowExecutor', () => {
     expect(transformedData.type).toBe(StepType.Transform);
   });
 
-  test('handles context variables', async () => {
+  it('handles context variables', async () => {
     const flow: Flow = {
       name: 'Context Test',
       description: 'Test context usage',
@@ -304,7 +303,7 @@ describe('FlowExecutor', () => {
       ],
     };
 
-    const executor = new FlowExecutor(flow, mockJsonRpcHandler);
+    const executor = new FlowExecutor(flow, mockJsonRpcHandler, noLogger);
     const results = await executor.execute();
 
     const filteredData = results.get('filter_by_context');
@@ -313,7 +312,7 @@ describe('FlowExecutor', () => {
     expect(filteredData.type).toBe(StepType.Transform);
   });
 
-  test('handles reference resolution errors', async () => {
+  it('handles reference resolution errors', async () => {
     const flow: Flow = {
       name: 'Error Test',
       description: 'Test error handling',
@@ -340,11 +339,11 @@ describe('FlowExecutor', () => {
       ],
     };
 
-    const executor = new FlowExecutor(flow, mockJsonRpcHandler);
+    const executor = new FlowExecutor(flow, mockJsonRpcHandler, noLogger);
     await expect(executor.execute()).rejects.toThrow('Cannot access property');
   });
 
-  test('executes nested loops', async () => {
+  it('executes nested loops', async () => {
     const flow: Flow = {
       name: 'Nested Loop Test',
       description: 'Test nested loop execution',
@@ -385,7 +384,7 @@ describe('FlowExecutor', () => {
       ],
     };
 
-    const executor = new FlowExecutor(flow, mockJsonRpcHandler);
+    const executor = new FlowExecutor(flow, mockJsonRpcHandler, noLogger);
     const results = await executor.execute();
 
     expect(mockJsonRpcHandler).toHaveBeenCalledTimes(5); // 1 getData + (2 outer * 2 inner)
@@ -396,7 +395,7 @@ describe('FlowExecutor', () => {
     expect(nestedResults.type).toBe(StepType.Loop);
   });
 
-  test('handles complex conditional nesting', async () => {
+  it('handles complex conditional nesting', async () => {
     const flow: Flow = {
       name: 'Complex Conditional Test',
       description: 'Test complex conditional nesting',
@@ -444,7 +443,7 @@ describe('FlowExecutor', () => {
       ],
     };
 
-    const executor = new FlowExecutor(flow, mockJsonRpcHandler);
+    const executor = new FlowExecutor(flow, mockJsonRpcHandler, noLogger);
     const results = await executor.execute();
 
     expect(mockJsonRpcHandler).toHaveBeenCalledTimes(2); // getData + processItem
@@ -456,18 +455,18 @@ describe('FlowExecutor', () => {
       result: {
         type: 'request',
         result: { processed: true, itemId: -1 },
-        metadata: expect.any(Object)
+        metadata: expect.any(Object),
       },
       metadata: {
         branchTaken: 'else',
         conditionValue: false,
         condition: '${get_data.result.items[0].value > 150}',
-        timestamp: expect.any(String)
-      }
+        timestamp: expect.any(String),
+      },
     });
   });
 
-  test('handles transform operation errors gracefully', async () => {
+  it('handles transform operation errors gracefully', async () => {
     const flow: Flow = {
       name: 'Transform Error Test',
       description: 'Test transform error handling',
@@ -494,7 +493,7 @@ describe('FlowExecutor', () => {
       ],
     };
 
-    const executor = new FlowExecutor(flow, mockJsonRpcHandler);
+    const executor = new FlowExecutor(flow, mockJsonRpcHandler, noLogger);
     await expect(executor.execute()).rejects.toThrow();
   });
 });

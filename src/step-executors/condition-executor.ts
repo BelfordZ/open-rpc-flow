@@ -4,8 +4,11 @@ import { Logger } from '../util/logger';
 
 export class ConditionStepExecutor implements StepExecutor {
   constructor(
-    private executeStep: (step: Step, extraContext?: Record<string, any>) => Promise<StepExecutionResult>,
-    private logger: Logger
+    private executeStep: (
+      step: Step,
+      extraContext?: Record<string, any>,
+    ) => Promise<StepExecutionResult>,
+    private logger: Logger,
   ) {}
 
   canExecute(step: Step): step is ConditionStep {
@@ -22,7 +25,7 @@ export class ConditionStepExecutor implements StepExecutor {
     }
 
     const conditionStep = step as ConditionStep;
-    
+
     this.logger.debug('Evaluating condition', {
       stepName: step.name,
       condition: conditionStep.condition.if,

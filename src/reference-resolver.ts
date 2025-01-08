@@ -29,6 +29,15 @@ export class ReferenceResolver {
   }
 
   /**
+   * Extracts references from a string like "I like ${foo} and ${bar}" and returns ["${foo}", "${bar}"]
+   */
+  resolveReferencesFromString(str: string): string[] {
+    const regex = /\${([^}]+)}/g;
+    const matches = str.match(regex);
+    return matches ?? [];
+  }
+
+  /**
    * Resolves a reference string like "${step1.data.value}" to its value
    */
   resolveReference(ref: string, extraContext: Record<string, any> = {}): any {
@@ -63,7 +72,24 @@ export class ReferenceResolver {
   resolveReferences(obj: any, extraContext: Record<string, any> = {}): any {
     this.logger.debug('Resolving references in:', typeof obj);
     if (typeof obj === 'string') {
-      return this.resolveReference(obj, extraContext);
+      const references = this.resolveReferencesFromString(obj);
+      if (references.length > 0) {
+        // If there is only one reference and it's the same length as the original string,
+        // i.e. we have a string like "${foo}" and not a string like "Tom${foo}lery",
+        if (references.length === 1 && references[0].length === obj.length) {
+          return this.resolveReference(obj, extraContext);
+        }
+
+        this.logger.debug('handling string containing references:', references);
+        references.forEach((ref) => {
+          const resolvedValue = this.resolveReference(ref, extraContext);
+          obj = obj.replace(ref, resolvedValue);
+          this.logger.debug(`replaced ${ref} with ${resolvedValue} in ${obj}`);
+        });
+        return obj;
+      } else {
+        return obj;
+      }
     }
     if (Array.isArray(obj)) {
       this.logger.debug('Resolving array of length:', obj.length);

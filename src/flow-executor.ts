@@ -40,18 +40,18 @@ export class FlowExecutor {
     const referenceResolver = new ReferenceResolver(
       this.stepResults,
       this.context,
-      this.logger.createNested('ReferenceResolver')
+      this.logger.createNested('ReferenceResolver'),
     );
     const expressionEvaluator = new ExpressionEvaluator(
       referenceResolver,
       this.context,
-      this.logger.createNested('ExpressionEvaluator')
+      this.logger.createNested('ExpressionEvaluator'),
     );
     const transformExecutor = new TransformExecutor(
       expressionEvaluator,
       referenceResolver,
       this.context,
-      this.logger.createNested('TransformExecutor')
+      this.logger.createNested('TransformExecutor'),
     );
 
     this.executionContext = {
@@ -67,8 +67,14 @@ export class FlowExecutor {
     this.stepExecutors = [
       new RequestStepExecutor(jsonRpcHandler, this.logger.createNested('RequestExecutor')),
       new LoopStepExecutor(this.executeStep.bind(this), this.logger.createNested('LoopExecutor')),
-      new ConditionStepExecutor(this.executeStep.bind(this), this.logger.createNested('ConditionExecutor')),
-      new TransformStepExecutor(transformExecutor, this.logger.createNested('TransformStepExecutor')),
+      new ConditionStepExecutor(
+        this.executeStep.bind(this),
+        this.logger.createNested('ConditionExecutor'),
+      ),
+      new TransformStepExecutor(
+        transformExecutor,
+        this.logger.createNested('TransformStepExecutor'),
+      ),
     ];
   }
 

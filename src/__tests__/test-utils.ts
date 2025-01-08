@@ -16,7 +16,12 @@ export function createMockContext(
 
   const referenceResolver = new ReferenceResolver(stepResults, context, noLogger);
   const expressionEvaluator = new ExpressionEvaluator(referenceResolver, context, noLogger);
-  const transformExecutor = new TransformExecutor(expressionEvaluator, referenceResolver, context, noLogger);
+  const transformExecutor = new TransformExecutor(
+    expressionEvaluator,
+    referenceResolver,
+    context,
+    noLogger,
+  );
 
   return {
     referenceResolver,

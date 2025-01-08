@@ -38,13 +38,18 @@ describe('ConsoleLogger', () => {
   test('logs error with prefix', () => {
     const logger = new ConsoleLogger('TestPrefix');
     logger.error('error message', new Error('test error'));
-    expect(mockConsole.error).toHaveBeenCalledWith('[TestPrefix] error message', new Error('test error'));
+    expect(mockConsole.error).toHaveBeenCalledWith(
+      '[TestPrefix] error message',
+      new Error('test error'),
+    );
   });
 
   test('logs warning with prefix', () => {
     const logger = new ConsoleLogger('TestPrefix');
     logger.warn('warning message', { warning: true });
-    expect(mockConsole.warn).toHaveBeenCalledWith('[TestPrefix] warning message', { warning: true });
+    expect(mockConsole.warn).toHaveBeenCalledWith('[TestPrefix] warning message', {
+      warning: true,
+    });
   });
 
   test('logs debug with prefix', () => {
@@ -147,13 +152,13 @@ describe('TestLogger', () => {
   test('shares logs between nested loggers', () => {
     const parent = new TestLogger('Parent');
     const child = parent.createNested('Child');
-    
+
     parent.log('parent message');
     child.log('child message');
-    
+
     expect(parent.getLogs()).toEqual([
       '[LOG] [Parent] parent message',
-      '[LOG] [Parent:Child] child message'
+      '[LOG] [Parent:Child] child message',
     ]);
     expect(child.getLogs()).toBe(parent.getLogs());
   });
@@ -191,4 +196,4 @@ describe('NoLogger', () => {
     const nested = noLogger.createNested('test');
     expect(nested).toBe(noLogger);
   });
-}); 
+});

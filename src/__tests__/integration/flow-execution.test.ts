@@ -1,6 +1,8 @@
 import { FlowExecutor } from '../../flow-executor';
 import { Flow } from '../../types';
 import { createMockJsonRpcHandler } from '../test-utils';
+import { TestLogger } from '../../util/logger';
+import { noLogger } from '../../util/logger';
 
 // Defined but not used directly
 type MockResponses = {
@@ -13,10 +15,18 @@ type MockResponses = {
 
 describe('Flow Execution Integration', () => {
   let jsonRpcHandler: jest.Mock;
-
+  let testLogger: TestLogger;
   beforeEach(() => {
     jsonRpcHandler = createMockJsonRpcHandler();
+    //testLogger = new TestLogger('FlowExecutionTest');
   });
+
+  /**
+  afterEach(() => {
+    testLogger.print();
+    testLogger.clear();
+  });
+  */
 
   it('executes a complex data processing flow', async () => {
     const flow: Flow = {
@@ -59,7 +69,7 @@ describe('Flow Execution Integration', () => {
         {
           name: 'processBatches',
           loop: {
-            over: '${validateData.result}',
+            over: '${validateData.result.result}',
             as: 'batch',
             step: {
               name: 'processBatch',
@@ -67,8 +77,8 @@ describe('Flow Execution Integration', () => {
                 method: 'batch.process',
                 params: {
                   data: '${batch}',
-                  index: '${metadata.current.index}'
-                }
+                  index: '${metadata.current.index}',
+                },
               },
             },
           },
@@ -109,20 +119,22 @@ describe('Flow Execution Integration', () => {
       }
     });
 
-    const executor = new FlowExecutor(flow, jsonRpcHandler);
+    const executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
     const results = await executor.execute();
 
     // Verify the complete execution chain
     expect(results.get('getData').result).toEqual(mockData);
-    expect(results.get('validateData').result).toEqual([
+    expect(results.get('validateData').result.result).toEqual([
       { id: 2, value: 15, processed: true },
       { id: 3, value: 20, processed: true },
     ]);
-    expect(results.get('processBatches').result.value.map((r: { result: any }) => r.result)).toEqual(mockBatchResults);
+    expect(
+      results.get('processBatches').result.value.map((r: { result: any }) => r.result),
+    ).toEqual(mockBatchResults);
     expect(results.get('aggregateResults').result).toEqual([['result1'], ['result2']]);
   });
 
-  it.only('handles error conditions gracefully', async () => {
+  it('handles error conditions gracefully', async () => {
     const flow: Flow = {
       name: 'error-handling',
       description: 'Test error handling in flows',
@@ -165,34 +177,33 @@ describe('Flow Execution Integration', () => {
     };
 
     // Mock error response
-    jsonRpcHandler
-      .mockImplementationOnce((request) => {
-        if (request.method === 'data.fetch') {
-          return Promise.resolve({
-            jsonrpc: '2.0',
-            id: request.id,
-            error: {
-              code: -32000,
-              message: 'Data fetch failed',
-              data: { source: 'test' }
-            }
-          });
-        }
-        if (request.method === 'error.log') {
-          return Promise.resolve({
-            jsonrpc: '2.0',
-            id: request.id,
-            result: { logged: true }
-          });
-        }
+    jsonRpcHandler.mockImplementation((request) => {
+      if (request.method === 'data.fetch') {
         return Promise.resolve({
           jsonrpc: '2.0',
           id: request.id,
-          result: {}
+          error: {
+            code: -32000,
+            message: 'Data fetch failed',
+            data: { source: 'test' },
+          },
         });
+      }
+      if (request.method === 'error.log') {
+        return Promise.resolve({
+          jsonrpc: '2.0',
+          id: request.id,
+          result: { logged: true },
+        });
+      }
+      return Promise.resolve({
+        jsonrpc: '2.0',
+        id: request.id,
+        result: {},
       });
+    });
 
-    const executor = new FlowExecutor(flow, jsonRpcHandler);
+    const executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
     const results = await executor.execute();
 
     const getDataResult = results.get('getData');
@@ -200,7 +211,7 @@ describe('Flow Execution Integration', () => {
     expect(getDataResult.error).toEqual({
       code: -32000,
       message: 'Data fetch failed',
-      data: { source: 'test' }
+      data: { source: 'test' },
     });
     expect(jsonRpcHandler).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -225,7 +236,7 @@ describe('Flow Execution Integration', () => {
         {
           name: 'processTeams',
           loop: {
-            over: '${getTeams}',
+            over: '${getTeams.result}',
             as: 'team',
             step: {
               name: 'processMembers',
@@ -243,7 +254,7 @@ describe('Flow Execution Integration', () => {
                         params: {
                           teamId: '${team.id}',
                           memberId: '${member.id}',
-                          message: '${`Welcome to ${team.name}`}',
+                          message: 'Welcome to ${team.name}',
                         },
                       },
                     },
@@ -279,7 +290,7 @@ describe('Flow Execution Integration', () => {
       return Promise.resolve({ sent: true });
     });
 
-    const executor = new FlowExecutor(flow, jsonRpcHandler);
+    const executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
     await executor.execute();
 
     // Should only notify active members

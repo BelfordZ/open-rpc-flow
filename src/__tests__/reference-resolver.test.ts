@@ -79,7 +79,7 @@ describe('ReferenceResolver', () => {
 
     it('throws on unknown references', () => {
       expect(() => resolver.resolveReference('${unknown.value}')).toThrow(
-        'Unknown reference: unknown',
+        "Reference 'unknown' not found. Available references are: step1, context",
       );
     });
 
@@ -93,10 +93,12 @@ describe('ReferenceResolver', () => {
     });
 
     it('throws on invalid path syntax', () => {
-      expect(() => resolver.resolveReference('${step1[result]}')).toThrow(
-        'Property names in brackets must be quoted or numeric at position 12',
-      );
       expect(() => resolver.resolveReference('${step1.result[0}')).toThrow('Unclosed [');
+    });
+    it('handles array pathing with expressions that evaluate to a string', () => {
+      expect(resolver.resolveReference('${step1[result]}')).toEqual(
+        stepResults.get('step1').result,
+      );
     });
   });
 
@@ -171,7 +173,9 @@ describe('ReferenceResolver', () => {
         invalid: '${unknown.value}',
       };
 
-      expect(() => resolver.resolveReferences(obj)).toThrow('Unknown reference: unknown');
+      expect(() => resolver.resolveReferences(obj)).toThrow(
+        "Reference 'unknown' not found. Available references are: user, items, context",
+      );
     });
   });
 
@@ -228,7 +232,9 @@ describe('ReferenceResolver', () => {
     });
 
     it('throws on unknown references', () => {
-      expect(() => resolver.resolvePath('unknown.value')).toThrow('Unknown reference: unknown');
+      expect(() => resolver.resolvePath('unknown.value')).toThrow(
+        "Reference 'unknown' not found. Available references are: step1, context",
+      );
     });
 
     it('throws on invalid property access', () => {
@@ -241,7 +247,7 @@ describe('ReferenceResolver', () => {
     });
 
     it('throws on invalid path syntax', () => {
-      expect(() => resolver.resolvePath('step1[result]')).toThrow('Path cannot start with [');
+      expect(() => resolver.resolvePath('[result]')).toThrow('Invalid path: [result]');
       expect(() => resolver.resolvePath('step1.result[0')).toThrow('Unclosed [');
     });
   });

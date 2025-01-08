@@ -18,7 +18,7 @@ describe('FlowExecutor', () => {
     executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
   });
 
-  test('executes a simple request step', async () => {
+  it('executes a simple request step', async () => {
     const flow: Flow = {
       name: 'Test Flow',
       description: 'Test flow for unit tests',
@@ -41,7 +41,7 @@ describe('FlowExecutor', () => {
     expect(jsonRpcHandler).toHaveBeenCalledTimes(1);
   });
 
-  test('executes a loop step', async () => {
+  it('executes a loop step', async () => {
     const flow: Flow = {
       name: 'Test Flow',
       description: 'Test flow for unit tests',
@@ -80,7 +80,7 @@ describe('FlowExecutor', () => {
     expect(jsonRpcHandler).toHaveBeenCalledTimes(2);
   });
 
-  test('executes a condition step', async () => {
+  it('executes a condition step', async () => {
     const flow: Flow = {
       name: 'Test Flow',
       description: 'Test flow for unit tests',
@@ -116,11 +116,11 @@ describe('FlowExecutor', () => {
     const results = await executor.execute();
 
     const conditionResult = results.get('check_condition');
-    expect(conditionResult.branchTaken).toBe('then');
+    expect(conditionResult.metadata.branchTaken).toBe('then');
     expect(jsonRpcHandler).toHaveBeenCalledTimes(1);
   });
 
-  test('executes a transform step', async () => {
+  it('executes a transform step', async () => {
     const flow: Flow = {
       name: 'Test Flow',
       description: 'Test flow for unit tests',
@@ -160,7 +160,7 @@ describe('FlowExecutor', () => {
     expect(transformResult[1].doubled).toBe(600);
   });
 
-  test('handles errors gracefully', async () => {
+  it('handles errors gracefully', async () => {
     const flow: Flow = {
       name: 'Test Flow',
       description: 'Test flow for unit tests',

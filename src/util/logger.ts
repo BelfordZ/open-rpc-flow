@@ -60,7 +60,8 @@ export class TestLogger implements Logger {
 
   private formatLogEntry(level: string, message: string, args: any[]): string {
     const prefixPart = this.prefix ? `[${this.prefix}] ` : '';
-    const argsStr = args.length === 1 ? JSON.stringify(args[0]) : args.length > 1 ? JSON.stringify(args) : '';
+    const argsStr =
+      args.length === 1 ? JSON.stringify(args[0]) : args.length > 1 ? JSON.stringify(args) : '';
     return `[${level}] ${prefixPart}${message}${argsStr ? ' ' + argsStr : ''}`.trim();
   }
 
@@ -95,4 +96,4 @@ export class TestLogger implements Logger {
   }
 }
 
-export const defaultLogger = new ConsoleLogger('FlowExecutor'); 
+export const defaultLogger = new ConsoleLogger('FlowExecutor');

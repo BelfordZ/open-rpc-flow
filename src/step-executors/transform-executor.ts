@@ -6,7 +6,7 @@ import { TransformExecutor } from '../transform-executor';
 export class TransformStepExecutor implements StepExecutor {
   constructor(
     private transformExecutor: TransformExecutor,
-    private logger: Logger
+    private logger: Logger,
   ) {}
 
   canExecute(step: Step): step is TransformStep {
@@ -23,10 +23,10 @@ export class TransformStepExecutor implements StepExecutor {
     }
 
     const transformStep = step as TransformStep;
-    
+
     this.logger.debug('Executing transform step', {
       stepName: step.name,
-      operations: transformStep.transform.operations.map(op => op.type),
+      operations: transformStep.transform.operations.map((op) => op.type),
     });
 
     try {
@@ -57,7 +57,7 @@ export class TransformStepExecutor implements StepExecutor {
         result,
         type: StepType.Transform,
         metadata: {
-          operations: transformStep.transform.operations.map(op => ({
+          operations: transformStep.transform.operations.map((op) => ({
             type: op.type,
             using: op.using,
             initial: 'initial' in op ? op.initial : undefined,

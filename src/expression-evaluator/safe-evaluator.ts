@@ -64,7 +64,7 @@ export class SafeExpressionEvaluator {
       }
       throw new ExpressionError(
         `Failed to evaluate expression: ${expression}`,
-        error instanceof Error ? error : undefined
+        error instanceof Error ? error : undefined,
       );
     }
   }
@@ -76,18 +76,12 @@ export class SafeExpressionEvaluator {
 
     if (expression.length > SafeExpressionEvaluator.MAX_EXPRESSION_LENGTH) {
       throw new ExpressionError(
-        `Expression length exceeds maximum of ${SafeExpressionEvaluator.MAX_EXPRESSION_LENGTH} characters`
+        `Expression length exceeds maximum of ${SafeExpressionEvaluator.MAX_EXPRESSION_LENGTH} characters`,
       );
     }
 
     // Check for potentially dangerous patterns
-    const dangerousPatterns = [
-      'eval',
-      'Function',
-      'constructor',
-      '__proto__',
-      'prototype',
-    ];
+    const dangerousPatterns = ['eval', 'Function', 'constructor', '__proto__', 'prototype'];
 
     for (const pattern of dangerousPatterns) {
       if (expression.includes(pattern)) {
@@ -169,7 +163,7 @@ export class SafeExpressionEvaluator {
       }
     }
 
-    const filtered = result.filter(t => t.trim());
+    const filtered = result.filter((t) => t.trim());
     if (filtered.length === 0) {
       throw new ExpressionError('Empty expression');
     }
@@ -365,7 +359,7 @@ export class SafeExpressionEvaluator {
           return operator(left, right);
         } catch (error) {
           throw new ExpressionError(
-            `Failed to evaluate operation ${ast.operator}: ${error instanceof Error ? error.message : 'Unknown error'}`
+            `Failed to evaluate operation ${ast.operator}: ${error instanceof Error ? error.message : 'Unknown error'}`,
           );
         }
 
@@ -391,11 +385,11 @@ export class SafeExpressionEvaluator {
         current = current[part];
       } catch (error) {
         throw new ExpressionError(
-          `Failed to access property '${part}': ${error instanceof Error ? error.message : 'Unknown error'}`
+          `Failed to access property '${part}': ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
       }
     }
 
     return current;
   }
-} 
+}

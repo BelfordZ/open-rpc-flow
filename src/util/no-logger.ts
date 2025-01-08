@@ -33,4 +33,4 @@ export class NoLogger implements Logger {
  * A singleton instance of NoLogger that can be reused.
  * The prefix is ignored as all instances share the same state.
  */
-export const noLogger = NoLogger.getInstance(); 
+export const noLogger = NoLogger.getInstance();

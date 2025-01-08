@@ -101,10 +101,7 @@ export class ExpressionEvaluator {
         const matches = expression.match(/\$\{[^}]+\}/g) || [];
         this.logger.debug('Found matches:', matches);
         if (matches.length === 1 && matches[0] === expression) {
-          this.logger.debug(
-            'Single reference detected, evaluating path:',
-            expression.slice(2, -1),
-          );
+          this.logger.debug('Single reference detected, evaluating path:', expression.slice(2, -1));
           const path = expression.slice(2, -1);
           try {
             return this.evaluateReference(path, extraContext);

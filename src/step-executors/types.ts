@@ -16,7 +16,7 @@ export class JsonRpcRequestError extends Error {
       code: number;
       message: string;
       data?: any;
-    }
+    },
   ) {
     super(message);
     this.name = 'JsonRpcRequestError';
@@ -57,7 +57,7 @@ export enum StepType {
   Request = 'request',
   Loop = 'loop',
   Condition = 'condition',
-  Transform = 'transform'
+  Transform = 'transform',
 }
 
 /**

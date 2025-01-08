@@ -71,49 +71,53 @@ describe('SafeExpressionEvaluator', () => {
 
   describe('error handling', () => {
     it('throws on invalid expressions', () => {
-      expect(() => evaluator.evaluate('', {}))
-        .toThrow(ExpressionError);
-      expect(() => evaluator.evaluate('invalid expression', {}))
-        .toThrow(ExpressionError);
+      expect(() => evaluator.evaluate('', {})).toThrow(ExpressionError);
+      expect(() => evaluator.evaluate('invalid expression', {})).toThrow(ExpressionError);
     });
 
     it('throws on unknown operators', () => {
-      expect(() => evaluator.evaluate('a @ b', {}))
-        .toThrow('Unknown operator: @');
+      expect(() => evaluator.evaluate('a @ b', {})).toThrow('Unknown operator: @');
     });
 
     it('throws on invalid references', () => {
-      expect(() => evaluator.evaluate('nonexistent.property', {}))
-        .toThrow("Property 'nonexistent' not found in context");
+      expect(() => evaluator.evaluate('nonexistent.property', {})).toThrow(
+        "Property 'nonexistent' not found in context",
+      );
     });
 
     it('throws on null/undefined property access', () => {
       const context = { obj: null };
-      expect(() => evaluator.evaluate('obj.property', context))
-        .toThrow("Cannot access property 'property' of null");
+      expect(() => evaluator.evaluate('obj.property', context)).toThrow(
+        "Cannot access property 'property' of null",
+      );
     });
 
     it('throws on dangerous patterns', () => {
-      expect(() => evaluator.evaluate('constructor', {}))
-        .toThrow('Expression contains forbidden pattern: constructor');
-      expect(() => evaluator.evaluate('__proto__', {}))
-        .toThrow('Expression contains forbidden pattern: __proto__');
-      expect(() => evaluator.evaluate('prototype', {}))
-        .toThrow('Expression contains forbidden pattern: prototype');
+      expect(() => evaluator.evaluate('constructor', {})).toThrow(
+        'Expression contains forbidden pattern: constructor',
+      );
+      expect(() => evaluator.evaluate('__proto__', {})).toThrow(
+        'Expression contains forbidden pattern: __proto__',
+      );
+      expect(() => evaluator.evaluate('prototype', {})).toThrow(
+        'Expression contains forbidden pattern: prototype',
+      );
     });
 
     it('throws on expression timeout', async () => {
       // Create a complex expression that will timeout
       const complexExpression = Array(100).fill('1 + ').join('') + '1';
       (evaluator as any).TIMEOUT_MS = 1; // Set timeout to 1ms
-      expect(() => evaluator.evaluate(complexExpression, {}))
-        .toThrow('Expression evaluation timed out');
+      expect(() => evaluator.evaluate(complexExpression, {})).toThrow(
+        'Expression evaluation timed out',
+      );
     });
 
     it('throws on expression length limit', () => {
       const longExpression = 'x'.repeat(1001);
-      expect(() => evaluator.evaluate(longExpression, {}))
-        .toThrow('Expression length exceeds maximum');
+      expect(() => evaluator.evaluate(longExpression, {})).toThrow(
+        'Expression length exceeds maximum',
+      );
     });
   });
 
@@ -175,4 +179,4 @@ describe('SafeExpressionEvaluator', () => {
       expect(evaluator.evaluate('(x + y) * (z / 2)', context)).toBe(450);
     });
   });
-}); 
+});

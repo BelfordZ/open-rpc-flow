@@ -165,7 +165,7 @@ describe('TransformExecutor', () => {
   });
 
   describe('unique operation', () => {
-    test('removes duplicates from array', () => {
+    it('removes duplicates from array', () => {
       const data = [1, 2, 2, 3, 3, 4];
       const operations: TransformOperation[] = [
         {
@@ -194,13 +194,19 @@ describe('TransformExecutor', () => {
       ];
 
       const result = executor.execute(operations, data);
-      expect(result).toEqual({
-        a: [
-          { type: 'a', value: 1 },
-          { type: 'a', value: 3 },
-        ],
-        b: [{ type: 'b', value: 2 }],
-      });
+      expect(result).toEqual([
+        {
+          key: 'a',
+          items: [
+            { type: 'a', value: 1 },
+            { type: 'a', value: 3 },
+          ],
+        },
+        {
+          key: 'b',
+          items: [{ type: 'b', value: 2 }],
+        },
+      ]);
     });
   });
 
@@ -254,7 +260,7 @@ describe('TransformExecutor', () => {
       ];
 
       expect(() => executor.execute(operations, data)).toThrow(
-        'map operation requires array input',
+        'map operation requires an array input, got string',
       );
     });
 

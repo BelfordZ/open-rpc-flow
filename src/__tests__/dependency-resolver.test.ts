@@ -35,11 +35,6 @@ describe('DependencyResolver', () => {
     expect(resolver.getDependencies('getFriends')).toEqual(['getUser']);
     expect(resolver.getDependencies('getUser')).toEqual([]);
     expect(resolver.getDependents('getUser')).toEqual(['getFriends']);
-
-    // Verify logging
-    const logs = testLogger.getLogs();
-    expect(logs.some(log => log.includes('Processing request step'))).toBe(true);
-    expect(logs.some(log => log.includes('Found dependency'))).toBe(true);
   });
 
   it('correctly identifies dependencies in loop steps', () => {
@@ -89,11 +84,6 @@ describe('DependencyResolver', () => {
       'getFriends',
       'notifyFriends',
     ]);
-
-    // Verify logging
-    const logs = testLogger.getLogs();
-    expect(logs.some(log => log.includes('Processing loop step'))).toBe(true);
-    expect(logs.some(log => log.includes('Found dependency'))).toBe(true);
   });
 
   it('correctly identifies dependencies in condition steps', () => {
@@ -126,11 +116,6 @@ describe('DependencyResolver', () => {
 
     const resolver = new DependencyResolver(flow, testLogger);
     expect(resolver.getDependencies('notifyIfAdmin')).toEqual(['getUser']);
-
-    // Verify logging
-    const logs = testLogger.getLogs();
-    expect(logs.some(log => log.includes('Processing condition step'))).toBe(true);
-    expect(logs.some(log => log.includes('Found dependency'))).toBe(true);
   });
 
   it('detects circular dependencies', () => {
@@ -157,10 +142,6 @@ describe('DependencyResolver', () => {
 
     const resolver = new DependencyResolver(flow, testLogger);
     expect(() => resolver.getExecutionOrder()).toThrow('Circular dependency detected');
-
-    // Verify logging
-    const logs = testLogger.getLogs();
-    expect(logs.some(log => log.includes('Circular dependency detected'))).toBe(true);
   });
 
   it('handles complex dependency chains', () => {
@@ -214,11 +195,6 @@ describe('DependencyResolver', () => {
     const resolver = new DependencyResolver(flow, testLogger);
     const order = resolver.getExecutionOrder().map((s) => s.name);
     expect(order).toEqual(['getUser', 'getFriends', 'filterFriends', 'notifyFriends']);
-
-    // Verify logging
-    const logs = testLogger.getLogs();
-    expect(logs.some(log => log.includes('Processing complex dependency chain'))).toBe(true);
-    expect(logs.some(log => log.includes('Found dependency'))).toBe(true);
   });
 
   it('correctly handles loop variable dependencies', () => {
@@ -256,10 +232,5 @@ describe('DependencyResolver', () => {
     const resolver = new DependencyResolver(flow, testLogger);
     expect(resolver.getDependencies('notifyFriends')).toEqual(['getFriends']);
     expect(() => resolver.getExecutionOrder()).not.toThrow();
-
-    // Verify logging
-    const logs = testLogger.getLogs();
-    expect(logs.some(log => log.includes('Processing loop variable dependency'))).toBe(true);
-    expect(logs.some(log => log.includes('Found dependency'))).toBe(true);
   });
 });

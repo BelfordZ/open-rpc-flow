@@ -37,7 +37,7 @@ describe('ConditionStepExecutor', () => {
     const mockRequestStepResult: StepExecutionResult = {
       result: { success: true },
       type: StepType.Request,
-      metadata: { method: 'notification.send' }
+      metadata: { method: 'notification.send' },
     };
     executeStep.mockResolvedValue(mockRequestStepResult);
     const result = (await executor.execute(step, context)) as StepExecutionResult & {
@@ -89,7 +89,7 @@ describe('ConditionStepExecutor', () => {
     const mockRequestStepResult: StepExecutionResult = {
       result: { success: true },
       type: StepType.Request,
-      metadata: { method: 'notification.send' }
+      metadata: { method: 'notification.send' },
     };
     executeStep.mockResolvedValue(mockRequestStepResult);
     const result = (await executor.execute(step, context)) as StepExecutionResult & {
@@ -175,7 +175,7 @@ describe('ConditionStepExecutor', () => {
     const mockRequestStepResult: StepExecutionResult = {
       result: { success: true },
       type: StepType.Request,
-      metadata: { method: 'notification.send' }
+      metadata: { method: 'notification.send' },
     };
     executeStep.mockResolvedValue(mockRequestStepResult);
 
@@ -220,7 +220,7 @@ describe('ConditionStepExecutor', () => {
     const mockRequestStepResult: StepExecutionResult = {
       result: { success: true },
       type: StepType.Request,
-      metadata: { method: 'notification.send' }
+      metadata: { method: 'notification.send' },
     };
     executeStep.mockResolvedValue(mockRequestStepResult);
     const result = (await executor.execute(step, context)) as StepExecutionResult & {
@@ -235,7 +235,9 @@ describe('ConditionStepExecutor', () => {
     expect(result.type).toBe('condition');
     expect(result.metadata.branchTaken).toBe('then');
     expect(result.metadata.conditionValue).toBe(true);
-    expect(result.metadata.condition).toBe("${user.role} === 'admin' && ${user.active} && ${user.loginCount} > ${context.minLoginCount}");
+    expect(result.metadata.condition).toBe(
+      "${user.role} === 'admin' && ${user.active} && ${user.loginCount} > ${context.minLoginCount}",
+    );
     expect(result.metadata.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
     expect(result.result).toEqual(mockRequestStepResult);
     expect(executeStep).toHaveBeenCalledTimes(1);

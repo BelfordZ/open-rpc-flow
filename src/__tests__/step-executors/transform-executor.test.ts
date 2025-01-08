@@ -16,7 +16,7 @@ describe('TransformStepExecutor', () => {
       context.expressionEvaluator,
       context.referenceResolver,
       context.context,
-      noLogger
+      noLogger,
     );
     executor = new TransformStepExecutor(transformExecutor, noLogger);
   });

@@ -30,33 +30,33 @@ describe('ExpressionEvaluator', () => {
   });
 
   describe('evaluateCondition', () => {
-    test('evaluates simple boolean expressions', () => {
+    it('evaluates simple boolean expressions', () => {
       expect(evaluator.evaluateCondition('true')).toBe(true);
       expect(evaluator.evaluateCondition('false')).toBe(false);
     });
 
-    test('evaluates comparison expressions', () => {
+    it('evaluates comparison expressions', () => {
       expect(evaluator.evaluateCondition('10 > 5')).toBe(true);
       expect(evaluator.evaluateCondition('10 < 5')).toBe(false);
     });
 
-    test('evaluates expressions with context', () => {
+    it('evaluates expressions with context', () => {
       expect(evaluator.evaluateCondition('${context.config.threshold} > 50')).toBe(true);
       expect(evaluator.evaluateCondition('${context.config.enabled}')).toBe(true);
     });
 
-    test('evaluates expressions with references', () => {
+    it('evaluates expressions with references', () => {
       expect(evaluator.evaluateCondition('${step1.data.value} > 40')).toBe(true);
       expect(evaluator.evaluateCondition('${step1.data.value} < 40')).toBe(false);
     });
 
-    test('evaluates expressions with extra context', () => {
+    it('evaluates expressions with extra context', () => {
       const extraContext = { item: { value: 75 } };
       expect(evaluator.evaluateCondition('${item.value} > 50', extraContext)).toBe(true);
       expect(evaluator.evaluateCondition('${item.value} < 50', extraContext)).toBe(false);
     });
 
-    test('coerces non-boolean values to boolean', () => {
+    it('coerces non-boolean values to boolean', () => {
       expect(evaluator.evaluateCondition('1')).toBe(true);
       expect(evaluator.evaluateCondition('0')).toBe(false);
       expect(evaluator.evaluateCondition('""')).toBe(false);
@@ -78,28 +78,28 @@ describe('ExpressionEvaluator', () => {
       expect(evaluator.evaluateExpression('{ x: 1, y: 2 }')).toEqual({ x: 1, y: 2 });
     });
 
-    test('evaluates expressions with references', () => {
+    it('evaluates expressions with references', () => {
       expect(evaluator.evaluateExpression('${step1.data.value} * 2')).toBe(84);
       expect(evaluator.evaluateExpression('`Value is ${step1.data.value}`')).toBe('Value is 42');
     });
 
-    test('evaluates expressions with context', () => {
+    it('evaluates expressions with context', () => {
       expect(evaluator.evaluateExpression('${context.config.threshold} + 50')).toBe(150);
     });
 
-    test('evaluates expressions with extra context', () => {
+    it('evaluates expressions with extra context', () => {
       const extraContext = { item: { value: 75 } };
       expect(evaluator.evaluateExpression('${item.value} * 2', extraContext)).toBe(150);
     });
 
-    test('evaluates complex object literals with references', () => {
+    it('evaluates complex object literals with references', () => {
       const result = evaluator.evaluateExpression(
         '{ id: ${step1.data.value}, config: ${context.config.threshold} }',
       );
       expect(result).toEqual({ id: 42, config: 100 });
     });
 
-    test('throws on invalid expressions', () => {
+    it('throws on invalid expressions', () => {
       expect(() => evaluator.evaluateExpression('invalid syntax')).toThrow(
         'Failed to evaluate expression',
       );
@@ -111,7 +111,7 @@ describe('ExpressionEvaluator', () => {
       );
     });
 
-    test('resolves simple references directly', () => {
+    it('resolves simple references directly', () => {
       const items = [1, 2, 3];
       stepResults.set('items', items);
       expect(evaluator.evaluateExpression('${items}')).toBe(items);
@@ -129,7 +129,11 @@ describe('ExpressionEvaluator', () => {
           type: StepType.Request,
           metadata: { requestId: '123' },
         };
-        referenceResolver = new ReferenceResolver(new Map([['userInfo', wrappedResult]]), {}, noLogger);
+        referenceResolver = new ReferenceResolver(
+          new Map([['userInfo', wrappedResult]]),
+          {},
+          noLogger,
+        );
         evaluator = new ExpressionEvaluator(referenceResolver, context, noLogger);
       });
 
@@ -169,7 +173,11 @@ describe('ExpressionEvaluator', () => {
           },
           type: StepType.Transform,
         };
-        referenceResolver = new ReferenceResolver(new Map([['nested', nestedResult]]), {}, noLogger);
+        referenceResolver = new ReferenceResolver(
+          new Map([['nested', nestedResult]]),
+          {},
+          noLogger,
+        );
         evaluator = new ExpressionEvaluator(referenceResolver, context, noLogger);
 
         // Must use .result at each level
@@ -266,7 +274,11 @@ describe('ExpressionEvaluator', () => {
           },
           type: StepType.Request,
         };
-        referenceResolver = new ReferenceResolver(new Map([['complex', complexResult]]), {}, noLogger);
+        referenceResolver = new ReferenceResolver(
+          new Map([['complex', complexResult]]),
+          {},
+          noLogger,
+        );
         evaluator = new ExpressionEvaluator(referenceResolver, context, noLogger);
 
         // Special characters in keys require array notation

@@ -62,4 +62,4 @@ export class ComparisonError extends ExpressionError {
   ) {
     super(message, cause);
   }
-} 
+}

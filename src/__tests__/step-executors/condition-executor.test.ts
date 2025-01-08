@@ -1,5 +1,5 @@
 import { ConditionStepExecutor } from '../../step-executors';
-import { StepExecutionContext, ConditionStep } from '../../step-executors/types';
+import { StepExecutionContext, ConditionStep, StepType } from '../../step-executors/types';
 import { StepExecutionResult } from '../../step-executors';
 import { noLogger } from '../../util/logger';
 import { createMockContext } from '../test-utils';
@@ -34,7 +34,12 @@ describe('ConditionStepExecutor', () => {
       },
     };
 
-    executeStep.mockResolvedValue({ result: { success: true }, type: 'request' });
+    const mockRequestStepResult: StepExecutionResult = {
+      result: { success: true },
+      type: StepType.Request,
+      metadata: { method: 'notification.send' }
+    };
+    executeStep.mockResolvedValue(mockRequestStepResult);
     const result = (await executor.execute(step, context)) as StepExecutionResult & {
       metadata: {
         branchTaken: 'then' | 'else';
@@ -49,7 +54,7 @@ describe('ConditionStepExecutor', () => {
     expect(result.metadata.conditionValue).toBe(true);
     expect(result.metadata.condition).toBe("${user.role} === 'admin'");
     expect(result.metadata.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
-    expect(result.result).toEqual({ success: true });
+    expect(result.result).toEqual(mockRequestStepResult);
     expect(executeStep).toHaveBeenCalledTimes(1);
   });
 
@@ -81,7 +86,12 @@ describe('ConditionStepExecutor', () => {
       },
     };
 
-    executeStep.mockResolvedValue({ result: { success: true }, type: 'request' });
+    const mockRequestStepResult: StepExecutionResult = {
+      result: { success: true },
+      type: StepType.Request,
+      metadata: { method: 'notification.send' }
+    };
+    executeStep.mockResolvedValue(mockRequestStepResult);
     const result = (await executor.execute(step, context)) as StepExecutionResult & {
       metadata: {
         branchTaken: 'then' | 'else';
@@ -96,7 +106,7 @@ describe('ConditionStepExecutor', () => {
     expect(result.metadata.conditionValue).toBe(false);
     expect(result.metadata.condition).toBe("${user.role} === 'admin'");
     expect(result.metadata.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
-    expect(result.result).toEqual({ success: true });
+    expect(result.result).toEqual(mockRequestStepResult);
     expect(executeStep).toHaveBeenCalledTimes(1);
   });
 
@@ -162,11 +172,12 @@ describe('ConditionStepExecutor', () => {
       },
     };
 
-    executeStep.mockResolvedValue({
+    const mockRequestStepResult: StepExecutionResult = {
       result: { success: true },
-      type: 'request',
-      metadata: { method: 'notification.send' },
-    });
+      type: StepType.Request,
+      metadata: { method: 'notification.send' }
+    };
+    executeStep.mockResolvedValue(mockRequestStepResult);
 
     const result = (await executor.execute(step, context)) as StepExecutionResult & {
       metadata: {
@@ -182,7 +193,7 @@ describe('ConditionStepExecutor', () => {
     expect(result.metadata.conditionValue).toBe(true);
     expect(result.metadata.condition).toBe("${user.role} === 'admin'");
     expect(result.metadata.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
-    expect(result.result).toEqual({ success: true });
+    expect(result.result).toEqual(mockRequestStepResult);
     expect(executeStep).toHaveBeenCalledTimes(1);
   });
 
@@ -206,7 +217,12 @@ describe('ConditionStepExecutor', () => {
       },
     };
 
-    executeStep.mockResolvedValue({ result: { success: true }, type: 'request' });
+    const mockRequestStepResult: StepExecutionResult = {
+      result: { success: true },
+      type: StepType.Request,
+      metadata: { method: 'notification.send' }
+    };
+    executeStep.mockResolvedValue(mockRequestStepResult);
     const result = (await executor.execute(step, context)) as StepExecutionResult & {
       metadata: {
         branchTaken: 'then' | 'else';
@@ -221,7 +237,7 @@ describe('ConditionStepExecutor', () => {
     expect(result.metadata.conditionValue).toBe(true);
     expect(result.metadata.condition).toBe("${user.role} === 'admin' && ${user.active} && ${user.loginCount} > ${context.minLoginCount}");
     expect(result.metadata.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
-    expect(result.result).toEqual({ success: true });
+    expect(result.result).toEqual(mockRequestStepResult);
     expect(executeStep).toHaveBeenCalledTimes(1);
   });
 });

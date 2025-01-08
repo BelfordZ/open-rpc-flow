@@ -153,8 +153,12 @@ describe('FlowExecutor', () => {
     expect(mockJsonRpcHandler).toHaveBeenCalledTimes(2);
     const conditionResult = results.get('check_items');
     expect(conditionResult).toBeDefined();
-    expect(conditionResult.branchTaken).toBe('then');
-    expect(conditionResult.value.result).toEqual({ result: 'default' });
+    expect(conditionResult.metadata.branchTaken).toBe('then');
+    expect(conditionResult.result).toEqual({
+      type: 'request',
+      result: { result: 'default' },
+      metadata: expect.any(Object)
+    });
   });
 
   test('executes aggregate operations', async () => {
@@ -446,9 +450,21 @@ describe('FlowExecutor', () => {
     expect(mockJsonRpcHandler).toHaveBeenCalledTimes(2); // getData + processItem
     const conditionResult = results.get('nested_condition');
     expect(conditionResult).toBeDefined();
-    expect(conditionResult.branchTaken).toBe('then');
-    expect(conditionResult.value.branchTaken).toBe('else'); // First item has value 100, which is <= 150
-    expect(conditionResult.value.value.result).toEqual({ processed: true, itemId: -1 });
+    expect(conditionResult.metadata.branchTaken).toBe('then');
+    expect(conditionResult.result).toEqual({
+      type: 'condition',
+      result: {
+        type: 'request',
+        result: { processed: true, itemId: -1 },
+        metadata: expect.any(Object)
+      },
+      metadata: {
+        branchTaken: 'else',
+        conditionValue: false,
+        condition: '${get_data.result.items[0].value > 150}',
+        timestamp: expect.any(String)
+      }
+    });
   });
 
   test('handles transform operation errors gracefully', async () => {

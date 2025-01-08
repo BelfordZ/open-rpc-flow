@@ -62,7 +62,7 @@ export class ConditionStepExecutor implements StepExecutor {
 
       return {
         type: StepType.Condition,
-        result: value?.result,
+        result: value,
         metadata: {
           branchTaken,
           conditionValue,

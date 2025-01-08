@@ -14,6 +14,30 @@ export class DependencyResolver {
   }
 
   /**
+   * Get all dependencies for a given step
+   */
+  getDependencies(stepName: string): string[] {
+    const graph = this.buildDependencyGraph();
+    return Array.from(graph.get(stepName) || new Set());
+  }
+
+  /**
+   * Get all steps that depend on a given step
+   */
+  getDependents(stepName: string): string[] {
+    const graph = this.buildDependencyGraph();
+    const dependents: string[] = [];
+    
+    for (const [step, deps] of graph.entries()) {
+      if (deps.has(stepName)) {
+        dependents.push(step);
+      }
+    }
+    
+    return dependents;
+  }
+
+  /**
    * Build a dependency graph for all steps in the flow
    */
   private buildDependencyGraph(): Map<string, Set<string>> {
@@ -46,50 +70,49 @@ export class DependencyResolver {
 
     // Extract references from loop steps
     if (isLoopStep(step)) {
+      // Add dependencies from the loop's "over" expression
+      this.extractReferences(step.loop.over, localContextVars).forEach(dep => deps.add(dep));
+
+      // Add the loop variable to localContextVars for nested steps
       const loopVars = [...localContextVars, step.loop.as];
-      const mergeDeps = (subStep: Step | undefined, vars: string[]) => {
-        if (subStep) {
-          this.findStepDependencies(subStep, vars).forEach((dep) => deps.add(dep));
-        }
-      };
-
-      // Extract references from the collection expression
-      this.extractReferences(step.loop.over, localContextVars).forEach((dep) => deps.add(dep));
-
-      // Extract references from the condition expression
-      if (step.loop.condition) {
-        this.extractReferences(step.loop.condition, loopVars).forEach((dep) => deps.add(dep));
+      
+      // Process the loop's step with updated context variables
+      if (step.loop.step) {
+        this.findStepDependencies(step.loop.step, loopVars).forEach(dep => deps.add(dep));
       }
+    }
 
-      // Extract references from the loop step(s)
-      mergeDeps(step.loop.step, loopVars);
-      if (step.loop.steps) {
-        step.loop.steps.forEach((s) => mergeDeps(s, loopVars));
+    // Extract references from condition steps
+    if (isConditionStep(step)) {
+      this.extractReferences(step.condition.if, localContextVars).forEach(dep => deps.add(dep));
+      if (step.condition.then) {
+        this.findStepDependencies(step.condition.then, localContextVars).forEach(dep => deps.add(dep));
+      }
+      if (step.condition.else) {
+        this.findStepDependencies(step.condition.else, localContextVars).forEach(dep => deps.add(dep));
       }
     }
 
     // Extract references from request steps
     if (isRequestStep(step)) {
-      this.extractReferences(JSON.stringify(step.request.params)).forEach((dep) => deps.add(dep));
-    }
-
-    // Extract references from condition steps
-    if (isConditionStep(step)) {
-      this.extractReferences(step.condition.if).forEach((dep) => deps.add(dep));
-      if (step.condition.then) {
-        this.findStepDependencies(step.condition.then, localContextVars).forEach((dep) => deps.add(dep));
-      }
-      if (step.condition.else) {
-        this.findStepDependencies(step.condition.else, localContextVars).forEach((dep) => deps.add(dep));
+      const params = step.request.params || {};
+      for (const value of Object.values(params)) {
+        if (typeof value === 'string') {
+          this.extractReferences(value, localContextVars).forEach(dep => deps.add(dep));
+        }
       }
     }
 
     // Extract references from transform steps
     if (isTransformStep(step)) {
-      this.extractReferences(step.transform.input).forEach((dep) => deps.add(dep));
-      for (const op of step.transform.operations) {
-        if ('using' in op) {
-          this.extractReferences(op.using).forEach((dep) => deps.add(dep));
+      if (typeof step.transform.input === 'string') {
+        this.extractReferences(step.transform.input, localContextVars).forEach(dep => deps.add(dep));
+      }
+      if (step.transform.operations) {
+        for (const op of step.transform.operations) {
+          if (op.using && typeof op.using === 'string') {
+            this.extractReferences(op.using, localContextVars).forEach(dep => deps.add(dep));
+          }
         }
       }
     }

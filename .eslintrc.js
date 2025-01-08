@@ -18,10 +18,13 @@ module.exports = {
   rules: {
     '@typescript-eslint/explicit-function-return-type': 'off',
     '@typescript-eslint/no-explicit-any': 'warn',
-    '@typescript-eslint/no-unused-vars': ['error', { 
-      argsIgnorePattern: '^_',
-      varsIgnorePattern: '^_'
-    }],
+    '@typescript-eslint/no-unused-vars': [
+      'error',
+      {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+      },
+    ],
     'no-prototype-builtins': 'off', // We'll handle this with proper type checking
   },
   overrides: [
@@ -29,8 +32,8 @@ module.exports = {
       files: ['**/__tests__/**/*.ts', '**/*.test.ts', '**/*.spec.ts'],
       rules: {
         '@typescript-eslint/no-explicit-any': 'off',
-        'no-case-declarations': 'off'
-      }
-    }
-  ]
-}; 
+        'no-case-declarations': 'off',
+      },
+    },
+  ],
+};

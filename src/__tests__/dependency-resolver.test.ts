@@ -1,7 +1,14 @@
 import { DependencyResolver } from '../dependency-resolver';
 import { Flow } from '../types';
+import { TestLogger } from '../util/logger';
 
 describe('DependencyResolver', () => {
+  let testLogger: TestLogger;
+
+  beforeEach(() => {
+    testLogger = new TestLogger('Test');
+  });
+
   it('correctly identifies dependencies in request steps', () => {
     const flow: Flow = {
       name: 'Test Flow',
@@ -11,20 +18,20 @@ describe('DependencyResolver', () => {
           name: 'getUser',
           request: {
             method: 'user.get',
-            params: { id: 1 }
-          }
+            params: { id: 1 },
+          },
         },
         {
           name: 'getFriends',
           request: {
             method: 'user.getFriends',
-            params: { userId: '${getUser.id}' }
-          }
-        }
-      ]
+            params: { userId: '${getUser.id}' },
+          },
+        },
+      ],
     };
 
-    const resolver = new DependencyResolver(flow);
+    const resolver = new DependencyResolver(flow, testLogger);
     expect(resolver.getDependencies('getFriends')).toEqual(['getUser']);
     expect(resolver.getDependencies('getUser')).toEqual([]);
     expect(resolver.getDependents('getUser')).toEqual(['getFriends']);
@@ -39,15 +46,15 @@ describe('DependencyResolver', () => {
           name: 'getUser',
           request: {
             method: 'user.get',
-            params: { id: 1 }
-          }
+            params: { id: 1 },
+          },
         },
         {
           name: 'getFriends',
           request: {
             method: 'user.getFriends',
-            params: { userId: '${getUser.id}' }
-          }
+            params: { userId: '${getUser.id}' },
+          },
         },
         {
           name: 'notifyFriends',
@@ -61,18 +68,22 @@ describe('DependencyResolver', () => {
                 method: 'notification.send',
                 params: {
                   userId: '${friend.id}',
-                  message: 'Hello from ${getUser.name}!'
-                }
-              }
-            }
-          }
-        }
-      ]
+                  message: 'Hello from ${getUser.name}!',
+                },
+              },
+            },
+          },
+        },
+      ],
     };
 
-    const resolver = new DependencyResolver(flow);
+    const resolver = new DependencyResolver(flow, testLogger);
     expect(resolver.getDependencies('notifyFriends')).toEqual(['getFriends', 'getUser']);
-    expect(resolver.getExecutionOrder().map(s => s.name)).toEqual(['getUser', 'getFriends', 'notifyFriends']);
+    expect(resolver.getExecutionOrder().map((s) => s.name)).toEqual([
+      'getUser',
+      'getFriends',
+      'notifyFriends',
+    ]);
   });
 
   it('correctly identifies dependencies in condition steps', () => {
@@ -84,8 +95,8 @@ describe('DependencyResolver', () => {
           name: 'getUser',
           request: {
             method: 'user.get',
-            params: { id: 1 }
-          }
+            params: { id: 1 },
+          },
         },
         {
           name: 'notifyIfAdmin',
@@ -95,15 +106,15 @@ describe('DependencyResolver', () => {
               name: 'sendNotification',
               request: {
                 method: 'notification.send',
-                params: { userId: '${getUser.id}' }
-              }
-            }
-          }
-        }
-      ]
+                params: { userId: '${getUser.id}' },
+              },
+            },
+          },
+        },
+      ],
     };
 
-    const resolver = new DependencyResolver(flow);
+    const resolver = new DependencyResolver(flow, testLogger);
     expect(resolver.getDependencies('notifyIfAdmin')).toEqual(['getUser']);
   });
 
@@ -116,20 +127,20 @@ describe('DependencyResolver', () => {
           name: 'step1',
           request: {
             method: 'test',
-            params: { value: '${step2.value}' }
-          }
+            params: { value: '${step2.value}' },
+          },
         },
         {
           name: 'step2',
           request: {
             method: 'test',
-            params: { value: '${step1.value}' }
-          }
-        }
-      ]
+            params: { value: '${step1.value}' },
+          },
+        },
+      ],
     };
 
-    const resolver = new DependencyResolver(flow);
+    const resolver = new DependencyResolver(flow, testLogger);
     expect(() => resolver.getExecutionOrder()).toThrow('Circular dependency detected');
   });
 
@@ -142,15 +153,15 @@ describe('DependencyResolver', () => {
           name: 'getUser',
           request: {
             method: 'user.get',
-            params: { id: 1 }
-          }
+            params: { id: 1 },
+          },
         },
         {
           name: 'getFriends',
           request: {
             method: 'user.getFriends',
-            params: { userId: '${getUser.id}' }
-          }
+            params: { userId: '${getUser.id}' },
+          },
         },
         {
           name: 'filterFriends',
@@ -159,10 +170,10 @@ describe('DependencyResolver', () => {
             operations: [
               {
                 type: 'filter',
-                using: '${item.age} > ${getUser.age}'
-              }
-            ]
-          }
+                using: '${item.age} > ${getUser.age}',
+              },
+            ],
+          },
         },
         {
           name: 'notifyFriends',
@@ -173,16 +184,16 @@ describe('DependencyResolver', () => {
               name: 'sendNotification',
               request: {
                 method: 'notification.send',
-                params: { userId: '${friend.id}' }
-              }
-            }
-          }
-        }
-      ]
+                params: { userId: '${friend.id}' },
+              },
+            },
+          },
+        },
+      ],
     };
 
-    const resolver = new DependencyResolver(flow);
-    const order = resolver.getExecutionOrder().map(s => s.name);
+    const resolver = new DependencyResolver(flow, testLogger);
+    const order = resolver.getExecutionOrder().map((s) => s.name);
     expect(order).toEqual(['getUser', 'getFriends', 'filterFriends', 'notifyFriends']);
   });
 
@@ -195,8 +206,8 @@ describe('DependencyResolver', () => {
           name: 'getFriends',
           request: {
             method: 'user.getFriends',
-            params: { userId: 1 }
-          }
+            params: { userId: 1 },
+          },
         },
         {
           name: 'notifyFriends',
@@ -209,17 +220,17 @@ describe('DependencyResolver', () => {
                 method: 'notification.send',
                 params: {
                   userId: '${friend.id}',
-                  message: 'Hello ${friend.name}!'
-                }
-              }
-            }
-          }
-        }
-      ]
+                  message: 'Hello ${friend.name}!',
+                },
+              },
+            },
+          },
+        },
+      ],
     };
 
-    const resolver = new DependencyResolver(flow);
+    const resolver = new DependencyResolver(flow, testLogger);
     expect(resolver.getDependencies('notifyFriends')).toEqual(['getFriends']);
     expect(() => resolver.getExecutionOrder()).not.toThrow();
   });
-}); 
+});

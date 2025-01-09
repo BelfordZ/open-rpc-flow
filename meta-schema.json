@@ -91,7 +91,16 @@
                 "properties": {
                   "type": {
                     "type": "string",
-                    "enum": ["map", "filter", "reduce", "flatten", "sort", "unique", "group", "join"],
+                    "enum": [
+                      "map",
+                      "filter",
+                      "reduce",
+                      "flatten",
+                      "sort",
+                      "unique",
+                      "group",
+                      "join"
+                    ],
                     "description": "The type of transformation operation to perform."
                   },
                   "using": {
@@ -174,4 +183,3 @@
     }
   }
 }
-  

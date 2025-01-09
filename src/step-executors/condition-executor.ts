@@ -1,93 +1,84 @@
-import { Step } from '../types';
-import {
-  StepExecutor,
-  StepExecutionContext,
-  StepExecutionResult,
-  ConditionStep,
-  isConditionStep,
-  StepType
-} from './types';
+import { Step, StepExecutionContext } from '../types';
+import { StepExecutor, StepExecutionResult, StepType, ConditionStep } from './types';
+import { Logger } from '../util/logger';
 
-/**
- * Result type for condition steps, including which branch was taken
- */
-export interface ConditionResult<T = any> {
-  value: T;
-  branchTaken: 'then' | 'else';
-  conditionValue: boolean;
-}
-
-/**
- * Executor for conditional branching steps
- */
-export class ConditionStepExecutor implements StepExecutor<ConditionStep, ConditionResult> {
+export class ConditionStepExecutor implements StepExecutor {
   constructor(
-    private executeStep: (step: Step, extraContext?: Record<string, any>) => Promise<any>
+    private executeStep: (
+      step: Step,
+      extraContext?: Record<string, any>,
+    ) => Promise<StepExecutionResult>,
+    private logger: Logger,
   ) {}
 
-  canExecute = isConditionStep;
+  canExecute(step: Step): step is ConditionStep {
+    return 'condition' in step;
+  }
 
   async execute(
-    step: ConditionStep,
+    step: Step,
     context: StepExecutionContext,
-    extraContext: Record<string, any> = {}
-  ): Promise<StepExecutionResult<ConditionResult>> {
-    const { expressionEvaluator, stepResults } = context;
-
-    console.log('Executing condition step:', {
-      stepName: step.name,
-      condition: step.condition.if,
-      extraContext,
-      currentStepResults: Object.fromEntries(stepResults)
-    });
-
-    const conditionMet = expressionEvaluator.evaluateCondition(step.condition.if, extraContext);
-    console.log('Condition evaluation result:', {
-      condition: step.condition.if,
-      result: conditionMet
-    });
-
-    const branchTaken = conditionMet ? 'then' as const : 'else' as const;
-    const branchStep = conditionMet ? step.condition.then : step.condition.else;
-
-    console.log('Selected branch:', {
-      branchTaken,
-      step: branchStep?.name
-    });
-
-    let result;
-    if (branchStep) {
-      console.log('Executing conditional step:', {
-        stepName: branchStep.name,
-        type: Object.keys(branchStep).find(k => k !== 'name')
-      });
-      result = await this.executeStep(branchStep, extraContext);
-      stepResults.set(branchStep.name, result);
-      console.log('Conditional step result:', {
-        stepName: branchStep.name,
-        result
-      });
+    extraContext: Record<string, any> = {},
+  ): Promise<StepExecutionResult> {
+    if (!this.canExecute(step)) {
+      throw new Error('Invalid step type for ConditionStepExecutor');
     }
 
-    const executionResult: StepExecutionResult<ConditionResult> = {
-      result: {
-        value: result,
-        branchTaken,
-        conditionValue: conditionMet
-      },
-      type: StepType.Condition,
-      metadata: {
-        condition: step.condition.if,
-        branchTaken,
-        stepName: branchStep?.name
-      }
-    };
+    const conditionStep = step as ConditionStep;
 
-    console.log('Condition step complete:', {
+    this.logger.debug('Evaluating condition', {
       stepName: step.name,
-      result: executionResult
+      condition: conditionStep.condition.if,
     });
 
-    return executionResult;
+    try {
+      const conditionValue = context.expressionEvaluator.evaluateExpression(
+        conditionStep.condition.if,
+        extraContext,
+      );
+
+      this.logger.debug('Condition evaluated', {
+        stepName: step.name,
+        result: conditionValue,
+      });
+
+      let value: StepExecutionResult | undefined;
+      let branchTaken: 'then' | 'else' | undefined;
+
+      if (conditionValue) {
+        this.logger.debug('Executing then branch', { stepName: step.name });
+        value = await this.executeStep(conditionStep.condition.then, extraContext);
+        branchTaken = 'then';
+      } else if (conditionStep.condition.else) {
+        this.logger.debug('Executing else branch', { stepName: step.name });
+        value = await this.executeStep(conditionStep.condition.else, extraContext);
+        branchTaken = 'else';
+      } else {
+        branchTaken = 'else';
+      }
+
+      this.logger.debug('Condition execution completed', {
+        stepName: step.name,
+        branchTaken,
+        conditionValue,
+      });
+
+      return {
+        type: StepType.Condition,
+        result: value,
+        metadata: {
+          branchTaken,
+          conditionValue,
+          condition: conditionStep.condition.if,
+          timestamp: new Date().toISOString(),
+        },
+      };
+    } catch (error: any) {
+      this.logger.error('Condition execution failed', {
+        stepName: step.name,
+        error: error.message || String(error),
+      });
+      throw error;
+    }
   }
-} 
+}

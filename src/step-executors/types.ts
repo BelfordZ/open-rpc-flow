@@ -2,8 +2,27 @@ import { Step } from '../types';
 import { ReferenceResolver } from '../reference-resolver';
 import { ExpressionEvaluator } from '../expression-evaluator';
 import { TransformExecutor, TransformOperation } from '../transform-executor';
+import { Logger } from '../util/logger';
 
 export { Step };
+
+/**
+ * Custom error class for JSON-RPC request errors
+ */
+export class JsonRpcRequestError extends Error {
+  constructor(
+    message: string,
+    public readonly error: {
+      code: number;
+      message: string;
+      data?: any;
+    },
+  ) {
+    super(message);
+    this.name = 'JsonRpcRequestError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
 
 /**
  * Represents the execution context available to all step executors
@@ -14,13 +33,19 @@ export interface StepExecutionContext {
   transformExecutor: TransformExecutor;
   stepResults: Map<string, any>;
   context: Record<string, any>;
+  logger: Logger;
 }
 
 /**
  * Base interface for step execution results with stronger typing
  */
 export interface StepExecutionResult<T = any> {
-  result: T;
+  result?: T;
+  error?: {
+    code: number;
+    message: string;
+    data?: any;
+  };
   type: StepType;
   metadata?: Record<string, any>;
 }
@@ -32,7 +57,7 @@ export enum StepType {
   Request = 'request',
   Loop = 'loop',
   Condition = 'condition',
-  Transform = 'transform'
+  Transform = 'transform',
 }
 
 /**
@@ -46,20 +71,20 @@ export type StepTypeGuard<T extends Step> = (step: Step) => step is T;
 export interface StepExecutor<
   TStep extends Step = Step,
   TResult = any,
-  TContext extends StepExecutionContext = StepExecutionContext
+  TContext extends StepExecutionContext = StepExecutionContext,
 > {
   /**
    * Type guard to check if a step can be handled by this executor
    */
   canExecute: StepTypeGuard<TStep>;
-  
+
   /**
    * Execute the step and return the result
    */
   execute(
     step: TStep,
     context: TContext,
-    extraContext?: Record<string, any>
+    extraContext?: Record<string, any>,
   ): Promise<StepExecutionResult<TResult>>;
 }
 
@@ -79,7 +104,8 @@ export interface LoopStep extends Step {
     as: string;
     condition?: string;
     maxIterations?: number;
-    step: Step;
+    step?: Step;
+    steps?: Step[];
   };
 }
 
@@ -101,7 +127,7 @@ export interface TransformStep extends Step {
 /**
  * Type guards for each step type
  */
-export const isRequestStep = (step: Step): step is RequestStep => 
+export const isRequestStep = (step: Step): step is RequestStep =>
   'request' in step && step.request !== undefined;
 
 export const isLoopStep = (step: Step): step is LoopStep =>
@@ -111,7 +137,13 @@ export const isConditionStep = (step: Step): step is ConditionStep =>
   'condition' in step && step.condition !== undefined;
 
 export const isTransformStep = (step: Step): step is TransformStep =>
-  'transform' in step && typeof step.transform === 'object'; 
+  'transform' in step && typeof step.transform === 'object';
+
+/**
+ * Type guard for loop results
+ */
+export const isLoopResult = <T>(result: StepExecutionResult<any>): result is LoopStepResult<T> =>
+  result.type === StepType.Loop && 'value' in result.result && 'iterationCount' in result.result;
 
 /**
  * Base type for loop results

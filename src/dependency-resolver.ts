@@ -1,187 +1,215 @@
 import { Flow, Step } from './types';
-import { 
-  RequestStep, 
-  LoopStep, 
-  ConditionStep, 
-  TransformStep,
-  isRequestStep,
+import { Logger } from './util/logger';
+import {
   isLoopStep,
+  isRequestStep,
   isConditionStep,
-  isTransformStep
-} from './step-executors';
+  isTransformStep,
+} from './step-executors/types';
 
-interface DependencyNode {
-  step: Step;
-  dependencies: Set<string>;
-  dependents: Set<string>;
-}
-
-/**
- * Resolves dependencies between steps and determines execution order
- */
 export class DependencyResolver {
-  private dependencyGraph: Map<string, DependencyNode> = new Map();
+  private logger: Logger;
 
-  constructor(private flow: Flow) {
-    this.buildDependencyGraph();
+  constructor(
+    private flow: Flow,
+    logger: Logger,
+  ) {
+    this.logger = logger.createNested('DependencyResolver');
   }
 
   /**
-   * Get steps in order of execution based on dependencies
+   * Get the execution order for all steps in the flow
    */
   getExecutionOrder(): Step[] {
-    const visited = new Set<string>();
-    const order: Step[] = [];
-    const visiting = new Set<string>();
-
-    const visit = (stepName: string) => {
-      if (visiting.has(stepName)) {
-        throw new Error(`Circular dependency detected involving step: ${stepName}`);
-      }
-      if (visited.has(stepName)) return;
-
-      visiting.add(stepName);
-      const node = this.dependencyGraph.get(stepName);
-      if (!node) return;
-
-      for (const dep of node.dependencies) {
-        visit(dep);
-      }
-
-      visiting.delete(stepName);
-      visited.add(stepName);
-      order.push(node.step);
-    };
-
-    for (const step of this.flow.steps) {
-      visit(step.name);
-    }
-
-    return order;
+    this.logger.debug('Getting execution order');
+    const graph = this.buildDependencyGraph();
+    return this.topologicalSort(graph);
   }
 
-  private buildDependencyGraph() {
-    // First pass: create nodes
-    for (const step of this.flow.steps) {
-      this.dependencyGraph.set(step.name, {
-        step,
-        dependencies: new Set(),
-        dependents: new Set()
-      });
-    }
-
-    // Second pass: analyze dependencies
-    for (const step of this.flow.steps) {
-      const deps = this.findStepDependencies(step);
-      const node = this.dependencyGraph.get(step.name)!;
-      
-      for (const dep of deps) {
-        if (!this.dependencyGraph.has(dep)) {
-          throw new Error(`Step "${step.name}" depends on unknown step "${dep}"`);
-        }
-        node.dependencies.add(dep);
-        this.dependencyGraph.get(dep)!.dependents.add(step.name);
-      }
-    }
-  }
-
-  private findStepDependencies(step: Step, contextVars: Set<string> = new Set()): Set<string> {
-    const deps = new Set<string>();
-    
-    // Helper to extract references from a string
-    const extractRefs = (expr: string, localContextVars: Set<string> = contextVars) => {
-      const matches = expr.match(/\${([^}]+)}/g) || [];
-      for (const match of matches) {
-        const ref = match.slice(2, -1).split('.')[0];
-        if (ref !== 'context' && !localContextVars.has(ref)) {
-          deps.add(ref);
-        }
-      }
-    };
-
-    // Helper to process an object for references
-    const processObject = (obj: any, localContextVars: Set<string> = contextVars) => {
-      for (const value of Object.values(obj)) {
-        if (typeof value === 'string') {
-          extractRefs(value, localContextVars);
-        } else if (typeof value === 'object' && value !== null) {
-          processObject(value, localContextVars);
-        }
-      }
-    };
-
-    // Helper to merge dependencies from a nested step
-    const mergeDeps = (nestedStep: Step, localContextVars: Set<string> = contextVars) => {
-      const nestedDeps = this.findStepDependencies(nestedStep, localContextVars);
-      for (const dep of nestedDeps) {
-        deps.add(dep);
-      }
-    };
-
-    if (isLoopStep(step)) {
-      // Process loop configuration
-      extractRefs(step.loop.over);
-      if (step.loop.condition) {
-        const loopVars = new Set(contextVars);
-        loopVars.add(step.loop.as);
-        extractRefs(step.loop.condition, loopVars);
-      }
-      
-      // Process inner step with loop variable in context
-      const loopVars = new Set(contextVars);
-      loopVars.add(step.loop.as);
-      mergeDeps(step.loop.step, loopVars);
-    }
-
-    if (isRequestStep(step)) {
-      processObject(step.request.params);
-    }
-
-    if (isConditionStep(step)) {
-      extractRefs(step.condition.if);
-      if (step.condition.then) {
-        mergeDeps(step.condition.then, contextVars);
-      }
-      if (step.condition.else) {
-        mergeDeps(step.condition.else, contextVars);
-      }
-    }
-
-    if (isTransformStep(step)) {
-      if (step.transform.input) {
-        extractRefs(step.transform.input);
-      }
-      const transformVars = new Set(contextVars);
-      transformVars.add('item');
-      for (const op of step.transform.operations) {
-        extractRefs(op.using, transformVars);
-      }
-    }
-
-    return deps;
+  /**
+   * Get all dependencies for a given step
+   */
+  getDependencies(stepName: string): string[] {
+    this.logger.debug(`Getting dependencies for step: ${stepName}`);
+    const graph = this.buildDependencyGraph();
+    return Array.from(graph.get(stepName) || new Set());
   }
 
   /**
    * Get all steps that depend on a given step
    */
   getDependents(stepName: string): string[] {
-    const node = this.dependencyGraph.get(stepName);
-    return node ? Array.from(node.dependents) : [];
+    this.logger.debug(`Getting dependents for step: ${stepName}`);
+    const graph = this.buildDependencyGraph();
+    const dependents: string[] = [];
+
+    for (const [step, deps] of graph.entries()) {
+      if (deps.has(stepName)) {
+        dependents.push(step);
+      }
+    }
+
+    return dependents;
   }
 
   /**
-   * Get all steps that a given step depends on
+   * Build a dependency graph for all steps in the flow
    */
-  getDependencies(stepName: string): string[] {
-    const node = this.dependencyGraph.get(stepName);
-    return node ? Array.from(node.dependencies) : [];
+  private buildDependencyGraph(): Map<string, Set<string>> {
+    this.logger.debug('Building dependency graph');
+    const graph = new Map<string, Set<string>>();
+
+    // Initialize graph with all steps
+    for (const step of this.flow.steps) {
+      graph.set(step.name, new Set());
+    }
+
+    // Add dependencies for each step
+    for (const step of this.flow.steps) {
+      const deps = this.findStepDependencies(step);
+      for (const dep of deps) {
+        if (!graph.has(dep)) {
+          throw new Error(`Step '${step.name}' depends on unknown step '${dep}'`);
+        }
+        graph.get(step.name)?.add(dep);
+      }
+      this.logger.debug(`Added dependency: ${step.name} -> ${deps.join(', ')}`);
+    }
+
+    return graph;
   }
 
   /**
-   * Check if a step has any dependencies
+   * Find all dependencies for a step
    */
-  hasDependencies(stepName: string): boolean {
-    const node = this.dependencyGraph.get(stepName);
-    return node ? node.dependencies.size > 0 : false;
+  private findStepDependencies(step: Step, localContextVars: string[] = []): string[] {
+    this.logger.debug(`Finding dependencies for step: ${step.name}`);
+    const deps = new Set<string>();
+
+    // Extract references from loop steps
+    if (isLoopStep(step)) {
+      // Add dependencies from the loop's "over" expression
+      this.extractReferences(step.loop.over, localContextVars).forEach((dep) => deps.add(dep));
+
+      // Add the loop variable to localContextVars for nested steps
+      const loopVars = [...localContextVars, step.loop.as];
+
+      // Process the loop's step with updated context variables
+      if (step.loop.step) {
+        this.findStepDependencies(step.loop.step, loopVars).forEach((dep) => deps.add(dep));
+      }
+    }
+
+    // Extract references from condition steps
+    if (isConditionStep(step)) {
+      this.extractReferences(step.condition.if, localContextVars).forEach((dep) => deps.add(dep));
+      if (step.condition.then) {
+        this.findStepDependencies(step.condition.then, localContextVars).forEach((dep) =>
+          deps.add(dep),
+        );
+      }
+      if (step.condition.else) {
+        this.findStepDependencies(step.condition.else, localContextVars).forEach((dep) =>
+          deps.add(dep),
+        );
+      }
+    }
+
+    // Extract references from request steps
+    if (isRequestStep(step)) {
+      const params = step.request.params || {};
+      for (const value of Object.values(params)) {
+        if (typeof value === 'string') {
+          this.extractReferences(value, localContextVars).forEach((dep) => deps.add(dep));
+        }
+      }
+    }
+
+    // Extract references from transform steps
+    if (isTransformStep(step)) {
+      if (typeof step.transform.input === 'string') {
+        this.extractReferences(step.transform.input, localContextVars).forEach((dep) =>
+          deps.add(dep),
+        );
+      }
+      if (step.transform.operations) {
+        for (const op of step.transform.operations) {
+          if (op.using && typeof op.using === 'string') {
+            this.extractReferences(op.using, localContextVars).forEach((dep) => deps.add(dep));
+          }
+        }
+      }
+    }
+
+    this.logger.debug(`Found dependencies: ${Array.from(deps).join(', ')}`);
+    return Array.from(deps);
   }
-} 
+
+  /**
+   * Extract step references from an expression
+   */
+  private extractReferences(expr: string, localContextVars: string[] = []): string[] {
+    this.logger.debug(`Extracting references from expression: ${expr}`);
+    const refs = new Set<string>();
+    const matches = expr.match(/\${([^}]+)}/g) || [];
+
+    for (const match of matches) {
+      const path = match.slice(2, -1);
+      const parts = path.split('.');
+      const first = parts[0];
+
+      // Skip if it's a local context variable
+      if (localContextVars.includes(first)) {
+        continue;
+      }
+
+      // Skip if it's a global context variable or special variable
+      if (first === 'context' || first === 'metadata' || first === 'item' || first === 'acc') {
+        continue;
+      }
+
+      refs.add(first);
+    }
+
+    this.logger.debug(`Extracted references: ${Array.from(refs).join(', ')}`);
+    return Array.from(refs);
+  }
+
+  /**
+   * Perform a topological sort on the dependency graph
+   */
+  private topologicalSort(graph: Map<string, Set<string>>): Step[] {
+    this.logger.debug('Performing topological sort');
+    const visited = new Set<string>();
+    const temp = new Set<string>();
+    const order: string[] = [];
+
+    const visit = (node: string) => {
+      if (temp.has(node)) {
+        throw new Error(`Circular dependency detected: ${node}`);
+      }
+      if (visited.has(node)) {
+        return;
+      }
+      temp.add(node);
+      const deps = graph.get(node) || new Set();
+      for (const dep of deps) {
+        visit(dep);
+      }
+      temp.delete(node);
+      visited.add(node);
+      order.push(node);
+    };
+
+    for (const node of graph.keys()) {
+      if (!visited.has(node)) {
+        visit(node);
+      }
+    }
+
+    this.logger.debug(`Topological sort result: ${order.join(', ')}`);
+
+    // Convert step names back to step objects
+    return order.map((name) => this.flow.steps.find((s) => s.name === name)!);
+  }
+}

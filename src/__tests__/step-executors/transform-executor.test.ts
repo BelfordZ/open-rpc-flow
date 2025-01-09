@@ -1,6 +1,8 @@
 import { TransformStepExecutor } from '../../step-executors';
-import { StepExecutionContext, TransformStep, StepType } from '../../step-executors/types';
+import { TransformStep } from '../../step-executors/types';
+import { StepExecutionContext } from '../../types';
 import { TransformExecutor } from '../../transform-executor';
+import { noLogger } from '../../util/logger';
 import { createMockContext } from '../test-utils';
 
 describe('TransformStepExecutor', () => {
@@ -13,13 +15,17 @@ describe('TransformStepExecutor', () => {
     transformExecutor = new TransformExecutor(
       context.expressionEvaluator,
       context.referenceResolver,
-      context.context
+      context.context,
+      noLogger,
     );
-    executor = new TransformStepExecutor(transformExecutor);
+    executor = new TransformStepExecutor(transformExecutor, noLogger);
   });
 
   it('performs map transformation', async () => {
-    const items = [{ id: 1, value: 10 }, { id: 2, value: 20 }];
+    const items = [
+      { id: 1, value: 10 },
+      { id: 2, value: 20 },
+    ];
     context.stepResults.set('items', items);
 
     const step: TransformStep = {
@@ -29,10 +35,10 @@ describe('TransformStepExecutor', () => {
         operations: [
           {
             type: 'map',
-            using: '{ id: item.id, value: item.value * 2 }'
-          }
-        ]
-      }
+            using: '{ id: item.id, value: item.value * 2 }',
+          },
+        ],
+      },
     };
 
     const result = await executor.execute(step, context);
@@ -40,12 +46,28 @@ describe('TransformStepExecutor', () => {
     expect(result.type).toBe('transform');
     expect(result.result).toEqual([
       { id: 1, value: 20 },
-      { id: 2, value: 40 }
+      { id: 2, value: 40 },
     ]);
+    expect(result.metadata).toEqual({
+      operations: [
+        {
+          type: 'map',
+          using: '{ id: item.id, value: item.value * 2 }',
+          initial: undefined,
+        },
+      ],
+      inputType: 'array',
+      resultType: 'array',
+      timestamp: expect.any(String),
+    });
   });
 
   it('performs filter transformation', async () => {
-    const items = [{ id: 1, value: 10 }, { id: 2, value: 20 }, { id: 3, value: 30 }];
+    const items = [
+      { id: 1, value: 10 },
+      { id: 2, value: 20 },
+      { id: 3, value: 30 },
+    ];
     context.stepResults.set('items', items);
 
     const step: TransformStep = {
@@ -55,10 +77,10 @@ describe('TransformStepExecutor', () => {
         operations: [
           {
             type: 'filter',
-            using: '${item.value} > 15'
-          }
-        ]
-      }
+            using: '${item.value} > 15',
+          },
+        ],
+      },
     };
 
     const result = await executor.execute(step, context);
@@ -66,12 +88,28 @@ describe('TransformStepExecutor', () => {
     expect(result.type).toBe('transform');
     expect(result.result).toEqual([
       { id: 2, value: 20 },
-      { id: 3, value: 30 }
+      { id: 3, value: 30 },
     ]);
+    expect(result.metadata).toEqual({
+      operations: [
+        {
+          type: 'filter',
+          using: '${item.value} > 15',
+          initial: undefined,
+        },
+      ],
+      inputType: 'array',
+      resultType: 'array',
+      timestamp: expect.any(String),
+    });
   });
 
   it('performs reduce transformation', async () => {
-    const items = [{ id: 1, value: 10 }, { id: 2, value: 20 }, { id: 3, value: 30 }];
+    const items = [
+      { id: 1, value: 10 },
+      { id: 2, value: 20 },
+      { id: 3, value: 30 },
+    ];
     context.stepResults.set('items', items);
 
     const step: TransformStep = {
@@ -82,20 +120,36 @@ describe('TransformStepExecutor', () => {
           {
             type: 'reduce',
             using: '${acc} + ${item.value}',
-            initial: 0
-          }
-        ]
-      }
+            initial: 0,
+          },
+        ],
+      },
     };
 
     const result = await executor.execute(step, context);
 
     expect(result.type).toBe('transform');
     expect(result.result).toBe(60);
+    expect(result.metadata).toEqual({
+      operations: [
+        {
+          type: 'reduce',
+          using: '${acc} + ${item.value}',
+          initial: 0,
+        },
+      ],
+      inputType: 'array',
+      resultType: 'number',
+      timestamp: expect.any(String),
+    });
   });
 
   it('performs flatten transformation', async () => {
-    const items = [[1, 2], [3, 4], [5, 6]];
+    const items = [
+      [1, 2],
+      [3, 4],
+      [5, 6],
+    ];
     context.stepResults.set('items', items);
 
     const step: TransformStep = {
@@ -105,10 +159,10 @@ describe('TransformStepExecutor', () => {
         operations: [
           {
             type: 'flatten',
-            using: '${item}'
-          }
-        ]
-      }
+            using: '${item}',
+          },
+        ],
+      },
     };
 
     const result = await executor.execute(step, context);
@@ -118,7 +172,11 @@ describe('TransformStepExecutor', () => {
   });
 
   it('chains multiple transformations', async () => {
-    const items = [{ id: 1, value: 10 }, { id: 2, value: 20 }, { id: 3, value: 30 }];
+    const items = [
+      { id: 1, value: 10 },
+      { id: 2, value: 20 },
+      { id: 3, value: 30 },
+    ];
     context.stepResults.set('items', items);
 
     const step: TransformStep = {
@@ -128,19 +186,19 @@ describe('TransformStepExecutor', () => {
         operations: [
           {
             type: 'filter',
-            using: '${item.value} > 15'
+            using: '${item.value} > 15',
           },
           {
             type: 'map',
-            using: '{ id: item.id, doubled: item.value * 2 }'
+            using: '{ id: item.id, doubled: item.value * 2 }',
           },
           {
             type: 'reduce',
             using: '${acc} + ${item.doubled}',
-            initial: 0
-          }
-        ]
-      }
+            initial: 0,
+          },
+        ],
+      },
     };
 
     const result = await executor.execute(step, context);
@@ -159,10 +217,10 @@ describe('TransformStepExecutor', () => {
         operations: [
           {
             type: 'map',
-            using: '${item}'
-          }
-        ]
-      }
+            using: '${item}',
+          },
+        ],
+      },
     };
 
     const result = await executor.execute(step, context);
@@ -182,26 +240,37 @@ describe('TransformStepExecutor', () => {
         operations: [
           {
             type: 'map',
-            using: '${item} * 2'
-          }
-        ]
-      }
+            using: '${item} * 2',
+          },
+        ],
+      },
     };
 
     const result = await executor.execute(step, context);
 
     expect(result.metadata).toEqual({
-      operations: ['map'],
-      inputSource: '${items}'
+      operations: [
+        {
+          type: 'map',
+          using: '${item} * 2',
+          initial: undefined,
+        },
+      ],
+      inputType: 'array',
+      resultType: 'array',
+      timestamp: expect.any(String),
     });
   });
 
   it('handles wrapped step results', async () => {
     // Set up a step result that includes the result wrapper
     const wrappedResult = {
-      result: [{ id: 1, name: 'Bob' }, { id: 2, name: 'Charlie' }],
-      type: StepType.Request,
-      metadata: { method: 'user.getFriends', requestId: 1 }
+      result: [
+        { id: 1, name: 'Bob' },
+        { id: 2, name: 'Charlie' },
+      ],
+      type: 'request',
+      metadata: { method: 'user.getFriends', requestId: 1 },
     };
     context.stepResults.set('getFriends', wrappedResult);
 
@@ -212,14 +281,14 @@ describe('TransformStepExecutor', () => {
         operations: [
           {
             type: 'map',
-            using: '${item.name}'
+            using: '${item.name}',
           },
           {
             type: 'join',
-            using: ', '
-          }
-        ]
-      }
+            using: ', ',
+          },
+        ],
+      },
     };
 
     const result = await executor.execute(step, context);
@@ -227,4 +296,4 @@ describe('TransformStepExecutor', () => {
     expect(result.type).toBe('transform');
     expect(result.result).toBe('Bob, Charlie');
   });
-}); 
+});

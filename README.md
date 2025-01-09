@@ -41,8 +41,8 @@ const flow: Flow = {
       name: 'getData',
       request: {
         method: 'data.get',
-        params: { id: 1 }
-      }
+        params: { id: 1 },
+      },
     },
     {
       name: 'processData',
@@ -51,12 +51,12 @@ const flow: Flow = {
         operations: [
           {
             type: 'map',
-            using: '{ id: item.id, value: item.value * 2 }'
-          }
-        ]
-      }
-    }
-  ]
+            using: '{ id: item.id, value: item.value * 2 }',
+          },
+        ],
+      },
+    },
+  ],
 };
 
 // Execute the flow
@@ -207,4 +207,4 @@ Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md)
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details. 
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

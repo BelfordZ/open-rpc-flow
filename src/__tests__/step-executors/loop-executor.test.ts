@@ -1,15 +1,15 @@
-import { LoopStepExecutor, isLoopResult } from '../../step-executors';
-import { 
-  StepExecutionContext, 
-  LoopStep, 
-  StepExecutionResult, 
+import { LoopStepExecutor } from '../../step-executors';
+import {
+  StepExecutionContext,
+  LoopStep,
+  StepExecutionResult,
   StepType,
-  LoopStepResult,
-  LoopResult
+  LoopResult,
+  isLoopResult,
 } from '../../step-executors/types';
-import { createMockContext } from '../test-utils';
 import { ExpressionEvaluator } from '../../expression-evaluator';
 import { ReferenceResolver } from '../../reference-resolver';
+import { noLogger } from '../../util/logger';
 
 interface TestResult {
   success: boolean;
@@ -21,29 +21,24 @@ interface TestMember {
   id: number;
 }
 
-interface TestTeam {
-  id: number;
-  members: TestMember[];
-}
-
 describe('LoopStepExecutor', () => {
-  let executor: LoopStepExecutor<TestResult>;
+  let executor: LoopStepExecutor;
   let context: StepExecutionContext;
   let executeStep: jest.Mock;
   let stepResults: Map<string, any>;
-
   beforeEach(() => {
     executeStep = jest.fn();
-    executor = new LoopStepExecutor<TestResult>(executeStep);
+    executor = new LoopStepExecutor(executeStep, noLogger);
     stepResults = new Map();
-    const referenceResolver = new ReferenceResolver(stepResults, {});
-    const expressionEvaluator = new ExpressionEvaluator(referenceResolver, {});
+    const referenceResolver = new ReferenceResolver(stepResults, {}, noLogger);
+    const expressionEvaluator = new ExpressionEvaluator(referenceResolver, {}, noLogger);
     context = {
       referenceResolver,
       expressionEvaluator,
       transformExecutor: null as any,
       stepResults,
-      context: {}
+      context: {},
+      logger: noLogger,
     };
     // Add spies to the real expression evaluator
     jest.spyOn(context.expressionEvaluator, 'evaluateExpression');
@@ -63,14 +58,14 @@ describe('LoopStepExecutor', () => {
           request: {
             method: 'item.process',
             params: {
-              id: '${item.id}'
-            }
-          }
-        }
-      }
+              id: '${item.id}',
+            },
+          },
+        },
+      },
     };
 
-    executeStep.mockResolvedValue({ result: { success: true }, type: StepType.Request });
+    executeStep.mockResolvedValue({ type: StepType.Request, result: { success: true } });
     const result = await executor.execute(step, context);
 
     expect(isLoopResult<TestResult>(result)).toBe(true);
@@ -79,16 +74,18 @@ describe('LoopStepExecutor', () => {
     expect(result.result.iterationCount).toBe(3);
     expect(result.result.skippedCount).toBe(0);
     expect(executeStep).toHaveBeenCalledTimes(3);
-    
+
     // Verify expression evaluator calls
-    expect(context.expressionEvaluator.evaluateExpression)
-      .toHaveBeenCalledWith('${items}', expect.any(Object));
+    expect(context.expressionEvaluator.evaluateExpression).toHaveBeenCalledWith(
+      '${items}',
+      expect.any(Object),
+    );
   });
 
   it('handles nested loops', async () => {
     const teams = [
       { id: 1, members: [{ id: 1 }, { id: 2 }] },
-      { id: 2, members: [{ id: 3 }, { id: 4 }] }
+      { id: 2, members: [{ id: 3 }, { id: 4 }] },
     ];
     stepResults.set('teams', teams);
 
@@ -110,81 +107,85 @@ describe('LoopStepExecutor', () => {
                 method: 'member.process',
                 params: {
                   teamId: '${team.id}',
-                  memberId: '${member.id}'
-                }
-              }
-            }
-          }
-        }
-      }
+                  memberId: '${member.id}',
+                },
+              },
+            },
+          },
+        },
+      },
     };
 
     // Mock inner loop results
-    executeStep.mockImplementation(async (step: any, context: any) => {
-      if (step.name === 'processMembers') {
-        const teamMembers = context.team.members as TestMember[];
-        const maxIterations = step.loop.maxIterations ?? teamMembers.length;
-        const innerResults = teamMembers.slice(0, maxIterations).map((member: TestMember) => ({
-          success: true,
-          teamId: context.team.id,
-          memberId: member.id
-        }));
-        return {
-          type: StepType.Loop,
-          result: {
+    executeStep.mockImplementation(
+      async (step: any, context: any): Promise<StepExecutionResult> => {
+        if (step.name === 'processMembers') {
+          const teamMembers = context.team.members as TestMember[];
+          const maxIterations = step.loop.maxIterations ?? teamMembers.length;
+          const innerResults = teamMembers.slice(0, maxIterations).map((member: TestMember) => ({
+            success: true,
+            teamId: context.team.id,
+            memberId: member.id,
+          }));
+          const loopResult: LoopResult<TestResult> = {
             value: innerResults,
             iterationCount: maxIterations,
-            skippedCount: 0
-          }
-        } as LoopStepResult<TestResult>;
-      }
-      return { result: { success: true }, type: StepType.Request } as StepExecutionResult<TestResult>;
-    });
+            skippedCount: 0,
+          };
+          return {
+            type: StepType.Loop,
+            result: loopResult,
+          };
+        }
+        return {
+          type: StepType.Request,
+          result: { success: true },
+        };
+      },
+    );
 
     const result = await executor.execute(step, context);
     expect(isLoopResult<TestResult>(result)).toBe(true);
-    const typedResult = result as LoopStepResult<TestResult>;
-
-    expect(typedResult.type).toBe(StepType.Loop);
-    expect(typedResult.result.value).toHaveLength(2);
-    expect(typedResult.result.iterationCount).toBe(2);
-    expect(typedResult.result.skippedCount).toBe(0);
+    expect(result.type).toBe(StepType.Loop);
+    expect(result.result.value).toHaveLength(2);
+    expect(result.result.iterationCount).toBe(2);
+    expect(result.result.skippedCount).toBe(0);
     expect(executeStep).toHaveBeenCalledTimes(2);
 
     // Each inner loop result should have 2 items due to maxIterations
-    const innerResults = typedResult.result.value;
-    expect(innerResults[0]).toEqual({
+    const innerResults = result.result.value;
+    expect(innerResults[0].result).toEqual({
       value: [
         {
           success: true,
           teamId: 1,
-          memberId: 1
+          memberId: 1,
         },
         {
           success: true,
           teamId: 1,
-          memberId: 2
-        }
+          memberId: 2,
+        },
       ],
       iterationCount: 2,
-      skippedCount: 0
+      skippedCount: 0,
     });
 
-    expect(innerResults[1]).toEqual({
+    expect(innerResults[1].result).toEqual({
       value: [
         {
           success: true,
           teamId: 2,
-          memberId: 3
+          memberId: 3,
         },
         {
           success: true,
           teamId: 2,
-          memberId: 4
-        }
+          memberId: 4,
+        },
       ],
       iterationCount: 2,
-      skippedCount: 0
+      skippedCount: 0,
     });
   });
 
@@ -201,24 +202,26 @@ describe('LoopStepExecutor', () => {
           request: {
             method: 'item.process',
             params: {
-              id: '${item.id}'
-            }
-          }
-        }
-      }
+              id: '${item.id}',
+            },
+          },
+        },
+      },
     };
 
     const result = await executor.execute(step, context);
 
-    expect(result.type).toBe('loop');
+    expect(result.type).toBe(StepType.Loop);
     expect(result.result.value).toHaveLength(0);
     expect(result.result.iterationCount).toBe(0);
     expect(result.result.skippedCount).toBe(0);
     expect(executeStep).not.toHaveBeenCalled();
 
     // Verify expression evaluator calls
-    expect(context.expressionEvaluator.evaluateExpression)
-      .toHaveBeenCalledWith('${items}', expect.any(Object));
+    expect(context.expressionEvaluator.evaluateExpression).toHaveBeenCalledWith(
+      '${items}',
+      expect.any(Object),
+    );
   });
 
   it('provides iteration index in context', async () => {
@@ -236,36 +239,70 @@ describe('LoopStepExecutor', () => {
             method: 'item.process',
             params: {
               id: '${item.id}',
-              index: '${$index}'
-            }
-          }
-        }
-      }
+              index: '${metadata.iteration.index}',
+            },
+          },
+        },
+      },
     };
 
-    executeStep.mockResolvedValue({ result: { success: true }, type: 'request' });
+    const mockRequestStepResult: StepExecutionResult = {
+      result: { success: true },
+      type: StepType.Request,
+      metadata: { method: 'item.process' },
+    };
+    executeStep.mockResolvedValue(mockRequestStepResult);
     await executor.execute(step, context);
+
+    const iterationHistory = [
+      {
+        index: 0,
+        count: 1,
+        total: items.length,
+        maxIterations: items.length,
+        isFirst: true,
+        isLast: false,
+        value: items[0],
+      },
+      {
+        index: 1,
+        count: 2,
+        total: items.length,
+        maxIterations: items.length,
+        isFirst: false,
+        isLast: true,
+        value: items[1],
+      },
+    ];
 
     // Verify the context passed to executeStep
     expect(executeStep).toHaveBeenCalledWith(
       expect.any(Object),
       expect.objectContaining({
         item: items[0],
-        $index: 0
-      })
+        metadata: {
+          iteration: [iterationHistory[0]],
+          current: iterationHistory[0],
+        },
+      }),
     );
 
     expect(executeStep).toHaveBeenCalledWith(
       expect.any(Object),
       expect.objectContaining({
         item: items[1],
-        $index: 1
-      })
+        metadata: {
+          iteration: iterationHistory,
+          current: iterationHistory[1],
+        },
+      }),
     );
 
     // Verify expression evaluator calls
-    expect(context.expressionEvaluator.evaluateExpression)
-      .toHaveBeenCalledWith('${items}', expect.any(Object));
+    expect(context.expressionEvaluator.evaluateExpression).toHaveBeenCalledWith(
+      '${items}',
+      expect.any(Object),
+    );
   });
 
   it('throws error for non-array input', async () => {
@@ -280,20 +317,22 @@ describe('LoopStepExecutor', () => {
           name: 'processItem',
           request: {
             method: 'item.process',
-            params: {}
-          }
-        }
-      }
+            params: {},
+          },
+        },
+      },
     };
 
-    await expect(executor.execute(step, context)).rejects.toThrow('must evaluate to an array');
-    
+    await expect(executor.execute(step, context)).rejects.toThrow(
+      'Failed to execute loop step "processItems": Loop "over" value must resolve to an array',
+    );
+
     // Verify expression evaluator calls
-    expect(context.expressionEvaluator.evaluateExpression)
-      .toHaveBeenCalledWith('${nonArray}', expect.any(Object));
+    expect(context.expressionEvaluator.evaluateExpression).toHaveBeenCalled();
   });
 
   it('respects maxIterations limit', async () => {
+    const maxIterations = 2;
     const items = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }];
     stepResults.set('items', items);
 
@@ -302,42 +341,69 @@ describe('LoopStepExecutor', () => {
       loop: {
         over: '${items}',
         as: 'item',
-        maxIterations: 2,
+        maxIterations,
         step: {
           name: 'processItem',
           request: {
             method: 'item.process',
             params: {
-              id: '${item.id}'
-            }
-          }
-        }
-      }
+              id: '${item.id}',
+            },
+          },
+        },
+      },
     };
 
-    executeStep.mockResolvedValue({ result: { success: true }, type: 'request' });
+    executeStep.mockResolvedValue({ type: StepType.Request, result: { success: true } });
     const result = await executor.execute(step, context);
 
-    expect(result.type).toBe('loop');
+    expect(result.type).toBe(StepType.Loop);
     expect(result.result.value).toHaveLength(2); // Should only process 2 items due to maxIterations
     expect(result.result.iterationCount).toBe(2); // Should count only processed iterations
-    expect(result.result.skippedCount).toBe(0);
+    expect(result.result.skippedCount).toBe(2); // Should all skipped items (maxIterations)
     expect(executeStep).toHaveBeenCalledTimes(2);
-    
+
+    const iterationHistory = [
+      {
+        index: 0,
+        count: 1,
+        total: items.length,
+        maxIterations,
+        isFirst: true,
+        isLast: false,
+        value: items[0],
+      },
+      {
+        index: 1,
+        count: 2,
+        total: items.length,
+        maxIterations,
+        isFirst: false,
+        isLast: true,
+        value: items[1],
+      },
+    ];
+
     // Verify that only the first two items were processed
     expect(executeStep).toHaveBeenCalledWith(
       expect.any(Object),
       expect.objectContaining({
         item: items[0],
-        $index: 0
-      })
+        metadata: {
+          iteration: [iterationHistory[0]],
+          current: iterationHistory[0],
+        },
+      }),
     );
     expect(executeStep).toHaveBeenCalledWith(
       expect.any(Object),
       expect.objectContaining({
         item: items[1],
-        $index: 1
-      })
+        metadata: {
+          iteration: iterationHistory,
+          current: iterationHistory[1],
+        },
+      }),
     );
   });
 
@@ -345,7 +411,7 @@ describe('LoopStepExecutor', () => {
     const teams = [
       { id: 1, members: [{ id: 1 }, { id: 2 }, { id: 3 }] },
       { id: 2, members: [{ id: 4 }, { id: 5 }, { id: 6 }] },
-      { id: 3, members: [{ id: 7 }, { id: 8 }, { id: 9 }] }
+      { id: 3, members: [{ id: 7 }, { id: 8 }, { id: 9 }] },
     ];
     stepResults.set('teams', teams);
 
@@ -367,86 +433,95 @@ describe('LoopStepExecutor', () => {
                 method: 'member.process',
                 params: {
                   teamId: '${team.id}',
-                  memberId: '${member.id}'
-                }
-              }
-            }
-          }
-        }
-      }
+                  memberId: '${member.id}',
+                },
+              },
+            },
+          },
+        },
+      },
     };
 
     // Mock inner loop results
-    executeStep.mockImplementation(async (step: any, context: any) => {
-      if (step.name === 'processMembers') {
-        const teamMembers = context.team.members as TestMember[];
-        const maxIterations = step.loop.maxIterations ?? teamMembers.length;
-        const innerResults = teamMembers.slice(0, maxIterations).map((member: TestMember) => ({
-          success: true,
-          teamId: context.team.id,
-          memberId: member.id
-        }));
-        return {
-          type: StepType.Loop,
-          result: {
+    executeStep.mockImplementation(
+      async (step: any, context: any): Promise<StepExecutionResult> => {
+        if (step.name === 'processMembers') {
+          const teamMembers = context.team.members as TestMember[];
+          const maxIterations = step.loop.maxIterations ?? teamMembers.length;
+          const innerResults = teamMembers.slice(0, maxIterations).map((member: TestMember) => ({
+            success: true,
+            teamId: context.team.id,
+            memberId: member.id,
+          }));
+          const loopResult: LoopResult<TestResult> = {
             value: innerResults,
             iterationCount: maxIterations,
-            skippedCount: 0
-          }
-        } as LoopStepResult<TestResult>;
-      }
-      return { result: { success: true }, type: StepType.Request } as StepExecutionResult<TestResult>;
-    });
+            skippedCount: 0,
+          };
+          return {
+            type: StepType.Loop,
+            result: loopResult,
+          };
+        }
+        return {
+          type: StepType.Request,
+          result: { success: true },
+        };
+      },
+    );
 
     const result = await executor.execute(step, context);
     expect(isLoopResult<TestResult>(result)).toBe(true);
-    const typedResult = result as LoopStepResult<TestResult>;
-
-    expect(typedResult.type).toBe(StepType.Loop);
-    expect(typedResult.result.value).toHaveLength(2);
-    expect(typedResult.result.iterationCount).toBe(2);
-    expect(typedResult.result.skippedCount).toBe(0);
+    expect(result.type).toBe(StepType.Loop);
+    expect(result.result.value).toHaveLength(2);
+    expect(result.result.iterationCount).toBe(2);
+    expect(result.result.skippedCount).toBe(1);
     expect(executeStep).toHaveBeenCalledTimes(2);
 
     // Each inner loop result should have 2 items due to maxIterations
-    const innerResults = typedResult.result.value;
-    expect(innerResults[0]).toEqual({
+    const innerResults = result.result.value;
+    expect(innerResults[0].result).toEqual({
       value: [
         {
           success: true,
           teamId: 1,
-          memberId: 1
+          memberId: 1,
         },
         {
           success: true,
           teamId: 1,
-          memberId: 2
-        }
+          memberId: 2,
+        },
       ],
       iterationCount: 2,
-      skippedCount: 0
+      skippedCount: 0,
     });
 
-    expect(innerResults[1]).toEqual({
+    expect(innerResults[1].result).toEqual({
       value: [
         {
           success: true,
           teamId: 2,
-          memberId: 4
+          memberId: 4,
         },
         {
           success: true,
           teamId: 2,
-          memberId: 5
-        }
+          memberId: 5,
+        },
       ],
       iterationCount: 2,
-      skippedCount: 0
+      skippedCount: 0,
     });
   });
 
   it('combines maxIterations with condition', async () => {
-    const items = [{ id: 1, valid: true }, { id: 2, valid: false }, { id: 3, valid: true }, { id: 4, valid: true }];
+    const items = [
+      { id: 1, valid: true },
+      { id: 2, valid: false },
+      { id: 3, valid: true },
+      { id: 4, valid: true },
+    ];
     stepResults.set('items', items);
 
     const step: LoopStep = {
@@ -461,20 +536,20 @@ describe('LoopStepExecutor', () => {
           request: {
             method: 'item.process',
             params: {
-              id: '${item.id}'
-            }
-          }
-        }
-      }
+              id: '${item.id}',
+            },
+          },
+        },
+      },
     };
 
-    executeStep.mockResolvedValue({ result: { success: true }, type: 'request' });
+    executeStep.mockResolvedValue({ type: StepType.Request, result: { success: true } });
     const result = await executor.execute(step, context);
 
     expect(result.type).toBe('loop');
     expect(result.result.value).toHaveLength(2); // Should process 2 valid items within maxIterations
     expect(result.result.iterationCount).toBe(3); // Should count all iterations within maxIterations
-    expect(result.result.skippedCount).toBe(1); // Should count skipped items within maxIterations
+    expect(result.result.skippedCount).toBe(2); // Should all skipped items (condiiton not met + skipped due to maxIterations)
     expect(executeStep).toHaveBeenCalledTimes(2);
   });
-}); 
+});

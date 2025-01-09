@@ -1,17 +1,238 @@
 # Flow Execution Engine
 
-A flexible and type-safe execution engine for JSON-RPC based workflows. This engine allows you to define complex flows of operations including requests, transformations, conditions, and loops, with full support for data dependencies and parallel execution.
+A flexible and type-safe execution engine for JSON-RPC based workflows. This engine allows you to define complex flows of operations including requests, transformations, conditions, and loops, with full support for data dependencies, parallel execution, and error handling.
 
 ## Features
 
-- 🔄 **JSON-RPC Request Handling**: Execute JSON-RPC 2.0 requests with automatic request ID management
-- 🔀 **Flow Control**: Support for conditional execution, loops, and parallel processing
+- 🔄 **JSON-RPC Request Handling**: Execute JSON-RPC 2.0 requests with automatic request ID management and error handling
+- 🔀 **Flow Control**: Support for conditional execution, loops, and parallel processing with proper variable scoping
 - 🔄 **Data Transformation**: Transform data between steps using map, filter, reduce, and other operations
 - 📊 **Expression Evaluation**: Dynamic expression evaluation with support for template literals and object paths
 - 🔗 **Dependency Resolution**: Automatic handling of data dependencies between steps
 - 🎯 **Type Safety**: Written in TypeScript with comprehensive type definitions
 - ⚡ **Parallel Execution**: Automatic parallel execution of independent steps
-- 🔍 **Error Handling**: Detailed error reporting and validation
+- 🔍 **Error Handling**: Detailed error reporting, validation, and graceful error recovery
+- 🌍 **Context Management**: Global context available to all steps with proper scoping
+- 📦 **Batch Processing**: Support for processing data in configurable batch sizes
+
+## Examples
+
+### 1. Team Member Processing
+
+Process team members with nested operations and dynamic notifications:
+
+```typescript
+const teamFlow: Flow = {
+  name: 'team-member-processing',
+  description: 'Process team members and send notifications',
+  context: {
+    welcomeTemplate: 'Welcome to ${team.name}! Your role: ${member.role}',
+  },
+  steps: [
+    {
+      name: 'getTeams',
+      request: {
+        method: 'teams.list',
+        params: { active: true }
+      }
+    },
+    {
+      name: 'processTeams',
+      loop: {
+        over: '${getTeams.result}',
+        as: 'team',
+        step: {
+          name: 'processMembers',
+          loop: {
+            over: '${team.members}',
+            as: 'member',
+            step: {
+              name: 'processMember',
+              condition: {
+                if: '${member.active}',
+                then: {
+                  name: 'notifyMember',
+                  request: {
+                    method: 'notify',
+                    params: {
+                      teamId: '${team.id}',
+                      memberId: '${member.id}',
+                      message: '${context.welcomeTemplate}'
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+};
+```
+
+### 2. Data Pipeline with Error Recovery
+
+Process data with validation, transformation, and error handling:
+
+```typescript
+const dataPipelineFlow: Flow = {
+  name: 'data-pipeline',
+  description: 'Process and transform data with error handling',
+  context: {
+    batchSize: 2,
+    minValue: 10,
+    retryCount: 3
+  },
+  steps: [
+    {
+      name: 'getData',
+      request: {
+        method: 'data.fetch',
+        params: { source: 'test' }
+      }
+    },
+    {
+      name: 'validateData',
+      condition: {
+        if: '${getData.error}',
+        then: {
+          name: 'retryData',
+          loop: {
+            over: 'Array.from({ length: ${context.retryCount} })',
+            as: 'attempt',
+            step: {
+              name: 'retryFetch',
+              request: {
+                method: 'data.fetch',
+                params: {
+                  source: 'test',
+                  attempt: '${metadata.current.index + 1}'
+                }
+              }
+            }
+          }
+        },
+        else: {
+          name: 'processData',
+          transform: {
+            input: '${getData.result}',
+            operations: [
+              {
+                type: 'filter',
+                using: '${item.value > context.minValue}'
+              },
+              {
+                type: 'map',
+                using: '{ ...item, processed: true }'
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      name: 'processBatches',
+      loop: {
+        over: '${validateData.result.result}',
+        as: 'batch',
+        step: {
+          name: 'processBatch',
+          request: {
+            method: 'batch.process',
+            params: {
+              data: '${batch}',
+              index: '${metadata.current.index}'
+            }
+          }
+        }
+      }
+    }
+  ]
+};
+```
+
+### 3. API Data Aggregation
+
+Aggregate data from multiple API endpoints with parallel processing:
+
+```typescript
+const apiAggregationFlow: Flow = {
+  name: 'api-aggregation',
+  description: 'Aggregate data from multiple APIs',
+  steps: [
+    {
+      name: 'fetchUsers',
+      request: {
+        method: 'users.list',
+        params: { status: 'active' }
+      }
+    },
+    {
+      name: 'fetchUserDetails',
+      loop: {
+        over: '${fetchUsers.result}',
+        as: 'user',
+        step: {
+          name: 'userDetails',
+          transform: {
+            input: '${user}',
+            operations: [
+              {
+                type: 'parallel',
+                operations: [
+                  {
+                    name: 'profile',
+                    request: {
+                      method: 'user.profile',
+                      params: { userId: '${user.id}' }
+                    }
+                  },
+                  {
+                    name: 'activity',
+                    request: {
+                      method: 'user.activity',
+                      params: { userId: '${user.id}' }
+                    }
+                  }
+                ]
+              },
+              {
+                type: 'map',
+                using: `{
+                  ...user,
+                  profile: ${profile.result},
+                  recentActivity: ${activity.result}
+                }`
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      name: 'aggregateData',
+      transform: {
+        input: '${fetchUserDetails.result.value}',
+        operations: [
+          {
+            type: 'group',
+            using: 'item.profile.department'
+          },
+          {
+            type: 'map',
+            using: `{
+              department: key,
+              userCount: items.length,
+              activeUsers: items.filter(u => u.recentActivity.length > 0).length
+            }`
+          }
+        ]
+      }
+    }
+  ]
+};
+```
 
 ## Installation
 
@@ -32,28 +253,48 @@ const jsonRpcHandler = async (request) => {
   return { result: 'Success' };
 };
 
-// Define a flow
+// Define a flow with data processing and error handling
 const flow: Flow = {
-  name: 'Example Flow',
-  description: 'Demonstrates basic flow functionality',
+  name: 'Data Processing Flow',
+  description: 'Process and transform data with error handling',
+  context: {
+    minValue: 10,
+  },
   steps: [
     {
       name: 'getData',
       request: {
-        method: 'data.get',
-        params: { id: 1 },
+        method: 'data.fetch',
+        params: { source: 'api' },
       },
     },
     {
-      name: 'processData',
-      transform: {
-        input: '${getData}',
-        operations: [
-          {
-            type: 'map',
-            using: '{ id: item.id, value: item.value * 2 }',
+      name: 'validateData',
+      condition: {
+        if: '${getData.result.length > 0}',
+        then: {
+          name: 'processData',
+          transform: {
+            input: '${getData.result}',
+            operations: [
+              {
+                type: 'filter',
+                using: '${item.value > context.minValue}',
+              },
+              {
+                type: 'map',
+                using: '{ ...item, processed: true }',
+              },
+            ],
           },
-        ],
+        },
+        else: {
+          name: 'handleError',
+          request: {
+            method: 'error.log',
+            params: { message: 'No data found' },
+          },
+        },
       },
     },
   ],
@@ -70,7 +311,7 @@ A flow consists of a series of steps that can include:
 
 ### Request Steps
 
-Execute JSON-RPC requests:
+Execute JSON-RPC requests with error handling:
 
 ```typescript
 {
@@ -90,15 +331,20 @@ Transform data using operations like map, filter, reduce:
 {
   name: 'processUsers',
   transform: {
-    input: '${getUser}',
+    input: '${getUser.result}',
     operations: [
       {
-        type: 'map',
-        using: '{ name: item.name, age: item.age }'
+        type: 'filter',
+        using: '${item.active === true}',
       },
       {
-        type: 'filter',
-        using: '${item.age} > 18'
+        type: 'map',
+        using: '{ id: item.id, name: item.name }',
+      },
+      {
+        type: 'reduce',
+        using: '[...acc, item.id]',
+        initial: [],
       }
     ]
   }
@@ -107,18 +353,30 @@ Transform data using operations like map, filter, reduce:
 
 ### Conditional Steps
 
-Execute steps based on conditions:
+Execute steps based on conditions with error handling:
 
 ```typescript
 {
-  name: 'notifyIfAdmin',
+  name: 'validateUser',
   condition: {
-    if: '${getUser.role} === "admin"',
+    if: '${getUser.error}',
     then: {
-      name: 'sendNotification',
+      name: 'handleError',
       request: {
-        method: 'notification.send',
-        params: { userId: '${getUser.id}' }
+        method: 'error.log',
+        params: { message: '${getUser.error.message}' }
+      }
+    },
+    else: {
+      name: 'processUser',
+      transform: {
+        input: '${getUser.result}',
+        operations: [
+          {
+            type: 'map',
+            using: '{ ...item, validated: true }'
+          }
+        ]
       }
     }
   }
@@ -127,19 +385,23 @@ Execute steps based on conditions:
 
 ### Loop Steps
 
-Iterate over collections:
+Iterate over collections with batch processing:
 
 ```typescript
 {
   name: 'processItems',
   loop: {
-    over: '${getItems}',
+    over: '${getItems.result}',
     as: 'item',
+    maxIterations: 100,
     step: {
       name: 'processItem',
       request: {
         method: 'item.process',
-        params: { id: '${item.id}' }
+        params: {
+          id: '${item.id}',
+          batchIndex: '${metadata.current.index}'
+        }
       }
     }
   }
@@ -155,12 +417,13 @@ The engine supports dynamic expressions using the `${...}` syntax:
 - Array access: `${stepName[0]}`
 - Nested properties: `${stepName.nested.property}`
 - Template literals: `` `Value: ${stepName.value}` ``
-- Comparisons: `${value} > 10`
+- Comparisons: `${value > 10}`
 - Object literals: `{ id: ${item.id}, name: ${item.name} }`
+- Error handling: `${stepName.error.message}`
 
 ## Error Handling
 
-The engine provides detailed error information:
+The engine provides detailed error information and recovery options:
 
 ```typescript
 try {
@@ -198,7 +461,7 @@ interface RequestStep {
   };
 }
 
-// ... more type definitions available in the source
+// More type definitions available in the source
 ```
 
 ## Contributing

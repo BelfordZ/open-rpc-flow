@@ -26,15 +26,18 @@ const teamFlow: Flow = {
   name: 'team-member-processing',
   description: 'Process team members and send notifications',
   context: {
-    welcomeTemplate: 'Welcome to ${team.name}! Your role: ${member.role}',
+    notificationTypes: {
+      welcome: 'WELCOME',
+      update: 'UPDATE'
+    }
   },
   steps: [
     {
       name: 'getTeams',
       request: {
         method: 'teams.list',
-        params: { active: true },
-      },
+        params: { active: true }
+      }
     },
     {
       name: 'processTeams',
@@ -57,17 +60,21 @@ const teamFlow: Flow = {
                     params: {
                       teamId: '${team.id}',
                       memberId: '${member.id}',
-                      message: '${context.welcomeTemplate}',
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
-  ],
+                      type: '${context.notificationTypes.welcome}',
+                      data: {
+                        teamName: '${team.name}',
+                        memberRole: '${member.role}'
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 };
 ```
 

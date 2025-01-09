@@ -28,16 +28,16 @@ const teamFlow: Flow = {
   context: {
     notificationTypes: {
       welcome: 'WELCOME',
-      update: 'UPDATE'
-    }
+      update: 'UPDATE',
+    },
   },
   steps: [
     {
       name: 'getTeams',
       request: {
         method: 'teams.list',
-        params: { active: true }
-      }
+        params: { active: true },
+      },
     },
     {
       name: 'processTeams',
@@ -63,18 +63,18 @@ const teamFlow: Flow = {
                       type: '${context.notificationTypes.welcome}',
                       data: {
                         teamName: '${team.name}',
-                        memberRole: '${member.role}'
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  ]
+                        memberRole: '${member.role}',
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  ],
 };
 ```
 

@@ -33,8 +33,8 @@ const teamFlow: Flow = {
       name: 'getTeams',
       request: {
         method: 'teams.list',
-        params: { active: true }
-      }
+        params: { active: true },
+      },
     },
     {
       name: 'processTeams',
@@ -57,17 +57,17 @@ const teamFlow: Flow = {
                     params: {
                       teamId: '${team.id}',
                       memberId: '${member.id}',
-                      message: '${context.welcomeTemplate}'
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  ]
+                      message: '${context.welcomeTemplate}',
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  ],
 };
 ```
 
@@ -82,15 +82,15 @@ const dataPipelineFlow: Flow = {
   context: {
     batchSize: 2,
     minValue: 10,
-    retryCount: 3
+    retryCount: 3,
   },
   steps: [
     {
       name: 'getData',
       request: {
         method: 'data.fetch',
-        params: { source: 'test' }
-      }
+        params: { source: 'test' },
+      },
     },
     {
       name: 'validateData',
@@ -107,11 +107,11 @@ const dataPipelineFlow: Flow = {
                 method: 'data.fetch',
                 params: {
                   source: 'test',
-                  attempt: '${metadata.current.index + 1}'
-                }
-              }
-            }
-          }
+                  attempt: '${metadata.current.index + 1}',
+                },
+              },
+            },
+          },
         },
         else: {
           name: 'processData',
@@ -120,16 +120,16 @@ const dataPipelineFlow: Flow = {
             operations: [
               {
                 type: 'filter',
-                using: '${item.value > context.minValue}'
+                using: '${item.value > context.minValue}',
               },
               {
                 type: 'map',
-                using: '{ ...item, processed: true }'
-              }
-            ]
-          }
-        }
-      }
+                using: '{ ...item, processed: true }',
+              },
+            ],
+          },
+        },
+      },
     },
     {
       name: 'processBatches',
@@ -142,13 +142,13 @@ const dataPipelineFlow: Flow = {
             method: 'batch.process',
             params: {
               data: '${batch}',
-              index: '${metadata.current.index}'
-            }
-          }
-        }
-      }
-    }
-  ]
+              index: '${metadata.current.index}',
+            },
+          },
+        },
+      },
+    },
+  ],
 };
 ```
 
@@ -165,8 +165,8 @@ const apiAggregationFlow: Flow = {
       name: 'fetchUsers',
       request: {
         method: 'users.list',
-        params: { status: 'active' }
-      }
+        params: { status: 'active' },
+      },
     },
     {
       name: 'fetchUserDetails',
@@ -185,17 +185,17 @@ const apiAggregationFlow: Flow = {
                     name: 'profile',
                     request: {
                       method: 'user.profile',
-                      params: { userId: '${user.id}' }
-                    }
+                      params: { userId: '${user.id}' },
+                    },
                   },
                   {
                     name: 'activity',
                     request: {
                       method: 'user.activity',
-                      params: { userId: '${user.id}' }
-                    }
-                  }
-                ]
+                      params: { userId: '${user.id}' },
+                    },
+                  },
+                ],
               },
               {
                 type: 'map',
@@ -203,12 +203,12 @@ const apiAggregationFlow: Flow = {
                   ...user,
                   profile: ${profile.result},
                   recentActivity: ${activity.result}
-                }`
-              }
-            ]
-          }
-        }
-      }
+                }`,
+              },
+            ],
+          },
+        },
+      },
     },
     {
       name: 'aggregateData',
@@ -217,7 +217,7 @@ const apiAggregationFlow: Flow = {
         operations: [
           {
             type: 'group',
-            using: 'item.profile.department'
+            using: 'item.profile.department',
           },
           {
             type: 'map',
@@ -225,12 +225,12 @@ const apiAggregationFlow: Flow = {
               department: key,
               userCount: items.length,
               activeUsers: items.filter(u => u.recentActivity.length > 0).length
-            }`
-          }
-        ]
-      }
-    }
-  ]
+            }`,
+          },
+        ],
+      },
+    },
+  ],
 };
 ```
 

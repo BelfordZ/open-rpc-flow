@@ -1,3 +1,12 @@
+## [1.0.1](https://github.com/BelfordZ/open-rpc-flow/compare/v1.0.0...v1.0.1) (2025-01-09)
+
+
+### Bug Fixes
+
+* bad example ([#4](https://github.com/BelfordZ/open-rpc-flow/issues/4)) ([4c1f2be](https://github.com/BelfordZ/open-rpc-flow/commit/4c1f2bedd17fe041fe1536c3fa7d36ba508e80eb))
+* big readme update ([#3](https://github.com/BelfordZ/open-rpc-flow/issues/3)) ([ae91c01](https://github.com/BelfordZ/open-rpc-flow/commit/ae91c01e701cddd4bf1725a6c170d3517760f940))
+* forgot to include dist folder ([#5](https://github.com/BelfordZ/open-rpc-flow/issues/5)) ([8e0eef0](https://github.com/BelfordZ/open-rpc-flow/commit/8e0eef003801ee5f6c442a917a69c5f28b2e1a88))
+
 # 1.0.0 (2025-01-09)
 
 ### Bug Fixes

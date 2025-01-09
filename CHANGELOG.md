@@ -1,3 +1,10 @@
+## [1.0.5](https://github.com/BelfordZ/open-rpc-flow/compare/v1.0.4...v1.0.5) (2025-01-09)
+
+
+### Bug Fixes
+
+* point at correct path to index.js ([#10](https://github.com/BelfordZ/open-rpc-flow/issues/10)) ([131c5d5](https://github.com/BelfordZ/open-rpc-flow/commit/131c5d598fbd45ca024088eac6d3b20514e47ebe))
+
 ## [1.0.4](https://github.com/BelfordZ/open-rpc-flow/compare/v1.0.3...v1.0.4) (2025-01-09)
 
 

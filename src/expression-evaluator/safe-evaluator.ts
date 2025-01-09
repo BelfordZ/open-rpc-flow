@@ -332,40 +332,40 @@ export class SafeExpressionEvaluator {
   private evaluateAst(ast: AstNode, context: Record<string, any>, startTime: number): any {
     this.checkTimeout(startTime);
 
-    switch (ast.type) {
-      case 'literal':
-        return ast.value;
-
-      case 'reference':
-        if (!ast.path) {
-          throw new ExpressionError('Reference node missing path');
-        }
-        return this.resolveReference(ast.path, context);
-
-      case 'operation':
-        if (!ast.operator || !ast.left || !ast.right) {
-          throw new ExpressionError('Invalid operation node');
-        }
-
-        const operator = SafeExpressionEvaluator.OPERATORS[ast.operator];
-        if (!operator) {
-          throw new ExpressionError(`Unknown operator: ${ast.operator}`);
-        }
-
-        const left = this.evaluateAst(ast.left, context, startTime);
-        const right = this.evaluateAst(ast.right, context, startTime);
-
-        try {
-          return operator(left, right);
-        } catch (error) {
-          throw new ExpressionError(
-            `Failed to evaluate operation ${ast.operator}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          );
-        }
-
-      default:
-        throw new ExpressionError(`Unknown AST node type: ${ast.type}`);
+    if (ast.type === 'literal') {
+      return ast.value;
     }
+
+    if (ast.type === 'reference') {
+      if (!ast.path) {
+        throw new ExpressionError('Internal error: Reference node missing path');
+      }
+      return this.resolveReference(ast.path, context);
+    }
+
+    if (ast.type === 'operation') {
+      if (!ast.operator || !ast.left || !ast.right) {
+        throw new ExpressionError('Invalid operation node');
+      }
+
+      const operator = SafeExpressionEvaluator.OPERATORS[ast.operator];
+      if (!operator) {
+        throw new ExpressionError(`Unknown operator: ${ast.operator}`);
+      }
+
+      const left = this.evaluateAst(ast.left, context, startTime);
+      const right = this.evaluateAst(ast.right, context, startTime);
+
+      try {
+        return operator(left, right);
+      } catch (error) {
+        throw new ExpressionError(
+          `Failed to evaluate operation ${ast.operator}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
+      }
+    }
+
+    throw new ExpressionError(`Unknown AST node type: ${ast.type}`);
   }
 
   private resolveReference(path: string, context: Record<string, any>): any {

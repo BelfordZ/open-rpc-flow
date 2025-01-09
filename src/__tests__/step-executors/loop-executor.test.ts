@@ -4,11 +4,9 @@ import {
   LoopStep,
   StepExecutionResult,
   StepType,
-  LoopStepResult,
   LoopResult,
   isLoopResult,
 } from '../../step-executors/types';
-import { createMockContext } from '../test-utils';
 import { ExpressionEvaluator } from '../../expression-evaluator';
 import { ReferenceResolver } from '../../reference-resolver';
 import { noLogger } from '../../util/logger';
@@ -21,11 +19,6 @@ interface TestResult {
 
 interface TestMember {
   id: number;
-}
-
-interface TestTeam {
-  id: number;
-  members: TestMember[];
 }
 
 describe('LoopStepExecutor', () => {

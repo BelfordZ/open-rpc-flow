@@ -1,8 +1,4 @@
-import {
-  RequestStepExecutor,
-  JsonRpcRequestError,
-  StepExecutionResult,
-} from '../../step-executors';
+import { RequestStepExecutor, JsonRpcRequestError } from '../../step-executors';
 import { StepExecutionContext, Step } from '../../types';
 import { createMockContext } from '../test-utils';
 import { noLogger } from '../../util/logger';
@@ -60,7 +56,7 @@ describe('RequestStepExecutor', () => {
 
     context.stepResults.set('user', { id: 1, role: 'admin' });
     jsonRpcHandler.mockResolvedValue(['read', 'write']);
-    const result = await executor.execute(step, context);
+    await executor.execute(step, context);
 
     expect(jsonRpcHandler).toHaveBeenCalledWith({
       jsonrpc: '2.0',

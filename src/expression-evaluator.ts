@@ -129,8 +129,6 @@ export class ExpressionEvaluator {
       let lastIndex = 0;
       let processedExpression = '';
       let inBacktick = false;
-      let bracketDepth = 0;
-      let currentExpression = '';
 
       for (let i = 0; i < expression.length; i++) {
         const char = expression[i];
@@ -138,14 +136,7 @@ export class ExpressionEvaluator {
 
         if (char === '`') {
           inBacktick = !inBacktick;
-          currentExpression += char;
           continue;
-        }
-
-        if (char === '[') {
-          bracketDepth++;
-        } else if (char === ']') {
-          bracketDepth--;
         }
 
         if (char === '$' && nextChar === '{' && !inBacktick) {
@@ -164,7 +155,6 @@ export class ExpressionEvaluator {
           }
 
           if (foundEnd) {
-            const fullMatch = expression.slice(i, j + 1);
             const path = expression.slice(i + 2, j);
             this.logger.debug('Found reference:', path);
             try {

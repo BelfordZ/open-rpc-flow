@@ -1,6 +1,4 @@
 import { ReferenceResolver } from '../reference-resolver';
-import { ExpressionEvaluator } from '../expression-evaluator';
-import { UnknownReferenceError } from '../reference-resolver';
 import { noLogger } from '../util/logger';
 
 describe('ReferenceResolver', () => {

@@ -50,7 +50,7 @@ export function createMockJsonRpcHandler(_mockResponses: Record<string, any> = {
  * Creates a mock step executor for testing
  */
 export function createMockStepExecutor() {
-  return jest.fn().mockImplementation((step, context) => {
+  return jest.fn().mockImplementation((step) => {
     return Promise.resolve({
       result: { success: true },
       type: 'mock',

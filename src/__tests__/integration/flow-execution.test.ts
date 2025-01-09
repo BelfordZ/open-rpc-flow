@@ -1,21 +1,12 @@
 import { FlowExecutor } from '../../flow-executor';
 import { Flow } from '../../types';
 import { createMockJsonRpcHandler } from '../test-utils';
-import { TestLogger } from '../../util/logger';
+//import { TestLogger } from '../../util/logger';
 import { noLogger } from '../../util/logger';
-
-// Defined but not used directly
-type MockResponses = {
-  [key: string]: unknown;
-  'user.get': { id: number; name: string; role: string };
-  'user.getPermissions': string[];
-  'user.getFriends': Array<{ id: number; name: string }>;
-  'notification.send': { success: boolean };
-};
 
 describe('Flow Execution Integration', () => {
   let jsonRpcHandler: jest.Mock;
-  let testLogger: TestLogger;
+  //let testLogger: TestLogger;
   beforeEach(() => {
     jsonRpcHandler = createMockJsonRpcHandler();
     //testLogger = new TestLogger('FlowExecutionTest');

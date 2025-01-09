@@ -1,4 +1,0 @@
-#!/usr/bin/env sh
-
-npm run format
-git add -A 

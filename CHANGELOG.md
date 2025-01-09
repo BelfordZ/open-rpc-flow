@@ -1,3 +1,10 @@
+## [1.0.3](https://github.com/BelfordZ/open-rpc-flow/compare/v1.0.2...v1.0.3) (2025-01-09)
+
+
+### Bug Fixes
+
+* add prettierignore ([#8](https://github.com/BelfordZ/open-rpc-flow/issues/8)) ([9897dc7](https://github.com/BelfordZ/open-rpc-flow/commit/9897dc7cb354fb9adfc14b5933caa99face4a7e2))
+
 ## [1.0.2](https://github.com/BelfordZ/open-rpc-flow/compare/v1.0.1...v1.0.2) (2025-01-09)
 
 ### Bug Fixes

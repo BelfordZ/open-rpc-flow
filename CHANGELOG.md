@@ -1,3 +1,10 @@
+## [1.0.4](https://github.com/BelfordZ/open-rpc-flow/compare/v1.0.3...v1.0.4) (2025-01-09)
+
+
+### Bug Fixes
+
+* include metaschema in build ([#9](https://github.com/BelfordZ/open-rpc-flow/issues/9)) ([6208bfa](https://github.com/BelfordZ/open-rpc-flow/commit/6208bfaf3158625639c4dcc6af4e2df5d5006ad1))
+
 ## [1.0.3](https://github.com/BelfordZ/open-rpc-flow/compare/v1.0.2...v1.0.3) (2025-01-09)
 
 

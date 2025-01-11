@@ -82,7 +82,11 @@ export class ReferenceResolver {
 
         this.logger.debug('handling string containing references:', references);
         references.forEach((ref) => {
-          const resolvedValue = this.resolveReference(ref, extraContext);
+          let resolvedValue = this.resolveReference(ref, extraContext);
+          // check if resolvedValue is an object and if so, convert it to a string
+          if (typeof resolvedValue === 'object') {
+            resolvedValue = JSON.stringify(resolvedValue);
+          }
           obj = obj.replace(ref, resolvedValue);
           this.logger.debug(`replaced ${ref} with ${resolvedValue} in ${obj}`);
         });

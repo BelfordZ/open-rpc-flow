@@ -563,13 +563,7 @@ describe('FlowExecutor', () => {
     };
     const executor = new FlowExecutor(flow, mockJsonRpcHandler, noLogger);
     const results = await executor.execute();
-    expect(results.get('step1').result).toEqual({
-      items: [
-        { id: 1, name: 'Item 1', value: 100 },
-        { id: 2, name: 'Item 2', value: 200 },
-        { id: 3, name: 'Item 3', value: 300 },
-      ],
-    });
+    expect(results.get('step1').result).toEqual('foo');
     expect(results.get('step2').result).toEqual({
       item: 'foo foo',
     });

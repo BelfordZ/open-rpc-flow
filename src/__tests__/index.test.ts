@@ -8,6 +8,10 @@ describe('FlowExecutor', () => {
   beforeEach(() => {
     mockJsonRpcHandler = jest.fn(async (request: JsonRpcRequest) => {
       switch (request.method) {
+        case 'return_params0':
+          return {
+            item: (request.params as { item: any }).item,
+          };
         case 'getData':
           return {
             items: [
@@ -495,5 +499,41 @@ describe('FlowExecutor', () => {
 
     const executor = new FlowExecutor(flow, mockJsonRpcHandler, noLogger);
     await expect(executor.execute()).rejects.toThrow();
+  });
+  it('handles a couple steps with their refs', async () => {
+    const flow: Flow = {
+      name: 'Ref Test',
+      description: 'Test ref handling',
+      steps: [
+        {
+          name: 'step1',
+          request: {
+            method: 'getData',
+            params: {},
+          },
+        },
+        {
+          name: 'step2',
+          request: {
+            method: 'return_params0',
+            params: {
+              item: 'foo ${step1.result.items[0]}',
+            },
+          },
+        },
+      ],
+    };
+    const executor = new FlowExecutor(flow, mockJsonRpcHandler, noLogger);
+    const results = await executor.execute();
+    expect(results.get('step1').result).toEqual({
+      items: [
+        { id: 1, name: 'Item 1', value: 100 },
+        { id: 2, name: 'Item 2', value: 200 },
+        { id: 3, name: 'Item 3', value: 300 },
+      ],
+    });
+    expect(results.get('step2').result).toEqual({
+      item: 'foo ' + JSON.stringify({ id: 1, name: 'Item 1', value: 100 }),
+    });
   });
 });

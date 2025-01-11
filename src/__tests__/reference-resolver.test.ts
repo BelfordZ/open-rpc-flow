@@ -98,6 +98,44 @@ describe('ReferenceResolver', () => {
         stepResults.get('step1').result,
       );
     });
+    it('handles objects that are inside complex strings', () => {
+      stepResults.set('step1', {
+        result: {
+          items: { id: 1, name: 'Item 1', value: 100 },
+        },
+        type: 'request',
+      });
+      expect(resolver.resolveReferences('foo ${step1.result.items}')).toEqual(
+        `foo ${JSON.stringify(stepResults.get('step1').result.items)}`,
+      );
+    });
+    it('handles arrays that are inside complex strings', () => {
+      stepResults.set('step1', {
+        result: {
+          items: [{ id: 1, name: 'Item 1', value: 100 }],
+        },
+        type: 'request',
+      });
+      expect(resolver.resolveReferences('foo ${step1.result.items}')).toEqual(
+        `foo ${JSON.stringify(stepResults.get('step1').result.items)}`,
+      );
+    });
+
+    it('handles arrays twice that are inside complex strings', () => {
+      stepResults.set('step1', {
+        result: {
+          items: [{ id: 1, name: 'Item 1', value: 100 }],
+        },
+        type: 'request',
+      });
+      expect(
+        resolver.resolveReferences('foo ${step1.result.items} foo ${step1.result.items}'),
+      ).toEqual(
+        `foo ${JSON.stringify(stepResults.get('step1').result.items)} foo ${JSON.stringify(
+          stepResults.get('step1').result.items,
+        )}`,
+      );
+    });
   });
 
   describe('resolveReferences', () => {

@@ -496,4 +496,54 @@ describe('FlowExecutor', () => {
     const executor = new FlowExecutor(flow, mockJsonRpcHandler, noLogger);
     await expect(executor.execute()).rejects.toThrow();
   });
+  it('handles a couple steps with their refs', async () => {
+    const flow: Flow = {
+      name: 'Ref Test',
+      description: 'Test ref handling',
+      steps: [
+        {
+          name: 'step1',
+          request: {
+            method: 'getData',
+            params: {},
+          },
+        },
+        {
+          name: 'step2',
+          request: {
+            method: 'getData',
+            params: {
+              foo: '${step1.items[0].id}',
+            },
+          },
+        },
+      ],
+    };
+    const executor = new FlowExecutor(flow, mockJsonRpcHandler, noLogger);
+    const results = await executor.execute();
+    expect(results).toEqual({
+      step1: {
+        result: {
+          result: {
+            items: [
+              { id: 1, name: 'Item 1', value: 100 },
+              { id: 2, name: 'Item 2', value: 200 },
+              { id: 3, name: 'Item 3', value: 300 },
+            ],
+          },
+        },
+      },
+      step2: {
+        result: {
+          result: {
+            items: [
+              { id: 1, name: 'Item 1', value: 100 },
+              { id: 2, name: 'Item 2', value: 200 },
+              { id: 3, name: 'Item 3', value: 300 },
+            ],
+          },
+        },
+      },
+    });
+  });
 });

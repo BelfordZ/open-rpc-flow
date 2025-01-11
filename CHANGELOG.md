@@ -1,3 +1,10 @@
+## [1.0.6](https://github.com/BelfordZ/open-rpc-flow/compare/v1.0.5...v1.0.6) (2025-01-11)
+
+
+### Bug Fixes
+
+* issue with string with object ref in it ([#11](https://github.com/BelfordZ/open-rpc-flow/issues/11)) ([2ba27be](https://github.com/BelfordZ/open-rpc-flow/commit/2ba27be8c36a64f39957686a815e8f915bc61e03))
+
 ## [1.0.5](https://github.com/BelfordZ/open-rpc-flow/compare/v1.0.4...v1.0.5) (2025-01-09)
 
 

@@ -1,7 +1,7 @@
 import { TransformStepExecutor } from '../../step-executors';
 import { TransformStep } from '../../step-executors/types';
 import { StepExecutionContext } from '../../types';
-import { TransformExecutor } from '../../transform-executor';
+import { TransformExecutor } from '../../step-executors/transform-executor';
 import { noLogger } from '../../util/logger';
 import { createMockContext } from '../test-utils';
 

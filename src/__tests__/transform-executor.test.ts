@@ -1,4 +1,4 @@
-import { TransformExecutor, TransformOperation } from '../transform-executor';
+import { TransformExecutor, TransformOperation } from '../step-executors/transform-executor';
 import { ExpressionEvaluator } from '../expression-evaluator';
 import { ReferenceResolver } from '../reference-resolver';
 import { noLogger } from '../util/logger';

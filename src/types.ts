@@ -1,7 +1,7 @@
-import { TransformOperation } from './transform-executor';
+import { TransformOperation } from './step-executors/transform-executor';
 import { ReferenceResolver } from './reference-resolver';
 import { ExpressionEvaluator } from './expression-evaluator';
-import { TransformExecutor } from './transform-executor';
+import { TransformExecutor } from './step-executors/transform-executor';
 import { Logger } from './util/logger';
 
 export interface Flow {

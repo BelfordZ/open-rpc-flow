@@ -1,7 +1,7 @@
 import { Step } from '../types';
 import { ReferenceResolver } from '../reference-resolver';
 import { ExpressionEvaluator } from '../expression-evaluator';
-import { TransformExecutor, TransformOperation } from '../transform-executor';
+import { TransformExecutor, TransformOperation } from '../step-executors/transform-executor';
 import { Logger } from '../util/logger';
 
 export { Step };

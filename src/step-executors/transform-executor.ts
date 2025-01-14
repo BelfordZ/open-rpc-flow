@@ -1,6 +1,8 @@
 import { Step, StepExecutionContext } from '../types';
 import { StepExecutor, StepExecutionResult, StepType, TransformStep } from './types';
 import { Logger } from '../util/logger';
+import { ExpressionEvaluator } from '../expression-evaluator';
+import { ReferenceResolver } from '../reference-resolver';
 
 export interface TransformOperation {
   type: 'map' | 'filter' | 'reduce' | 'flatten' | 'sort' | 'unique' | 'group' | 'join';

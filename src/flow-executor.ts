@@ -1,6 +1,6 @@
 import { ReferenceResolver } from './reference-resolver';
 import { ExpressionEvaluator } from './expression-evaluator';
-import { TransformExecutor } from './transform-executor';
+import { TransformExecutor } from './step-executors/transform-executor';
 import { DependencyResolver } from './dependency-resolver';
 import { Flow, Step, JsonRpcRequest, StepExecutionContext } from './types';
 import {

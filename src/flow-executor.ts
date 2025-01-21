@@ -34,7 +34,7 @@ export class FlowExecutor {
     this.logger = logger || defaultLogger;
     this.context = flow.context || {};
     this.stepResults = new Map();
-    this.dependencyResolver = new DependencyResolver(flow, this.logger);
+    this.dependencyResolver = new DependencyResolver(this.flow, this.logger);
 
     // Initialize shared execution context
     const referenceResolver = new ReferenceResolver(

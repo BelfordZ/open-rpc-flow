@@ -32,7 +32,11 @@ export class DependencyResolver {
   getDependencies(stepName: string): string[] {
     this.logger.debug(`Getting dependencies for step: ${stepName}`);
     const graph = this.buildDependencyGraph();
-    return Array.from(graph.get(stepName) || new Set());
+    const deps = graph.get(stepName);
+    if (!deps) {
+      throw new Error(`Step '${stepName}' not found in dependency graph`);
+    }
+    return Array.from(deps);
   }
 
   /**
@@ -117,7 +121,7 @@ export class DependencyResolver {
 
     // Extract references from request steps
     if (isRequestStep(step)) {
-      const params = step.request.params || {};
+      const params = step.request.params;
       for (const value of Object.values(params)) {
         if (typeof value === 'string') {
           this.extractReferences(value, localContextVars).forEach((dep) => deps.add(dep));
@@ -148,7 +152,7 @@ export class DependencyResolver {
   /**
    * Extract step references from an expression
    */
-  private extractReferences(expr: string, localContextVars: string[] = []): string[] {
+  private extractReferences(expr: string, localContextVars: string[]): string[] {
     this.logger.debug(`Extracting references from expression: ${expr}`);
     const refs = new Set<string>();
     const matches = expr.match(/\${([^}]+)}/g) || [];

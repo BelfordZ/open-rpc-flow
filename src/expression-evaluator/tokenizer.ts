@@ -70,14 +70,6 @@ function isValidIdentifierChar(char: string): boolean {
   return VALID_IDENTIFIER_CHARS.test(char);
 }
 
-function createToken(value: string): Token {
-  return {
-    type: 'identifier',
-    value,
-    raw: value
-  };
-}
-
 /**
  * Tokenizes an expression string into an array of tokens
  * @throws {TokenizerError} If the expression is invalid
@@ -102,7 +94,6 @@ export function tokenize(expression: string): Token[] {
     // Handle string literals
     if (isQuote(char)) {
       const quote = char;
-      const start = current;
       current++; // Skip opening quote
       let value = '';
       let escaped = false;
@@ -132,7 +123,7 @@ export function tokenize(expression: string): Token[] {
       tokens.push({
         type: 'string',
         value: value.replace(/\\(.)/g, '$1'),
-        raw: value + quote
+        raw: value + quote,
       });
       continue;
     }
@@ -141,7 +132,7 @@ export function tokenize(expression: string): Token[] {
     if (char === '$' && expression[current + 1] === '{') {
       const start = current;
       let depth = 1;
-      current += 2; // Skip ${ 
+      current += 2; // Skip ${
 
       while (current < expression.length && depth > 0) {
         if (expression[current] === '{') {
@@ -159,7 +150,7 @@ export function tokenize(expression: string): Token[] {
       tokens.push({
         type: 'identifier',
         value: expression.slice(start, current),
-        raw: expression.slice(start, current)
+        raw: expression.slice(start, current),
       });
       continue;
     }
@@ -185,7 +176,7 @@ export function tokenize(expression: string): Token[] {
       tokens.push({
         type: 'number',
         value,
-        raw: value
+        raw: value,
       });
       continue;
     }
@@ -195,7 +186,7 @@ export function tokenize(expression: string): Token[] {
       tokens.push({
         type: 'punctuation',
         value: char,
-        raw: char
+        raw: char,
       });
       current++;
       continue;
@@ -210,7 +201,7 @@ export function tokenize(expression: string): Token[] {
           tokens.push({
             type: 'operator',
             value: threeCharOp,
-            raw: threeCharOp
+            raw: threeCharOp,
           });
           current += 3;
           continue;
@@ -224,7 +215,7 @@ export function tokenize(expression: string): Token[] {
           tokens.push({
             type: 'operator',
             value: twoCharOp,
-            raw: twoCharOp
+            raw: twoCharOp,
           });
           current += 2;
           continue;
@@ -236,7 +227,7 @@ export function tokenize(expression: string): Token[] {
         tokens.push({
           type: 'operator',
           value: char,
-          raw: char
+          raw: char,
         });
         current++;
         continue;
@@ -246,11 +237,13 @@ export function tokenize(expression: string): Token[] {
     // Handle identifiers or throw on invalid characters
     if (isValidIdentifierChar(char)) {
       let identifier = '';
-      while (current < expression.length && 
-             !isWhitespace(expression[current]) && 
-             !isOperatorChar(expression[current]) &&
-             !isQuote(expression[current]) &&
-             !isPunctuation(expression[current])) {
+      while (
+        current < expression.length &&
+        !isWhitespace(expression[current]) &&
+        !isOperatorChar(expression[current]) &&
+        !isQuote(expression[current]) &&
+        !isPunctuation(expression[current])
+      ) {
         if (!isValidIdentifierChar(expression[current])) {
           throw new TokenizerError(`Invalid character in identifier: ${expression[current]}`);
         }
@@ -261,7 +254,7 @@ export function tokenize(expression: string): Token[] {
       tokens.push({
         type: 'identifier',
         value: identifier,
-        raw: identifier
+        raw: identifier,
       });
       continue;
     }
@@ -298,7 +291,11 @@ function validateTokens(tokens: Token[]): void {
     }
 
     // Check for invalid reference syntax
-    if (token.type === 'identifier' && token.value.startsWith('$') && !token.value.startsWith('${')) {
+    if (
+      token.type === 'identifier' &&
+      token.value.startsWith('$') &&
+      !token.value.startsWith('${')
+    ) {
       throw new TokenizerError('Invalid reference syntax');
     }
 
@@ -312,4 +309,4 @@ function validateTokens(tokens: Token[]): void {
   if (braceDepth !== 0) {
     throw new TokenizerError('Unmatched braces');
   }
-} 
+}

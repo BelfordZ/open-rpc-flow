@@ -87,8 +87,9 @@ describe('ExpressionEvaluator', () => {
 
   it('evaluates expressions with template literals', () => {
     expect(evaluator.evaluate('Value is ${step1.data.value}', {})).toBe('Value is 42');
-    expect(evaluator.evaluate('Value ${step1.data.value} with nested ${step1.data.nested.prop}', {}))
-      .toBe('Value 42 with nested test');
+    expect(
+      evaluator.evaluate('Value ${step1.data.value} with nested ${step1.data.nested.prop}', {}),
+    ).toBe('Value 42 with nested test');
   });
 
   it('evaluates expressions with context', () => {
@@ -109,9 +110,7 @@ describe('ExpressionEvaluator', () => {
   });
 
   it('throws on invalid expressions', () => {
-    expect(() => evaluator.evaluate('2 <> 3', {})).toThrow(
-      'Failed to evaluate expression: 2 <> 3',
-    );
+    expect(() => evaluator.evaluate('2 <> 3', {})).toThrow('Failed to evaluate expression: 2 <> 3');
   });
 
   it('throws on undefined references', () => {
@@ -158,18 +157,12 @@ describe('ExpressionEvaluator', () => {
 
     it('should not allow direct property access that skips result', () => {
       // Direct property access should fail
-      expect(() => evaluator.evaluate('${userInfo.name}', {})).toThrow(
-        'Cannot access property',
-      );
-      expect(() => evaluator.evaluate('${userInfo.age}', {})).toThrow(
-        'Cannot access property',
-      );
+      expect(() => evaluator.evaluate('${userInfo.name}', {})).toThrow('Cannot access property');
+      expect(() => evaluator.evaluate('${userInfo.age}', {})).toThrow('Cannot access property');
     });
 
     it('should not allow accessing result properties through array notation', () => {
-      expect(() => evaluator.evaluate('${userInfo["name"]}', {})).toThrow(
-        'Cannot access property',
-      );
+      expect(() => evaluator.evaluate('${userInfo["name"]}', {})).toThrow('Cannot access property');
     });
 
     it('should handle nested step results correctly', () => {
@@ -182,11 +175,7 @@ describe('ExpressionEvaluator', () => {
         },
         type: StepType.Transform,
       };
-      referenceResolver = new ReferenceResolver(
-        new Map([['nested', nestedResult]]),
-        {},
-        noLogger,
-      );
+      referenceResolver = new ReferenceResolver(new Map([['nested', nestedResult]]), {}, noLogger);
       evaluator = new SafeExpressionEvaluator(noLogger, referenceResolver);
 
       // Must use .result at each level
@@ -231,12 +220,8 @@ describe('ExpressionEvaluator', () => {
       expect(evaluator.evaluate('${userInfo["metadata"]["requestId"]}', {})).toBe('123');
 
       // Both notations should fail when trying to skip result
-      expect(() => evaluator.evaluate('${userInfo.name}', {})).toThrow(
-        'Cannot access property',
-      );
-      expect(() => evaluator.evaluate('${userInfo["name"]}', {})).toThrow(
-        'Cannot access property',
-      );
+      expect(() => evaluator.evaluate('${userInfo.name}', {})).toThrow('Cannot access property');
+      expect(() => evaluator.evaluate('${userInfo["name"]}', {})).toThrow('Cannot access property');
     });
 
     it('should handle array results with both notations', () => {
@@ -252,16 +237,12 @@ describe('ExpressionEvaluator', () => {
 
       // Both notations should work for accessing array elements
       expect(evaluator.evaluate('${users.result[0].result.name}', {})).toBe('Alice');
-      expect(evaluator.evaluate('${users["result"][0]["result"]["name"]}', {})).toBe(
-        'Alice',
-      );
+      expect(evaluator.evaluate('${users["result"][0]["result"]["name"]}', {})).toBe('Alice');
       expect(evaluator.evaluate('${users.result[1].result.name}', {})).toBe('Bob');
       expect(evaluator.evaluate('${users["result"][1]["result"]["name"]}', {})).toBe('Bob');
 
       // Both notations should fail when trying to skip result
-      expect(() => evaluator.evaluate('${users[0].name}', {})).toThrow(
-        'Cannot access property',
-      );
+      expect(() => evaluator.evaluate('${users[0].name}', {})).toThrow('Cannot access property');
       expect(() => evaluator.evaluate('${users["result"][0].name}', {})).toThrow(
         'Cannot access property',
       );
@@ -292,9 +273,7 @@ describe('ExpressionEvaluator', () => {
 
       it('special characters in keys require array notation', () => {
         // Special characters in keys require array notation
-        expect(evaluator.evaluate('${complex.result["special.key"]}', {})).toBe(
-          'special value',
-        );
+        expect(evaluator.evaluate('${complex.result["special.key"]}', {})).toBe('special value');
         expect(evaluator.evaluate('${complex.result["key-with-dash"]}', {})).toBe('dash value');
       });
 
@@ -303,7 +282,7 @@ describe('ExpressionEvaluator', () => {
         expect(evaluator.evaluate('${complex.result["0"]}', {})).toBe('zero');
       });
 
-      it('empty and space keys require array notation', () => { 
+      it('empty and space keys require array notation', () => {
         // Empty and space keys
         expect(evaluator.evaluate('${complex.result[""]}', {})).toBe('empty');
         expect(evaluator.evaluate('${complex.result[" "]}', {})).toBe('space');
@@ -380,7 +359,7 @@ describe('ExpressionEvaluator', () => {
         expect(
           evaluator.evaluate('${deep.result.users[0].result.friends[0].result.name}', {}),
         ).toBe('Charlie');
-      
+
         expect(
           evaluator.evaluate(
             '${deep["result"]["users"][0]["result"]["friends"][1]["result"]["name"]}',
@@ -410,11 +389,11 @@ describe('ExpressionEvaluator', () => {
         evaluator = new SafeExpressionEvaluator(noLogger, referenceResolver);
       });
 
-      it('dynamic property access using string expressions', () => {  
+      it('dynamic property access using string expressions', () => {
         expect(evaluator.evaluate('${data.result[data.keys[0]]}', {})).toBe(1);
         expect(evaluator.evaluate('${data.result[data.keys[1]]}', {})).toBe(2);
       });
-      
+
       xit('string concatenation in property access', () => {
         expect(evaluator.evaluate('${data.result["" + data.keys[2]]}', {})).toBe(3);
       });

@@ -1,5 +1,11 @@
 import { Step, StepExecutionContext } from '../types';
-import { StepExecutor, StepExecutionResult, StepType, TransformStep, TransformOperation } from './types';
+import {
+  StepExecutor,
+  StepExecutionResult,
+  StepType,
+  TransformStep,
+  TransformOperation,
+} from './types';
 import { Logger } from '../util/logger';
 import { SafeExpressionEvaluator } from '../expression-evaluator/safe-evaluator';
 import { ReferenceResolver } from '../reference-resolver';

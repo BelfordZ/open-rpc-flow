@@ -256,7 +256,7 @@ describe('DependencyResolver', () => {
 
     const resolver = new DependencyResolver(flow, testLogger);
     expect(() => resolver.getExecutionOrder()).toThrow(
-      "Step 'getFriends' depends on unknown step 'nonExistentStep'"
+      "Step 'getFriends' depends on unknown step 'nonExistentStep'",
     );
   });
 
@@ -277,7 +277,7 @@ describe('DependencyResolver', () => {
 
     const resolver = new DependencyResolver(flow, testLogger);
     expect(() => resolver.getDependencies('nonExistentStep')).toThrow(
-      "Step 'nonExistentStep' not found in dependency graph"
+      "Step 'nonExistentStep' not found in dependency graph",
     );
   });
 
@@ -301,8 +301,7 @@ describe('DependencyResolver', () => {
     const graph = new Map<string, Set<string>>();
     // Add a node that depends on a non-existent node
     graph.set('step1', new Set(['nonExistentStep']));
-    
-    // @ts-ignore - Accessing private method for testing
+
     expect(() => resolver['topologicalSort'](graph)).not.toThrow();
   });
 

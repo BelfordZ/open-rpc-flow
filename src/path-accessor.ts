@@ -178,7 +178,11 @@ export class PathAccessor {
         if (current) {
           // Check if current is a number, which would indicate an attempt to use dot notation for array indices
           if (/^[0-9]+$/.test(current)) {
-            throw new PathSyntaxError('Array indices must use bracket notation (e.g. [0] instead of .0)', path, i);
+            throw new PathSyntaxError(
+              'Array indices must use bracket notation (e.g. [0] instead of .0)',
+              path,
+              i,
+            );
           }
           segments.push({ type: 'property', value: current, raw: current });
           current = '';
@@ -203,7 +207,11 @@ export class PathAccessor {
         }
         // Check if we're starting a numeric property name outside of brackets
         if (current === '' && /^[0-9]$/.test(char)) {
-          throw new PathSyntaxError('Array indices must use bracket notation (e.g. [0] instead of .0)', path, i);
+          throw new PathSyntaxError(
+            'Array indices must use bracket notation (e.g. [0] instead of .0)',
+            path,
+            i,
+          );
         }
         current += char;
       }

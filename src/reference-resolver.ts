@@ -56,9 +56,11 @@ export class ReferenceResolver {
     } catch (error) {
       this.logger.error('Failed to resolve reference:', ref, error);
       // Re-throw UnknownReferenceError, PathSyntaxError, and PropertyAccessError as is
-      if (error instanceof UnknownReferenceError || 
-          error instanceof PathSyntaxError || 
-          error instanceof PropertyAccessError) {
+      if (
+        error instanceof UnknownReferenceError ||
+        error instanceof PathSyntaxError ||
+        error instanceof PropertyAccessError
+      ) {
         throw error;
       }
       // Wrap other errors in PathSyntaxError

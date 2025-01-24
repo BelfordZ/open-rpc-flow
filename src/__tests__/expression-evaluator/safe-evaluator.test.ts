@@ -165,16 +165,17 @@ describe('SafeExpressionEvaluator', () => {
       evaluator = new SafeExpressionEvaluator(noLogger, referenceResolver);
 
       // Test spreading array into array
-      expect(evaluator.evaluate('[1, 2, ...${context.numbers}, 7]', {}))
-        .toEqual([1, 2, 4, 5, 6, 7]);
+      expect(evaluator.evaluate('[1, 2, ...${context.numbers}, 7]', {})).toEqual([
+        1, 2, 4, 5, 6, 7,
+      ]);
 
       // Test spreading multiple arrays
-      expect(evaluator.evaluate('[...${context.array1}, ...${context.array2}]', {}))
-        .toEqual([1, 2, 3, 4]);
+      expect(evaluator.evaluate('[...${context.array1}, ...${context.array2}]', {})).toEqual([
+        1, 2, 3, 4,
+      ]);
 
       // Test spreading object values into array
-      expect(evaluator.evaluate('[...${context.object}]', {}))
-        .toEqual([1, 2]);
+      expect(evaluator.evaluate('[...${context.object}]', {})).toEqual([1, 2]);
     });
   });
 
@@ -184,9 +185,7 @@ describe('SafeExpressionEvaluator', () => {
     });
 
     it('throws on unknown operators', () => {
-      expect(() => evaluator.evaluate('a @ b', {})).toThrow(
-        'Failed to evaluate expression: a @ b'
-      );
+      expect(() => evaluator.evaluate('a @ b', {})).toThrow('Failed to evaluate expression: a @ b');
     });
 
     it('throws on invalid references', () => {
@@ -287,7 +286,10 @@ describe('SafeExpressionEvaluator', () => {
   describe('array access', () => {
     beforeEach(() => {
       stepResults.set('items', [1, 2, 3]);
-      stepResults.set('matrix', [[1, 2], [3, 4]]);
+      stepResults.set('matrix', [
+        [1, 2],
+        [3, 4],
+      ]);
       referenceResolver = new ReferenceResolver(stepResults, context, noLogger);
       evaluator = new SafeExpressionEvaluator(noLogger, referenceResolver);
     });

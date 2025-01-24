@@ -6,7 +6,7 @@ import { RequestStep } from './types';
 export class RequestStepExecutor implements StepExecutor {
   private requestId: number = 0;
   private logger: Logger;
-  
+
   constructor(
     private jsonRpcHandler: (request: JsonRpcRequest) => Promise<any>,
     logger: Logger,
@@ -73,7 +73,6 @@ export class RequestStepExecutor implements StepExecutor {
         params: resolvedParams,
         id: requestId,
       });
-
 
       this.logger.debug('Request completed successfully', {
         stepName: step.name,

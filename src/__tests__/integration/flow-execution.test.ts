@@ -123,9 +123,8 @@ describe('Flow Execution Integration', () => {
     expect(
       results.get('processBatches').result.value.map((r: { result: any }) => r.result),
     ).toEqual(mockBatchResults);
-    
-    expect(results.get('aggregateResults').result)
-      .toEqual([['result1'], ['result2']]);
+
+    expect(results.get('aggregateResults').result).toEqual([['result1'], ['result2']]);
   });
 
   it('handles error conditions gracefully', async () => {

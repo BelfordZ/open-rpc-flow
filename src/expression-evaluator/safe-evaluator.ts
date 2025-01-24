@@ -1,9 +1,9 @@
 import { Logger } from '../util/logger';
 import { ExpressionError } from '../expression-evaluator/errors';
 import { ReferenceResolver } from '../reference-resolver';
-import { PathAccessor, PathSyntaxError, PropertyAccessError } from '../path-accessor';
+import { PathSyntaxError, PropertyAccessError } from '../path-accessor';
 import { UnknownReferenceError } from '../reference-resolver';
-import { tokenize, TokenizerError, Token } from './tokenizer';
+import { tokenize, Token } from './tokenizer';
 
 type Operator = keyof typeof SafeExpressionEvaluator.OPERATORS;
 
@@ -41,7 +41,9 @@ export class SafeExpressionEvaluator {
     },
     '*': (a: any, b: any) => {
       if (typeof a !== 'number' || typeof b !== 'number') {
-        throw new ExpressionError(`Cannot perform multiplication on non-numeric values: ${a} * ${b}`);
+        throw new ExpressionError(
+          `Cannot perform multiplication on non-numeric values: ${a} * ${b}`,
+        );
       }
       return a * b;
     },
@@ -149,7 +151,7 @@ export class SafeExpressionEvaluator {
             throw error;
           }
         });
-        
+
         // Then tokenize and parse as normal
         const tokens = tokenize(resolvedExpression);
         this.logger.debug('Tokens:', tokens);
@@ -174,7 +176,7 @@ export class SafeExpressionEvaluator {
             throw error;
           }
         });
-        
+
         // Then tokenize and parse as normal
         const tokens = tokenize(resolvedExpression);
         this.logger.debug('Tokens:', tokens);
@@ -186,7 +188,11 @@ export class SafeExpressionEvaluator {
       // Handle string literals with references
       if (expression.includes('${')) {
         // If it's a single reference expression (e.g., ${context.config.threshold})
-        if (expression.startsWith('${') && expression.endsWith('}') && expression.indexOf('${', 2) === -1) {
+        if (
+          expression.startsWith('${') &&
+          expression.endsWith('}') &&
+          expression.indexOf('${', 2) === -1
+        ) {
           const path = expression.slice(2, -1);
           try {
             return this.referenceResolver.resolvePath(path, context);
@@ -199,9 +205,13 @@ export class SafeExpressionEvaluator {
             throw new ExpressionError(error.message);
           }
         }
-        
+
         // If it's an expression containing references (e.g., ${context.config.threshold} > 50 or ${step1.data.value} * 2)
-        if (/\${[^}]+}(?:\s*[><=!+\-*/%]+\s*(?:\d+|"[^"]*"|'[^']*'|\${[^}]+}|\btrue\b|\bfalse\b))/.test(expression)) {
+        if (
+          /\${[^}]+}(?:\s*[><=!+\-*/%]+\s*(?:\d+|"[^"]*"|'[^']*'|\${[^}]+}|\btrue\b|\bfalse\b))/.test(
+            expression,
+          )
+        ) {
           const resolvedExpression = expression.replace(/\${([^}]+)}/g, (match, path) => {
             try {
               const value = this.referenceResolver.resolvePath(path, context);
@@ -223,7 +233,7 @@ export class SafeExpressionEvaluator {
           this.logger.debug('AST:', ast);
           return this.evaluateAst(ast, context, startTime);
         }
-        
+
         // Otherwise, treat it as a template literal
         this.logger.debug('Found template literal:', expression);
         return expression.replace(/\${([^}]+)}/g, (match, path) => {
@@ -248,9 +258,11 @@ export class SafeExpressionEvaluator {
     } catch (error) {
       this.logger.error('Error evaluating expression:', error);
       // Re-throw UnknownReferenceError and PropertyAccessError as is
-      if (error instanceof ExpressionError || 
-          error instanceof UnknownReferenceError || 
-          error instanceof PropertyAccessError) {
+      if (
+        error instanceof ExpressionError ||
+        error instanceof UnknownReferenceError ||
+        error instanceof PropertyAccessError
+      ) {
         throw error;
       }
       throw new ExpressionError(
@@ -259,7 +271,7 @@ export class SafeExpressionEvaluator {
       );
     }
   }
-  
+
   private validateExpression(expression: string): void {
     if (!expression || typeof expression !== 'string') {
       throw new ExpressionError('Expression must be a non-empty string');
@@ -303,7 +315,9 @@ export class SafeExpressionEvaluator {
         const completed = stack.pop()!;
         current = stack[stack.length - 1];
         // Parse the contents of the parentheses into an AST node and convert to string
-        const innerAst = this.parseTokens(completed.map(t => typeof t === 'string' ? t : t.value));
+        const innerAst = this.parseTokens(
+          completed.map((t) => (typeof t === 'string' ? t : t.value)),
+        );
         current.push(`__expr_${JSON.stringify(innerAst)}`);
       } else {
         current.push(token);
@@ -315,7 +329,7 @@ export class SafeExpressionEvaluator {
     }
 
     // Convert the final tokens to values for parsing
-    const finalTokens = stack[0].map(t => typeof t === 'string' ? t : t.value);
+    const finalTokens = stack[0].map((t) => (typeof t === 'string' ? t : t.value));
     return this.parseTokens(finalTokens);
   }
 
@@ -423,9 +437,10 @@ export class SafeExpressionEvaluator {
     const properties: { key: string; value: AstNode; spread?: boolean }[] = [];
     let i = 1; // Skip opening brace
 
-    while (i < tokens.length - 1) { // Stop before closing brace
+    while (i < tokens.length - 1) {
+      // Stop before closing brace
       logger.debug('Parsing property:', tokens[i]);
-      
+
       // Handle spread operator
       if (tokens[i] === '...') {
         i++;
@@ -549,7 +564,8 @@ export class SafeExpressionEvaluator {
     const elements: { value: AstNode; spread?: boolean }[] = [];
     let i = 1; // Skip opening bracket
 
-    while (i < tokens.length - 1) { // Stop before closing bracket
+    while (i < tokens.length - 1) {
+      // Stop before closing bracket
       logger.debug('Parsing element:', tokens[i]);
 
       // Handle spread operator
@@ -745,11 +761,12 @@ export class SafeExpressionEvaluator {
         return this.referenceResolver.resolvePath(ast.path, context);
       } catch (error) {
         logger.error('Error resolving reference:', error);
-        if (error instanceof PathSyntaxError || error instanceof PropertyAccessError || error instanceof UnknownReferenceError) {
-          throw new ExpressionError(
-            `Failed to resolve reference: ${ast.path}`,
-            error,
-          );
+        if (
+          error instanceof PathSyntaxError ||
+          error instanceof PropertyAccessError ||
+          error instanceof UnknownReferenceError
+        ) {
+          throw new ExpressionError(`Failed to resolve reference: ${ast.path}`, error);
         }
         throw error;
       }
@@ -819,7 +836,9 @@ export class SafeExpressionEvaluator {
         logger.debug(`Evaluating operation ${ast.operator} with left: ${left} and right: ${right}`);
         return operator(left, right);
       } catch (error) {
-        logger.error(`Failed to evaluate operation ${ast.operator}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        logger.error(
+          `Failed to evaluate operation ${ast.operator}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
         throw new ExpressionError(
           `Failed to evaluate operation ${ast.operator}: ${error instanceof Error ? error.message : 'Unknown error'}`,
         );

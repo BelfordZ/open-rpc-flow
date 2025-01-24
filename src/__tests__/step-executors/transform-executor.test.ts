@@ -277,7 +277,9 @@ describe('Transform Executors', () => {
           },
         ];
 
-        expect(() => executor.execute(operations, data)).toThrow('Unknown transform operation type');
+        expect(() => executor.execute(operations, data)).toThrow(
+          'Unknown transform operation type',
+        );
       });
     });
 

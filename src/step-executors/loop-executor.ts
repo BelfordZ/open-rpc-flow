@@ -44,10 +44,7 @@ export class LoopStepExecutor implements StepExecutor {
 
     try {
       // Resolve the collection to iterate over using expressionEvaluator
-      const collection = context.expressionEvaluator.evaluate(
-        loopStep.loop.over,
-        extraContext,
-      );
+      const collection = context.expressionEvaluator.evaluate(loopStep.loop.over, extraContext);
 
       if (!Array.isArray(collection)) {
         throw new Error(

@@ -1,5 +1,5 @@
 import { ReferenceResolver, UnknownReferenceError } from '../reference-resolver';
-import { PathSyntaxError, PropertyAccessError } from '../path-accessor';
+import { PathSyntaxError } from '../path-accessor';
 import { noLogger } from '../util/logger';
 
 describe('ReferenceResolver', () => {
@@ -182,8 +182,16 @@ describe('ReferenceResolver', () => {
       resolver = new ReferenceResolver(stepResults, {}, noLogger);
 
       // Test nested array access with expressions
-      expect(resolver.resolveReference('${complex.matrix[complex.indices.row[0]][complex.indices.col[1]]}')).toBe('a2');
-      expect(resolver.resolveReference('${complex.matrix[complex.indices.row[1]][complex.indices.col[0]]}')).toBe('b1');
+      expect(
+        resolver.resolveReference(
+          '${complex.matrix[complex.indices.row[0]][complex.indices.col[1]]}',
+        ),
+      ).toBe('a2');
+      expect(
+        resolver.resolveReference(
+          '${complex.matrix[complex.indices.row[1]][complex.indices.col[0]]}',
+        ),
+      ).toBe('b1');
     });
 
     it('should throw appropriate errors for invalid expressions', () => {

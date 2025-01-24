@@ -3,27 +3,23 @@ import { tokenize, TokenizerError } from '../../expression-evaluator/tokenizer';
 describe('tokenize', () => {
   describe('simple expressions', () => {
     it('tokenizes numbers', () => {
-      expect(tokenize('42')).toEqual([
-        { type: 'number', value: '42', raw: '42' },
-      ]);
+      expect(tokenize('42')).toEqual([{ type: 'number', value: '42', raw: '42' }]);
       expect(tokenize('-42')).toEqual([
         { type: 'operator', value: '-', raw: '-' },
         { type: 'number', value: '42', raw: '42' },
       ]);
-      expect(tokenize('3.14')).toEqual([
-        { type: 'number', value: '3.14', raw: '3.14' },
-      ]);
+      expect(tokenize('3.14')).toEqual([{ type: 'number', value: '3.14', raw: '3.14' }]);
     });
 
     it('tokenizes strings', () => {
-      expect(tokenize('"hello"')).toEqual([
-        { type: 'string', value: 'hello', raw: 'hello"' },
-      ]);
-      expect(tokenize("'world'")).toEqual([
-        { type: 'string', value: 'world', raw: "world'" },
-      ]);
+      expect(tokenize('"hello"')).toEqual([{ type: 'string', value: 'hello', raw: 'hello"' }]);
+      expect(tokenize("'world'")).toEqual([{ type: 'string', value: 'world', raw: "world'" }]);
       expect(tokenize('"contains \\"escaped\\" quotes"')).toEqual([
-        { type: 'string', value: 'contains "escaped" quotes', raw: 'contains \\"escaped\\" quotes"' },
+        {
+          type: 'string',
+          value: 'contains "escaped" quotes',
+          raw: 'contains \\"escaped\\" quotes"',
+        },
       ]);
     });
 
@@ -65,9 +61,7 @@ describe('tokenize', () => {
 
   describe('references', () => {
     it('tokenizes simple references', () => {
-      expect(tokenize('${foo}')).toEqual([
-        { type: 'identifier', value: '${foo}', raw: '${foo}' },
-      ]);
+      expect(tokenize('${foo}')).toEqual([{ type: 'identifier', value: '${foo}', raw: '${foo}' }]);
     });
 
     it('tokenizes references with dot notation', () => {
@@ -183,4 +177,4 @@ describe('tokenize', () => {
       expect(() => tokenize('(2 + 3')).toThrow(TokenizerError);
     });
   });
-}); 
+});

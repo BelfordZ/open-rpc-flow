@@ -16,7 +16,6 @@ export function createMockContext(
   const referenceResolver = new ReferenceResolver(stepResults, context, noLogger);
   const expressionEvaluator = new SafeExpressionEvaluator(noLogger, referenceResolver);
 
-
   return {
     referenceResolver,
     expressionEvaluator,

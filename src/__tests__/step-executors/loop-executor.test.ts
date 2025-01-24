@@ -6,7 +6,7 @@ import {
   LoopResult,
   isLoopResult,
 } from '../../step-executors/types';
-import {StepExecutionContext} from '../../types';
+import { StepExecutionContext } from '../../types';
 
 import { SafeExpressionEvaluator } from '../../expression-evaluator/safe-evaluator';
 import { ReferenceResolver } from '../../reference-resolver';

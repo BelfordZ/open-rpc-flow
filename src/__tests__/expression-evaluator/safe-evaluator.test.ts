@@ -1,6 +1,6 @@
 import { SafeExpressionEvaluator } from '../../expression-evaluator/safe-evaluator';
 import { ExpressionError } from '../../expression-evaluator/errors';
-import { noLogger, TestLogger } from '../../util/logger';
+import { TestLogger } from '../../util/logger';
 import { ReferenceResolver } from '../../reference-resolver';
 
 describe('SafeExpressionEvaluator', () => {
@@ -77,7 +77,6 @@ describe('SafeExpressionEvaluator', () => {
         enabled: true,
       };
 
-
       expect(evaluator.evaluate('${context.user.name} == "John"', {})).toBe(true);
       expect(evaluator.evaluate('${context.settings.enabled} == true', {})).toBe(true);
       expect(evaluator.evaluate('${context.settings.enabled} === true', {})).toBe(true);
@@ -91,7 +90,6 @@ describe('SafeExpressionEvaluator', () => {
       context.settings = {
         enabled: true,
       };
-
 
       expect(evaluator.evaluate('{ ...${context.user}, foo: true }', {})).toEqual({
         name: 'John',

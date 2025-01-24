@@ -5,11 +5,14 @@ import { RequestStep } from './types';
 
 export class RequestStepExecutor implements StepExecutor {
   private requestId: number = 0;
+  private logger: Logger;
 
   constructor(
     private jsonRpcHandler: (request: JsonRpcRequest) => Promise<any>,
-    private logger: Logger,
-  ) {}
+    logger: Logger,
+  ) {
+    this.logger = logger.createNested('RequestStepExecutor');
+  }
 
   private getNextRequestId(): number {
     if (this.requestId >= Number.MAX_SAFE_INTEGER) {
@@ -71,14 +74,6 @@ export class RequestStepExecutor implements StepExecutor {
         id: requestId,
       });
 
-      // Check if the response contains an error
-      if (result && 'error' in result) {
-        throw new JsonRpcRequestError(
-          `JSON-RPC request failed: ${result.error.message}`,
-          result.error,
-        );
-      }
-
       this.logger.debug('Request completed successfully', {
         stepName: step.name,
         requestId,
@@ -88,6 +83,7 @@ export class RequestStepExecutor implements StepExecutor {
         result,
         type: StepType.Request,
         metadata: {
+          hasError: result && 'error' in result,
           method: requestStep.request.method,
           requestId,
           timestamp: new Date().toISOString(),

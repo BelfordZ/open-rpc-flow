@@ -1,13 +1,14 @@
 import { LoopStepExecutor } from '../../step-executors';
 import {
-  StepExecutionContext,
   LoopStep,
   StepExecutionResult,
   StepType,
   LoopResult,
   isLoopResult,
 } from '../../step-executors/types';
-import { ExpressionEvaluator } from '../../expression-evaluator';
+import { StepExecutionContext } from '../../types';
+
+import { SafeExpressionEvaluator } from '../../expression-evaluator/safe-evaluator';
 import { ReferenceResolver } from '../../reference-resolver';
 import { noLogger } from '../../util/logger';
 
@@ -31,17 +32,16 @@ describe('LoopStepExecutor', () => {
     executor = new LoopStepExecutor(executeStep, noLogger);
     stepResults = new Map();
     const referenceResolver = new ReferenceResolver(stepResults, {}, noLogger);
-    const expressionEvaluator = new ExpressionEvaluator(referenceResolver, {}, noLogger);
+    const expressionEvaluator = new SafeExpressionEvaluator(noLogger, referenceResolver);
     context = {
       referenceResolver,
       expressionEvaluator,
-      transformExecutor: null as any,
       stepResults,
       context: {},
       logger: noLogger,
     };
     // Add spies to the real expression evaluator
-    jest.spyOn(context.expressionEvaluator, 'evaluateExpression');
+    jest.spyOn(context.expressionEvaluator, 'evaluate');
   });
 
   it('executes a simple loop over array', async () => {
@@ -76,7 +76,7 @@ describe('LoopStepExecutor', () => {
     expect(executeStep).toHaveBeenCalledTimes(3);
 
     // Verify expression evaluator calls
-    expect(context.expressionEvaluator.evaluateExpression).toHaveBeenCalledWith(
+    expect(context.expressionEvaluator.evaluate).toHaveBeenCalledWith(
       '${items}',
       expect.any(Object),
     );
@@ -218,7 +218,7 @@ describe('LoopStepExecutor', () => {
     expect(executeStep).not.toHaveBeenCalled();
 
     // Verify expression evaluator calls
-    expect(context.expressionEvaluator.evaluateExpression).toHaveBeenCalledWith(
+    expect(context.expressionEvaluator.evaluate).toHaveBeenCalledWith(
       '${items}',
       expect.any(Object),
     );
@@ -299,7 +299,7 @@ describe('LoopStepExecutor', () => {
     );
 
     // Verify expression evaluator calls
-    expect(context.expressionEvaluator.evaluateExpression).toHaveBeenCalledWith(
+    expect(context.expressionEvaluator.evaluate).toHaveBeenCalledWith(
       '${items}',
       expect.any(Object),
     );
@@ -328,7 +328,7 @@ describe('LoopStepExecutor', () => {
     );
 
     // Verify expression evaluator calls
-    expect(context.expressionEvaluator.evaluateExpression).toHaveBeenCalled();
+    expect(context.expressionEvaluator.evaluate).toHaveBeenCalled();
   });
 
   it('respects maxIterations limit', async () => {

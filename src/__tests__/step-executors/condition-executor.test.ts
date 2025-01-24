@@ -1,8 +1,9 @@
 import { ConditionStepExecutor } from '../../step-executors';
-import { StepExecutionContext, ConditionStep, StepType } from '../../step-executors/types';
+import { ConditionStep, StepType } from '../../step-executors/types';
 import { StepExecutionResult } from '../../step-executors';
 import { noLogger } from '../../util/logger';
 import { createMockContext } from '../test-utils';
+import { StepExecutionContext } from '../../types';
 
 describe('ConditionStepExecutor', () => {
   let executor: ConditionStepExecutor;

@@ -1,7 +1,6 @@
-import { TransformOperation } from './transform-executor';
+import { TransformOperation } from './step-executors/types';
 import { ReferenceResolver } from './reference-resolver';
-import { ExpressionEvaluator } from './expression-evaluator';
-import { TransformExecutor } from './transform-executor';
+import { SafeExpressionEvaluator } from './expression-evaluator/safe-evaluator';
 import { Logger } from './util/logger';
 
 export interface Flow {
@@ -50,10 +49,12 @@ export interface JsonRpcRequest {
   id: number;
 }
 
+/**
+ * Represents the execution context available to all step executors
+ */
 export interface StepExecutionContext {
   referenceResolver: ReferenceResolver;
-  expressionEvaluator: ExpressionEvaluator;
-  transformExecutor: TransformExecutor;
+  expressionEvaluator: SafeExpressionEvaluator;
   stepResults: Map<string, any>;
   context: Record<string, any>;
   logger: Logger;

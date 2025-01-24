@@ -59,6 +59,19 @@ describe('PathAccessor', () => {
         expect(() => PathAccessor.parsePath('foo[[bar]]')).toThrow(PathSyntaxError);
       });
 
+      it('should throw PathSyntaxError on invalid array index notation', () => {
+        // Using dot notation for array indices should throw
+        expect(() => PathAccessor.parsePath('foo.0.bar')).toThrow(
+          'Array indices must use bracket notation (e.g. [0] instead of .0)',
+        );
+        expect(() => PathAccessor.parsePath('foo.bar.0')).toThrow(
+          'Array indices must use bracket notation (e.g. [0] instead of .0)',
+        );
+        expect(() => PathAccessor.parsePath('foo.123.bar')).toThrow(
+          'Array indices must use bracket notation (e.g. [0] instead of .0)',
+        );
+      });
+
       it('should include position in PathSyntaxError', () => {
         let error: PathSyntaxError | undefined;
         try {
@@ -253,6 +266,55 @@ describe('PathAccessor', () => {
       it('should propagate PathSyntaxError from parsePath', () => {
         expect(() => PathAccessor.get(obj, 'foo[bar')).toThrow(PathSyntaxError);
       });
+    });
+
+    it('should handle basic property access', () => {
+      const obj = { foo: { bar: 'baz' } };
+      expect(PathAccessor.get(obj, 'foo.bar')).toBe('baz');
+    });
+
+    it('should handle array access', () => {
+      const obj = { arr: ['a', 'b', 'c'] };
+      expect(PathAccessor.get(obj, 'arr[0]')).toBe('a');
+      expect(PathAccessor.get(obj, 'arr[1]')).toBe('b');
+    });
+
+    it('should handle expression evaluation in array brackets', () => {
+      const obj = {
+        arr: ['a', 'b', 'c'],
+        indices: [0, 1, 2],
+      };
+
+      // Mock expression evaluator that resolves paths
+      const evaluateExpression = (expr: string) => {
+        if (expr === 'indices[0]') return 0;
+        if (expr === 'indices[1]') return 1;
+        throw new Error(`Unknown expression: ${expr}`);
+      };
+
+      expect(PathAccessor.get(obj, 'arr[indices[0]]', evaluateExpression)).toBe('a');
+      expect(PathAccessor.get(obj, 'arr[indices[1]]', evaluateExpression)).toBe('b');
+    });
+
+    it('should throw appropriate errors for invalid expressions', () => {
+      const obj = { arr: ['a', 'b', 'c'] };
+
+      // No expression evaluator provided
+      expect(() => {
+        PathAccessor.get(obj, 'arr[foo.bar]');
+      }).toThrow(PathSyntaxError);
+
+      // Expression evaluator returns invalid type
+      expect(() => {
+        PathAccessor.get(obj, 'arr[foo.bar]', () => ({}));
+      }).toThrow(PathSyntaxError);
+
+      // Expression evaluator throws
+      expect(() => {
+        PathAccessor.get(obj, 'arr[foo.bar]', () => {
+          throw new Error('Invalid expression');
+        });
+      }).toThrow(PathSyntaxError);
     });
   });
 

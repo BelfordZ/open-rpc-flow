@@ -9,6 +9,11 @@ describe('DependencyResolver', () => {
     testLogger = new TestLogger('Test');
   });
 
+  afterEach(() => {
+    testLogger.print();
+    testLogger.clear();
+  });
+
   it('correctly identifies dependencies in request steps', () => {
     const flow: Flow = {
       name: 'Test Flow',
@@ -232,5 +237,120 @@ describe('DependencyResolver', () => {
     const resolver = new DependencyResolver(flow, testLogger);
     expect(resolver.getDependencies('notifyFriends')).toEqual(['getFriends']);
     expect(() => resolver.getExecutionOrder()).not.toThrow();
+  });
+
+  it('throws error when step depends on unknown step', () => {
+    const flow: Flow = {
+      name: 'Test Flow',
+      description: 'Test flow for unknown dependency',
+      steps: [
+        {
+          name: 'getFriends',
+          request: {
+            method: 'user.getFriends',
+            params: { userId: '${nonExistentStep.id}' },
+          },
+        },
+      ],
+    };
+
+    const resolver = new DependencyResolver(flow, testLogger);
+    expect(() => resolver.getExecutionOrder()).toThrow(
+      "Step 'getFriends' depends on unknown step 'nonExistentStep'",
+    );
+  });
+
+  it('throws error when getting dependencies for non-existent step', () => {
+    const flow: Flow = {
+      name: 'Test Flow',
+      description: 'Test flow for non-existent step',
+      steps: [
+        {
+          name: 'getUser',
+          request: {
+            method: 'user.get',
+            params: { id: 1 },
+          },
+        },
+      ],
+    };
+
+    const resolver = new DependencyResolver(flow, testLogger);
+    expect(() => resolver.getDependencies('nonExistentStep')).toThrow(
+      "Step 'nonExistentStep' not found in dependency graph",
+    );
+  });
+
+  it('handles missing nodes gracefully in topological sort', () => {
+    const flow: Flow = {
+      name: 'Test Flow',
+      description: 'Test flow for topological sort with missing nodes',
+      steps: [
+        {
+          name: 'step1',
+          request: {
+            method: 'test',
+            params: {},
+          },
+        },
+      ],
+    };
+
+    const resolver = new DependencyResolver(flow, testLogger);
+    // Access the private methods for testing
+    const graph = new Map<string, Set<string>>();
+    // Add a node that depends on a non-existent node
+    graph.set('step1', new Set(['nonExistentStep']));
+
+    expect(() => resolver['topologicalSort'](graph)).not.toThrow();
+  });
+
+  it('handles transform step dependencies', () => {
+    const flow: Flow = {
+      name: 'Aggregate Test',
+      description: 'Test aggregation operations',
+      steps: [
+        {
+          name: 'get_data',
+          request: {
+            method: 'getData',
+            params: {},
+          },
+        },
+        {
+          name: 'select_fields',
+          transform: {
+            input: '${get_data.result.items}',
+            operations: [
+              {
+                type: 'map',
+                using: '{ id: ${item.id}, value: ${item.value} }',
+              },
+            ],
+          },
+        },
+        {
+          name: 'group_by_value',
+          transform: {
+            input: '${get_data.result.items}',
+            operations: [
+              {
+                type: 'group',
+                using: '${item.value}',
+              },
+              {
+                type: 'sort',
+                using: '${a.key} - ${b.key}',
+              },
+            ],
+          },
+        },
+      ],
+    };
+    const resolver = new DependencyResolver(flow, testLogger);
+    const order = resolver.getExecutionOrder().map((s) => s.name);
+    expect(order).toEqual(['get_data', 'select_fields', 'group_by_value']);
+    const dependencies = resolver.getDependencies('group_by_value');
+    expect(dependencies).toEqual(['get_data']);
   });
 });

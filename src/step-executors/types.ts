@@ -1,10 +1,17 @@
 import { Step } from '../types';
-import { ReferenceResolver } from '../reference-resolver';
-import { ExpressionEvaluator } from '../expression-evaluator';
-import { TransformExecutor, TransformOperation } from '../transform-executor';
-import { Logger } from '../util/logger';
+import { StepExecutionContext } from '../types';
 
 export { Step };
+
+/**
+ * Interface for transform operations
+ */
+export interface TransformOperation {
+  type: 'map' | 'filter' | 'reduce' | 'flatten' | 'sort' | 'unique' | 'group' | 'join';
+  using: string;
+  as?: string;
+  initial?: any;
+}
 
 /**
  * Custom error class for JSON-RPC request errors
@@ -22,18 +29,6 @@ export class JsonRpcRequestError extends Error {
     this.name = 'JsonRpcRequestError';
     Object.setPrototypeOf(this, new.target.prototype);
   }
-}
-
-/**
- * Represents the execution context available to all step executors
- */
-export interface StepExecutionContext {
-  referenceResolver: ReferenceResolver;
-  expressionEvaluator: ExpressionEvaluator;
-  transformExecutor: TransformExecutor;
-  stepResults: Map<string, any>;
-  context: Record<string, any>;
-  logger: Logger;
 }
 
 /**

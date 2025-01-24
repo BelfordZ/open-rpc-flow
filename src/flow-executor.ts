@@ -1,6 +1,5 @@
 import { ReferenceResolver } from './reference-resolver';
-import { ExpressionEvaluator } from './expression-evaluator';
-import { TransformExecutor } from './transform-executor';
+import { SafeExpressionEvaluator } from './expression-evaluator/safe-evaluator';
 import { DependencyResolver } from './dependency-resolver';
 import { Flow, Step, JsonRpcRequest, StepExecutionContext } from './types';
 import {
@@ -34,30 +33,15 @@ export class FlowExecutor {
     this.logger = logger || defaultLogger;
     this.context = flow.context || {};
     this.stepResults = new Map();
-    this.dependencyResolver = new DependencyResolver(flow, this.logger);
+    this.dependencyResolver = new DependencyResolver(this.flow, this.logger);
 
     // Initialize shared execution context
-    const referenceResolver = new ReferenceResolver(
-      this.stepResults,
-      this.context,
-      this.logger.createNested('ReferenceResolver'),
-    );
-    const expressionEvaluator = new ExpressionEvaluator(
-      referenceResolver,
-      this.context,
-      this.logger.createNested('ExpressionEvaluator'),
-    );
-    const transformExecutor = new TransformExecutor(
-      expressionEvaluator,
-      referenceResolver,
-      this.context,
-      this.logger.createNested('TransformExecutor'),
-    );
+    const referenceResolver = new ReferenceResolver(this.stepResults, this.context, this.logger);
+    const expressionEvaluator = new SafeExpressionEvaluator(this.logger, referenceResolver);
 
     this.executionContext = {
       referenceResolver,
       expressionEvaluator,
-      transformExecutor,
       stepResults: this.stepResults,
       context: this.context,
       logger: this.logger,
@@ -65,16 +49,10 @@ export class FlowExecutor {
 
     // Initialize step executors in order of specificity
     this.stepExecutors = [
-      new RequestStepExecutor(jsonRpcHandler, this.logger.createNested('RequestExecutor')),
-      new LoopStepExecutor(this.executeStep.bind(this), this.logger.createNested('LoopExecutor')),
-      new ConditionStepExecutor(
-        this.executeStep.bind(this),
-        this.logger.createNested('ConditionExecutor'),
-      ),
-      new TransformStepExecutor(
-        transformExecutor,
-        this.logger.createNested('TransformStepExecutor'),
-      ),
+      new RequestStepExecutor(jsonRpcHandler, this.logger),
+      new LoopStepExecutor(this.executeStep.bind(this), this.logger),
+      new ConditionStepExecutor(this.executeStep.bind(this), this.logger),
+      new TransformStepExecutor(expressionEvaluator, referenceResolver, this.context, this.logger),
     ];
   }
 

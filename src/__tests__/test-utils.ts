@@ -1,7 +1,6 @@
 import { StepExecutionContext } from '../types';
-import { ExpressionEvaluator } from '../expression-evaluator';
+import { SafeExpressionEvaluator } from '../expression-evaluator/safe-evaluator';
 import { ReferenceResolver } from '../reference-resolver';
-import { TransformExecutor } from '../transform-executor';
 import { noLogger } from '../util/logger';
 
 /**
@@ -15,18 +14,11 @@ export function createMockContext(
   const context = { ...initialContext };
 
   const referenceResolver = new ReferenceResolver(stepResults, context, noLogger);
-  const expressionEvaluator = new ExpressionEvaluator(referenceResolver, context, noLogger);
-  const transformExecutor = new TransformExecutor(
-    expressionEvaluator,
-    referenceResolver,
-    context,
-    noLogger,
-  );
+  const expressionEvaluator = new SafeExpressionEvaluator(noLogger, referenceResolver);
 
   return {
     referenceResolver,
     expressionEvaluator,
-    transformExecutor,
     stepResults,
     context,
     logger: noLogger,

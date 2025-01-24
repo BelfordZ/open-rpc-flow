@@ -38,7 +38,7 @@ describe('Flow Execution Integration', () => {
         {
           name: 'validateData',
           condition: {
-            if: '${getData.result.length > 0}',
+            if: '${getData.result.length} > 0',
             then: {
               name: 'processData',
               transform: {
@@ -46,11 +46,11 @@ describe('Flow Execution Integration', () => {
                 operations: [
                   {
                     type: 'filter',
-                    using: '${item.value > context.minValue}',
+                    using: '${item.value} > ${context.minValue}',
                   },
                   {
                     type: 'map',
-                    using: '{ ...item, processed: true }',
+                    using: '{ ...${item}, processed: true }',
                   },
                 ],
               },
@@ -81,7 +81,7 @@ describe('Flow Execution Integration', () => {
             operations: [
               {
                 type: 'reduce',
-                using: '[...acc, item.result.results]',
+                using: '[...${acc}, ${item.result.results}]',
                 initial: [],
               },
             ],
@@ -119,10 +119,13 @@ describe('Flow Execution Integration', () => {
       { id: 2, value: 15, processed: true },
       { id: 3, value: 20, processed: true },
     ]);
+
     expect(
       results.get('processBatches').result.value.map((r: { result: any }) => r.result),
     ).toEqual(mockBatchResults);
-    expect(results.get('aggregateResults').result).toEqual([['result1'], ['result2']]);
+    
+    expect(results.get('aggregateResults').result)
+      .toEqual([['result1'], ['result2']]);
   });
 
   it('handles error conditions gracefully', async () => {
@@ -140,13 +143,13 @@ describe('Flow Execution Integration', () => {
         {
           name: 'handleError',
           condition: {
-            if: '${getData.error.message}',
+            if: '${getData.metadata.hasError}',
             then: {
               name: 'logError',
               request: {
                 method: 'error.log',
                 params: {
-                  message: '${getData.error.message}',
+                  message: '${getData.result.error.message}',
                 },
               },
             },
@@ -197,7 +200,7 @@ describe('Flow Execution Integration', () => {
     const executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
     const results = await executor.execute();
 
-    const getDataResult = results.get('getData');
+    const getDataResult = results.get('getData').result;
     expect(getDataResult.result).toBeUndefined();
     expect(getDataResult.error).toEqual({
       code: -32000,

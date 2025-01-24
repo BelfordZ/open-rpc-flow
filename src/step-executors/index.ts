@@ -2,7 +2,6 @@ export {
   StepExecutor,
   StepExecutionResult,
   StepType,
-  StepExecutionContext,
   JsonRpcRequestError,
 } from './types';
 

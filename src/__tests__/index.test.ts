@@ -1,6 +1,8 @@
 import { Flow, FlowExecutor, JsonRpcRequest } from '../index';
 import { StepType } from '../step-executors/types';
-import { noLogger } from '../util/logger';
+import { TestLogger, noLogger } from '../util/logger';
+
+const testLogger = new TestLogger('FlowExecutorTest');
 
 describe('FlowExecutor', () => {
   let mockJsonRpcHandler: jest.Mock;
@@ -25,10 +27,17 @@ describe('FlowExecutor', () => {
             processed: true,
             itemId: (request.params as { id: number }).id,
           };
+        case 'return_string':
+          return { result: 'foo' };
         default:
           return { result: 'default' };
       }
     });
+  });
+
+  afterEach(() => {
+    testLogger.print();
+    testLogger.clear();
   });
 
   it('executes a simple request step', async () => {
@@ -130,7 +139,7 @@ describe('FlowExecutor', () => {
         {
           name: 'check_items',
           condition: {
-            if: '${get_data.result.items.length > 0}',
+            if: '${get_data.result.items.length} > 0',
             then: {
               name: 'process_success',
               request: {
@@ -183,7 +192,7 @@ describe('FlowExecutor', () => {
             operations: [
               {
                 type: 'map',
-                using: '{ id: item.id, value: item.value }',
+                using: '{ id: ${item.id}, value: ${item.value} }',
               },
             ],
           },
@@ -195,11 +204,11 @@ describe('FlowExecutor', () => {
             operations: [
               {
                 type: 'group',
-                using: 'item.value',
+                using: '${item.value}',
               },
               {
                 type: 'sort',
-                using: 'a.key - b.key',
+                using: '${a.key} - ${b.key}',
               },
             ],
           },
@@ -251,15 +260,15 @@ describe('FlowExecutor', () => {
             operations: [
               {
                 type: 'filter',
-                using: 'item.value > 150',
+                using: '${item.value} > 150',
               },
               {
                 type: 'map',
-                using: '{ id: item.id, doubled: item.value * 2 }',
+                using: '{ id: ${item.id}, doubled: ${item.value} * 2 }',
               },
               {
                 type: 'sort',
-                using: 'a.doubled - b.doubled',
+                using: '${a.doubled} - ${b.doubled}',
               },
             ],
           },
@@ -299,7 +308,7 @@ describe('FlowExecutor', () => {
             operations: [
               {
                 type: 'filter',
-                using: 'item.value > ${context.threshold}',
+                using: '${item.value} > ${context.threshold}',
               },
             ],
           },
@@ -335,7 +344,7 @@ describe('FlowExecutor', () => {
             operations: [
               {
                 type: 'map',
-                using: 'item',
+                using: '${item}',
               },
             ],
           },
@@ -414,11 +423,11 @@ describe('FlowExecutor', () => {
         {
           name: 'nested_condition',
           condition: {
-            if: '${get_data.result.items.length > 0}',
+            if: '${get_data.result.items.length} > 0',
             then: {
               name: 'inner_condition',
               condition: {
-                if: '${get_data.result.items[0].value > 150}',
+                if: '${get_data.result.items[0].value} > 150',
                 then: {
                   name: 'high_value_process',
                   request: {
@@ -464,7 +473,7 @@ describe('FlowExecutor', () => {
       metadata: {
         branchTaken: 'else',
         conditionValue: false,
-        condition: '${get_data.result.items[0].value > 150}',
+        condition: '${get_data.result.items[0].value} > 150',
         timestamp: expect.any(String),
       },
     });
@@ -489,7 +498,7 @@ describe('FlowExecutor', () => {
             operations: [
               {
                 type: 'map',
-                using: 'item.nonexistent.property',
+                using: '${item.nonexistent.property}',
               },
             ],
           },
@@ -497,9 +506,42 @@ describe('FlowExecutor', () => {
       ],
     };
 
-    const executor = new FlowExecutor(flow, mockJsonRpcHandler, noLogger);
+    const executor = new FlowExecutor(flow, mockJsonRpcHandler, testLogger);
     await expect(executor.execute()).rejects.toThrow();
   });
+
+  it('handles a couple steps with their refs when the ref is a string', async () => {
+    const flow: Flow = {
+      name: 'Ref Test',
+      description: 'Test ref handling',
+      steps: [
+        {
+          name: 'step1',
+          request: {
+            method: 'return_string',
+            params: {},
+          },
+        },
+        {
+          name: 'step2',
+          request: {
+            method: 'return_params0',
+            params: {
+              item: 'foo ${step1.result.result}',
+            },
+          },
+        },
+      ],
+    };
+    const executor = new FlowExecutor(flow, mockJsonRpcHandler, noLogger);
+    const results = await executor.execute();
+    console.log(results);
+    expect(results.get('step1').result.result).toEqual('foo');
+    expect(results.get('step2').result).toEqual({
+      item: 'foo foo',
+    });
+  });
+
   it('handles a couple steps with their refs', async () => {
     const flow: Flow = {
       name: 'Ref Test',

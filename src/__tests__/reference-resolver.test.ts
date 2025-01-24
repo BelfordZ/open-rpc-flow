@@ -1,4 +1,5 @@
-import { ReferenceResolver } from '../reference-resolver';
+import { ReferenceResolver, UnknownReferenceError } from '../reference-resolver';
+import { PathSyntaxError, PropertyAccessError } from '../path-accessor';
 import { noLogger } from '../util/logger';
 
 describe('ReferenceResolver', () => {
@@ -94,9 +95,11 @@ describe('ReferenceResolver', () => {
       expect(() => resolver.resolveReference('${step1.result[0}')).toThrow('Unclosed [');
     });
     it('handles array pathing with expressions that evaluate to a string', () => {
-      expect(resolver.resolveReference('${step1[result]}')).toEqual(
-        stepResults.get('step1').result,
-      );
+      stepResults.set('step1', {
+        result: 'test',
+        type: 'request',
+      });
+      expect(resolver.resolveReference('${step1["result"]}')).toEqual('test');
     });
     it('handles objects that are inside complex strings', () => {
       stepResults.set('step1', {
@@ -135,6 +138,80 @@ describe('ReferenceResolver', () => {
           stepResults.get('step1').result.items,
         )}`,
       );
+    });
+
+    it('should handle basic references', () => {
+      const stepResults = new Map([['step1', { value: 'test' }]]);
+      resolver = new ReferenceResolver(stepResults, {}, noLogger);
+      expect(resolver.resolveReference('${step1.value}')).toBe('test');
+    });
+
+    it('should handle array access with expressions', () => {
+      const stepResults = new Map([
+        [
+          'arr',
+          {
+            result: ['a', 'b', 'c'],
+            indices: [0, 1, 2],
+          },
+        ],
+      ]);
+      resolver = new ReferenceResolver(stepResults, {}, noLogger);
+
+      // Test array access with expressions
+      expect(resolver.resolveReference('${arr.result[arr.indices[0]]}')).toBe('a');
+      expect(resolver.resolveReference('${arr.result[arr.indices[1]]}')).toBe('b');
+    });
+
+    it('should handle nested array access with expressions', () => {
+      const stepResults = new Map([
+        [
+          'complex',
+          {
+            matrix: [
+              ['a1', 'a2'],
+              ['b1', 'b2'],
+            ],
+            indices: {
+              row: [0, 1],
+              col: [0, 1],
+            },
+          },
+        ],
+      ]);
+      resolver = new ReferenceResolver(stepResults, {}, noLogger);
+
+      // Test nested array access with expressions
+      expect(resolver.resolveReference('${complex.matrix[complex.indices.row[0]][complex.indices.col[1]]}')).toBe('a2');
+      expect(resolver.resolveReference('${complex.matrix[complex.indices.row[1]][complex.indices.col[0]]}')).toBe('b1');
+    });
+
+    it('should throw appropriate errors for invalid expressions', () => {
+      const stepResults = new Map([
+        [
+          'arr',
+          {
+            result: ['a', 'b', 'c'],
+            indices: [0, 1, 2],
+          },
+        ],
+      ]);
+      resolver = new ReferenceResolver(stepResults, {}, noLogger);
+
+      // Test invalid array index - should throw UnknownReferenceError
+      expect(() => {
+        resolver.resolveReference('${arr.result[invalid[0]]}');
+      }).toThrow(UnknownReferenceError);
+
+      // Test out of bounds array index - should throw PathSyntaxError
+      expect(() => {
+        resolver.resolveReference('${arr.result[arr.indices[99]]}');
+      }).toThrow(PathSyntaxError);
+
+      // Test invalid path syntax - should throw PathSyntaxError
+      expect(() => {
+        resolver.resolveReference('${arr.result[arr.indices[}');
+      }).toThrow(PathSyntaxError);
     });
   });
 

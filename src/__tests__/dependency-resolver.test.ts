@@ -9,6 +9,11 @@ describe('DependencyResolver', () => {
     testLogger = new TestLogger('Test');
   });
 
+  afterEach(() => {
+    testLogger.print();
+    testLogger.clear();
+  });
+
   it('correctly identifies dependencies in request steps', () => {
     const flow: Flow = {
       name: 'Test Flow',
@@ -299,5 +304,54 @@ describe('DependencyResolver', () => {
     
     // @ts-ignore - Accessing private method for testing
     expect(() => resolver['topologicalSort'](graph)).not.toThrow();
+  });
+
+  it('handles transform step dependencies', () => {
+    const flow: Flow = {
+      name: 'Aggregate Test',
+      description: 'Test aggregation operations',
+      steps: [
+        {
+          name: 'get_data',
+          request: {
+            method: 'getData',
+            params: {},
+          },
+        },
+        {
+          name: 'select_fields',
+          transform: {
+            input: '${get_data.result.items}',
+            operations: [
+              {
+                type: 'map',
+                using: '{ id: ${item.id}, value: ${item.value} }',
+              },
+            ],
+          },
+        },
+        {
+          name: 'group_by_value',
+          transform: {
+            input: '${get_data.result.items}',
+            operations: [
+              {
+                type: 'group',
+                using: '${item.value}',
+              },
+              {
+                type: 'sort',
+                using: '${a.key} - ${b.key}',
+              },
+            ],
+          },
+        },
+      ],
+    };
+    const resolver = new DependencyResolver(flow, testLogger);
+    const order = resolver.getExecutionOrder().map((s) => s.name);
+    expect(order).toEqual(['get_data', 'select_fields', 'group_by_value']);
+    const dependencies = resolver.getDependencies('group_by_value');
+    expect(dependencies).toEqual(['get_data']);
   });
 });

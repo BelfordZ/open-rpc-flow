@@ -168,7 +168,7 @@ export class DependencyResolver {
       }
 
       // Skip if it's a global context variable or special variable
-      if (first === 'context' || first === 'metadata' || first === 'item' || first === 'acc') {
+      if (first === 'context' || first === 'metadata' || first === 'item' || first === 'acc' || first === 'a' || first === 'b') {
         continue;
       }
 

@@ -3,13 +3,17 @@ import { StepExecutor, StepExecutionResult, StepType, ConditionStep } from './ty
 import { Logger } from '../util/logger';
 
 export class ConditionStepExecutor implements StepExecutor {
+  private logger: Logger;
+
   constructor(
     private executeStep: (
       step: Step,
       extraContext?: Record<string, any>,
     ) => Promise<StepExecutionResult>,
-    private logger: Logger,
-  ) {}
+    logger: Logger,
+  ) {
+    this.logger = logger.createNested('ConditionStepExecutor');
+  }
 
   canExecute(step: Step): step is ConditionStep {
     return 'condition' in step;
@@ -32,7 +36,7 @@ export class ConditionStepExecutor implements StepExecutor {
     });
 
     try {
-      const conditionValue = context.expressionEvaluator.evaluateExpression(
+      const conditionValue = context.expressionEvaluator.evaluate(
         conditionStep.condition.if,
         extraContext,
       );

@@ -36,6 +36,7 @@ describe('RequestStepExecutor', () => {
     expect(result.type).toBe('request');
     expect(result.result).toEqual({ id: 1, name: 'Test User' });
     expect(result.metadata).toEqual({
+      hasError: false,
       method: 'user.get',
       requestId: 1,
       timestamp: expect.any(String),
@@ -88,10 +89,10 @@ describe('RequestStepExecutor', () => {
 
     jsonRpcHandler.mockResolvedValue(errorResponse);
 
-    await expect(executor.execute(step, context)).rejects.toThrow(JsonRpcRequestError);
-    await expect(executor.execute(step, context)).rejects.toMatchObject({
-      error: errorResponse.error,
-    });
+    const result = await executor.execute(step, context);
+
+    expect(result.result).toBe(errorResponse);
+    expect(result.result.error).toBe(errorResponse.error);
   });
 
   it('validates method type and emptiness', async () => {
@@ -261,5 +262,20 @@ describe('RequestStepExecutor', () => {
     await expect(executor.execute(step, context)).rejects.toThrow(
       'Failed to execute request step "unknownError": Unknown error',
     );
+  });
+
+  it('handles request errors gracefully', async () => {
+    const step: RequestStep = {
+      name: 'requestError',
+      request: {
+        method: 'error.test',
+        params: {},
+      },
+    };
+    jsonRpcHandler.mockResolvedValue({ error: { message: 'Custom error' } });
+    const result = await executor.execute(step, context);
+    expect(result.metadata).toBeDefined();
+    expect(result?.metadata?.hasError).toBe(true);
+    expect(result.result.error).toEqual({ message: 'Custom error' });
   });
 });

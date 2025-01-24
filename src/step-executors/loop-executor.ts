@@ -2,14 +2,20 @@ import { Step, StepExecutionContext } from '../types';
 import { StepExecutor, StepExecutionResult, StepType, LoopStep } from './types';
 import { Logger } from '../util/logger';
 
+export type ExecuteStep = (
+  step: Step,
+  extraContext?: Record<string, any>,
+) => Promise<StepExecutionResult>;
+
 export class LoopStepExecutor implements StepExecutor {
+  private logger: Logger;
+
   constructor(
-    private executeStep: (
-      step: Step,
-      extraContext?: Record<string, any>,
-    ) => Promise<StepExecutionResult>,
-    private logger: Logger,
-  ) {}
+    private executeStep: ExecuteStep,
+    logger: Logger,
+  ) {
+    this.logger = logger.createNested('LoopStepExecutor');
+  }
 
   canExecute(step: Step): step is LoopStep {
     return 'loop' in step;
@@ -38,7 +44,7 @@ export class LoopStepExecutor implements StepExecutor {
 
     try {
       // Resolve the collection to iterate over using expressionEvaluator
-      const collection = context.expressionEvaluator.evaluateExpression(
+      const collection = context.expressionEvaluator.evaluate(
         loopStep.loop.over,
         extraContext,
       );
@@ -116,7 +122,7 @@ export class LoopStepExecutor implements StepExecutor {
 
         // Check condition if present
         if (loopStep.loop.condition) {
-          const conditionMet = context.expressionEvaluator.evaluateExpression(
+          const conditionMet = context.expressionEvaluator.evaluate(
             loopStep.loop.condition,
             iterationContext,
           );

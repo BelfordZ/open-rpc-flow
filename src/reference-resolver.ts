@@ -1,4 +1,4 @@
-import { PathAccessor, PathSyntaxError } from './path-accessor';
+import { PathAccessor, PathSyntaxError, PropertyAccessError } from './path-accessor';
 import { Logger } from './util/logger';
 
 /**
@@ -55,14 +55,18 @@ export class ReferenceResolver {
       return result;
     } catch (error) {
       this.logger.error('Failed to resolve reference:', ref, error);
-      if (error instanceof PathSyntaxError) {
-        throw new PathSyntaxError(
-          error.message,
-          ref,
-          error.position ? error.position + 2 : undefined,
-        );
+      // Re-throw UnknownReferenceError, PathSyntaxError, and PropertyAccessError as is
+      if (error instanceof UnknownReferenceError || 
+          error instanceof PathSyntaxError || 
+          error instanceof PropertyAccessError) {
+        throw error;
       }
-      throw error;
+      // Wrap other errors in PathSyntaxError
+      throw new PathSyntaxError(
+        error instanceof Error ? error.message : String(error),
+        ref,
+        undefined,
+      );
     }
   }
 
@@ -155,22 +159,54 @@ export class ReferenceResolver {
     try {
       let result;
       if (restPath.startsWith('.')) {
-        result = PathAccessor.get(value, restPath.slice(1));
+        result = PathAccessor.get(value, restPath.slice(1), (expr) => {
+          try {
+            return this.resolvePath(expr, extraContext);
+          } catch (error) {
+            // Re-throw UnknownReferenceError as is
+            if (error instanceof UnknownReferenceError) {
+              throw error;
+            }
+            // Wrap other errors in PathSyntaxError
+            throw new PathSyntaxError(
+              error instanceof Error ? error.message : String(error),
+              path,
+              undefined,
+            );
+          }
+        });
       } else {
-        result = PathAccessor.get(value, restPath);
+        result = PathAccessor.get(value, restPath, (expr) => {
+          try {
+            return this.resolvePath(expr, extraContext);
+          } catch (error) {
+            // Re-throw UnknownReferenceError as is
+            if (error instanceof UnknownReferenceError) {
+              throw error;
+            }
+            // Wrap other errors in PathSyntaxError
+            throw new PathSyntaxError(
+              error instanceof Error ? error.message : String(error),
+              path,
+              undefined,
+            );
+          }
+        });
       }
       this.logger.debug('Successfully resolved path:', { path, result });
       return result;
     } catch (error) {
       this.logger.error('Failed to resolve path:', path, error);
-      if (error instanceof PathSyntaxError) {
-        throw new PathSyntaxError(
-          error.message,
-          path,
-          error.position ? error.position + source.length : undefined,
-        );
+      // Re-throw UnknownReferenceError and PathSyntaxError as is
+      if (error instanceof UnknownReferenceError || error instanceof PathSyntaxError) {
+        throw error;
       }
-      throw error;
+      // Wrap other errors in PathSyntaxError
+      throw new PathSyntaxError(
+        error instanceof Error ? error.message : String(error),
+        path,
+        undefined,
+      );
     }
   }
 

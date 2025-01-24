@@ -1,3 +1,5 @@
+import { UnknownReferenceError } from './reference-resolver';
+
 /**
  * Represents a segment in a path, which can be either a property name, an array index, or an expression
  */
@@ -174,6 +176,10 @@ export class PathAccessor {
 
       if (char === '.' && !inBracket && !inQuote) {
         if (current) {
+          // Check if current is a number, which would indicate an attempt to use dot notation for array indices
+          if (/^[0-9]+$/.test(current)) {
+            throw new PathSyntaxError('Array indices must use bracket notation (e.g. [0] instead of .0)', path, i);
+          }
           segments.push({ type: 'property', value: current, raw: current });
           current = '';
         } else if (segments.length === 0) {
@@ -194,6 +200,10 @@ export class PathAccessor {
             path,
             i,
           );
+        }
+        // Check if we're starting a numeric property name outside of brackets
+        if (current === '' && /^[0-9]$/.test(char)) {
+          throw new PathSyntaxError('Array indices must use bracket notation (e.g. [0] instead of .0)', path, i);
         }
         current += char;
       }
@@ -218,11 +228,14 @@ export class PathAccessor {
   }
 
   /**
-   * Get a value from an object using a path
+   * Get a value from an object using a path string
+   * @param obj The object to get the value from
+   * @param path The path to the value
+   * @param evaluateExpression Optional callback to evaluate expressions in array brackets
    * @throws {PropertyAccessError} If a property access fails
    * @throws {PathSyntaxError} If the path syntax is invalid
    */
-  static get(obj: any, path: string): any {
+  static get(obj: any, path: string, evaluateExpression?: (expr: string) => any): any {
     const segments = this.parsePath(path);
     return segments.reduce((current, segment) => {
       if (current === undefined || current === null) {
@@ -240,6 +253,35 @@ export class PathAccessor {
         const num = parseInt(key, 10);
         if (!isNaN(num)) {
           key = num;
+        }
+      } else if (segment.type === 'expression') {
+        if (!evaluateExpression) {
+          throw new PathSyntaxError(
+            'Expression evaluation is not supported in this context',
+            path,
+            segment.raw.length,
+          );
+        }
+        try {
+          key = evaluateExpression(segment.value);
+          if (typeof key !== 'string' && typeof key !== 'number') {
+            throw new PathSyntaxError(
+              `Expression must evaluate to a string or number, got ${typeof key}`,
+              path,
+              segment.raw.length,
+            );
+          }
+        } catch (error: any) {
+          // Re-throw UnknownReferenceError and PathSyntaxError as is
+          if (error instanceof UnknownReferenceError || error instanceof PathSyntaxError) {
+            throw error;
+          }
+          // Wrap other errors in PathSyntaxError
+          throw new PathSyntaxError(
+            `Failed to evaluate expression: ${error.message}`,
+            path,
+            segment.raw.length,
+          );
         }
       }
 

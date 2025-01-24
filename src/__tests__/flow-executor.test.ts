@@ -137,11 +137,11 @@ describe('FlowExecutor', () => {
             operations: [
               {
                 type: 'filter',
-                using: 'item.value > 150',
+                using: '${item.value} > 150',
               },
               {
                 type: 'map',
-                using: '{ id: item.id, doubled: item.value * 2 }',
+                using: '{ id: ${item.id}, doubled: ${item.value} * 2 }',
               },
             ],
           },

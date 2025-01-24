@@ -14,15 +14,15 @@
     {
       "name": "processOrder",
       "condition": {
-        "if": "${checkInventory.inStock && checkInventory.quantity >= 10}",
+        "if": "${checkInventory.result.length} > 0 && ${checkInventory.result[0].quantity} >= 10",
         "then": {
           "name": "createBulkOrder",
           "transform": {
-            "input": "${checkInventory}",
+            "input": "${checkInventory.result}",
             "operations": [
               {
                 "type": "map",
-                "using": "{orderId: null, quantity: Math.min(item.quantity, 100)}"
+                "using": "{orderId: null, quantity: ${item.quantity}}"
               }
             ]
           }
@@ -33,7 +33,7 @@
             "method": "orders.create",
             "params": {
               "productId": 123,
-              "quantity": "${checkInventory.quantity}",
+              "quantity": "${checkInventory.result.quantity}",
               "backorderAllowed": true
             }
           }
@@ -42,17 +42,11 @@
     },
     {
       "name": "notifyResult",
-      "condition": {
-        "if": "${processOrder.orderId != null}",
-        "then": {
-          "name": "sendConfirmation",
-          "request": {
-            "method": "notification.send",
-            "params": {
-              "type": "order_confirmation",
-              "orderId": "${processOrder.orderId}"
-            }
-          }
+      "request": {
+        "method": "notification.send",
+        "params": {
+          "type": "order_confirmation",
+          "orderId": "${processOrder.result.result[0].orderId}"
         }
       }
     }

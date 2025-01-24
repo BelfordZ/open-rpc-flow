@@ -14,7 +14,7 @@
     {
       "name": "processTeams",
       "loop": {
-        "over": "${getTeams}",
+        "over": "${getTeams.result}",
         "as": "team",
         "step": {
           "name": "processTeamMembers",

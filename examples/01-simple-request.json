@@ -19,8 +19,8 @@
       "request": {
         "method": "permissions.get",
         "params": {
-          "userId": "${getUser.id}",
-          "role": "${getUser.role}"
+          "userId": "${getUser.result.id}",
+          "role": "${getUser.result.role}"
         }
       }
     }

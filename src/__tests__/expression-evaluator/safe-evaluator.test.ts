@@ -55,17 +55,13 @@ describe('SafeExpressionEvaluator', () => {
     });
 
     it('evaluates references from context', () => {
-      context = {
-        user: {
-          name: 'John',
-          age: 30,
-        },
-        settings: {
-          enabled: true,
-        },
+      context.user = {
+        name: 'John',
+        age: 30,
       };
-      referenceResolver = new ReferenceResolver(stepResults, context, noLogger);
-      evaluator = new SafeExpressionEvaluator(noLogger, referenceResolver);
+      context.settings = {
+        enabled: true,
+      };
 
       expect(evaluator.evaluate('${context.user.name}', {})).toBe('John');
       expect(evaluator.evaluate('${context.user.age} > 25', {})).toBe(true);
@@ -73,17 +69,14 @@ describe('SafeExpressionEvaluator', () => {
     });
 
     it('works with equality checking references', () => {
-      context = {
-        user: {
-          name: 'John',
-          age: 30,
-        },
-        settings: {
-          enabled: true,
-        },
+      context.user = {
+        name: 'John',
+        age: 30,
       };
-      referenceResolver = new ReferenceResolver(stepResults, context, noLogger);
-      evaluator = new SafeExpressionEvaluator(noLogger, referenceResolver);
+      context.settings = {
+        enabled: true,
+      };
+
 
       expect(evaluator.evaluate('${context.user.name} == "John"', {})).toBe(true);
       expect(evaluator.evaluate('${context.settings.enabled} == true', {})).toBe(true);
@@ -91,17 +84,14 @@ describe('SafeExpressionEvaluator', () => {
     });
 
     it('works with spread operator in object literals', () => {
-      context = {
-        user: {
-          name: 'John',
-          age: 30,
-        },
-        settings: {
-          enabled: true,
-        },
+      context.user = {
+        name: 'John',
+        age: 30,
       };
-      referenceResolver = new ReferenceResolver(stepResults, context, noLogger);
-      evaluator = new SafeExpressionEvaluator(noLogger, referenceResolver);
+      context.settings = {
+        enabled: true,
+      };
+
 
       expect(evaluator.evaluate('{ ...${context.user}, foo: true }', {})).toEqual({
         name: 'John',
@@ -111,14 +101,10 @@ describe('SafeExpressionEvaluator', () => {
     });
 
     it('works with spread operator in array literals', () => {
-      context = {
-        users: [
-          { name: 'John', age: 30 },
-          { name: 'Jane', age: 25 },
-        ],
-      };
-      referenceResolver = new ReferenceResolver(stepResults, context, noLogger);
-      evaluator = new SafeExpressionEvaluator(noLogger, referenceResolver);
+      context.users = [
+        { name: 'John', age: 30 },
+        { name: 'Jane', age: 25 },
+      ];
 
       expect(evaluator.evaluate('[ ...${context.users}, "foo" ]', {})).toEqual([
         { name: 'John', age: 30 },
@@ -135,8 +121,6 @@ describe('SafeExpressionEvaluator', () => {
       stepResults.set('settings', {
         enabled: true,
       });
-      referenceResolver = new ReferenceResolver(stepResults, context, noLogger);
-      evaluator = new SafeExpressionEvaluator(noLogger, referenceResolver);
 
       expect(evaluator.evaluate('${user.name}', {})).toBe('John');
       expect(evaluator.evaluate('${user.age} > 25', {})).toBe(true);
@@ -155,14 +139,10 @@ describe('SafeExpressionEvaluator', () => {
     });
 
     it('works with spread operator in arrays', () => {
-      context = {
-        numbers: [4, 5, 6],
-        array1: [1, 2],
-        array2: [3, 4],
-        object: { a: 1, b: 2 },
-      };
-      referenceResolver = new ReferenceResolver(stepResults, context, noLogger);
-      evaluator = new SafeExpressionEvaluator(noLogger, referenceResolver);
+      context.numbers = [4, 5, 6];
+      context.array1 = [1, 2];
+      context.array2 = [3, 4];
+      context.object = { a: 1, b: 2 };
 
       // Test spreading array into array
       expect(evaluator.evaluate('[1, 2, ...${context.numbers}, 7]', {})).toEqual([
@@ -263,8 +243,6 @@ describe('SafeExpressionEvaluator', () => {
       stepResults.set('x', 10);
       stepResults.set('y', 20);
       stepResults.set('z', 30);
-      referenceResolver = new ReferenceResolver(stepResults, context, noLogger);
-      evaluator = new SafeExpressionEvaluator(noLogger, referenceResolver);
     });
 
     it('evaluates nested expressions', () => {
@@ -290,8 +268,6 @@ describe('SafeExpressionEvaluator', () => {
         [1, 2],
         [3, 4],
       ]);
-      referenceResolver = new ReferenceResolver(stepResults, context, noLogger);
-      evaluator = new SafeExpressionEvaluator(noLogger, referenceResolver);
     });
 
     it('handles array indexing', () => {
@@ -320,8 +296,6 @@ describe('SafeExpressionEvaluator', () => {
           value: 42,
         },
       });
-      referenceResolver = new ReferenceResolver(stepResults, context, noLogger);
-      evaluator = new SafeExpressionEvaluator(noLogger, referenceResolver);
     });
 
     it('resolves simple references directly', () => {

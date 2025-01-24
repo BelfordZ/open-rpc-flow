@@ -1,4 +1,5 @@
 {
+  "$schema": "../meta-schema.json",
   "name": "data-transformation",
   "description": "Demonstrates various data transformation operations on an array of items",
   "steps": [
@@ -14,19 +15,19 @@
     {
       "name": "filterHighValue",
       "transform": {
-        "input": "${getOrders}",
+        "input": "${getOrders.result}",
         "operations": [
           {
             "type": "filter",
-            "using": "${item.total > 1000}"
+            "using": "${item.total} > 1000"
           },
           {
             "type": "map",
-            "using": "{ id: item.id, total: item.total, priority: 'high' }"
+            "using": "{ id: ${item.id}, total: ${item.total}, priority: 'high' }"
           },
           {
             "type": "sort",
-            "using": "${a.total - b.total}"
+            "using": "${a.total} - ${b.total}"
           }
         ]
       }
@@ -34,11 +35,11 @@
     {
       "name": "calculateTotal",
       "transform": {
-        "input": "${filterHighValue}",
+        "input": "${filterHighValue.result}",
         "operations": [
           {
             "type": "reduce",
-            "using": "${acc + item.total}",
+            "using": "${acc} + ${item.total}",
             "initial": 0
           }
         ]

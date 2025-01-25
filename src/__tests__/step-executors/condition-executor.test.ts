@@ -243,4 +243,40 @@ describe('ConditionStepExecutor', () => {
     expect(result.result).toEqual(mockRequestStepResult);
     expect(executeStep).toHaveBeenCalledTimes(1);
   });
+
+  it('throws error when given invalid step type', async () => {
+    const invalidStep = {
+      name: 'invalidStep',
+      request: {
+        // This makes it a RequestStep instead of a ConditionStep
+        method: 'some.method',
+        params: {},
+      },
+    };
+
+    await expect(executor.execute(invalidStep as any, context)).rejects.toThrow(
+      'Invalid step type for ConditionStepExecutor',
+    );
+  });
+
+  it('handles and rethrows errors during condition evaluation', async () => {
+    context.stepResults.set('user', { role: undefined });
+
+    const step: ConditionStep = {
+      name: 'errorStep',
+      condition: {
+        if: '${user.role.someNonExistentMethod()}', // This will cause a runtime error
+        then: {
+          name: 'shouldNotExecute',
+          request: {
+            method: 'test.method',
+            params: {},
+          },
+        },
+      },
+    };
+
+    await expect(executor.execute(step, context)).rejects.toThrow();
+    expect(executeStep).not.toHaveBeenCalled();
+  });
 });

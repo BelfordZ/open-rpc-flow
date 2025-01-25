@@ -90,6 +90,7 @@ export class RequestStepExecutor implements StepExecutor {
         },
       };
     } catch (error: any) {
+      // not convinced I need any of this error
       const errorMessage =
         error instanceof JsonRpcRequestError
           ? error.message

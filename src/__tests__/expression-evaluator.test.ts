@@ -284,7 +284,7 @@ describe('ExpressionEvaluator', () => {
 
       it('throws on empty keys', () => {
         expect(() => evaluator.evaluate('${complex.result[""]}', {})).toThrow();
-      })
+      });
 
       it('empty and space keys require array notation', () => {
         // Empty and space keys

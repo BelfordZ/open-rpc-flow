@@ -9,9 +9,7 @@ import {
   LoopStepExecutor,
   ConditionStepExecutor,
   TransformStepExecutor,
-  JsonRpcRequestError,
 } from './step-executors';
-import { StepType } from './step-executors/types';
 import { Logger, defaultLogger } from './util/logger';
 
 /**

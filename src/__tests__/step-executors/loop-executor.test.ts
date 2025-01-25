@@ -27,6 +27,7 @@ describe('LoopStepExecutor', () => {
   let context: StepExecutionContext;
   let executeStep: jest.Mock;
   let stepResults: Map<string, any>;
+
   beforeEach(() => {
     executeStep = jest.fn();
     executor = new LoopStepExecutor(executeStep, noLogger);
@@ -551,5 +552,118 @@ describe('LoopStepExecutor', () => {
     expect(result.result.iterationCount).toBe(3); // Should count all iterations within maxIterations
     expect(result.result.skippedCount).toBe(2); // Should all skipped items (condiiton not met + skipped due to maxIterations)
     expect(executeStep).toHaveBeenCalledTimes(2);
+  });
+
+  it('throws error when given invalid step type', async () => {
+    const invalidStep = {
+      name: 'invalidStep',
+      request: {
+        // This makes it a RequestStep instead of a LoopStep
+        method: 'some.method',
+        params: {},
+      },
+    };
+
+    await expect(executor.execute(invalidStep as any, context)).rejects.toThrow(
+      'Invalid step type for LoopStepExecutor',
+    );
+  });
+
+  it('throws error when neither step nor steps is defined', async () => {
+    const invalidStep: LoopStep = {
+      name: 'invalidLoop',
+      loop: {
+        over: '${items}',
+        as: 'item',
+        // Intentionally omitting both step and steps
+      },
+    };
+
+    await expect(executor.execute(invalidStep, context)).rejects.toThrow(
+      'Loop must have either step or steps defined',
+    );
+  });
+
+  it('executes multiple steps in a loop iteration', async () => {
+    const items = [{ id: 1 }, { id: 2 }];
+    stepResults.set('items', items);
+
+    const step: LoopStep = {
+      name: 'processItems',
+      loop: {
+        over: '${items}',
+        as: 'item',
+        steps: [
+          {
+            name: 'validateItem',
+            request: {
+              method: 'item.validate',
+              params: {
+                id: '${item.id}',
+              },
+            },
+          },
+          {
+            name: 'processItem',
+            request: {
+              method: 'item.process',
+              params: {
+                id: '${item.id}',
+              },
+            },
+          },
+        ],
+      },
+    };
+
+    const mockValidateResult: StepExecutionResult = {
+      type: StepType.Request,
+      result: { valid: true },
+      metadata: { method: 'item.validate' },
+    };
+
+    const mockProcessResult: StepExecutionResult = {
+      type: StepType.Request,
+      result: { success: true },
+      metadata: { method: 'item.process' },
+    };
+
+    executeStep
+      .mockResolvedValueOnce(mockValidateResult)
+      .mockResolvedValueOnce(mockProcessResult)
+      .mockResolvedValueOnce(mockValidateResult)
+      .mockResolvedValueOnce(mockProcessResult);
+
+    const result = await executor.execute(step, context);
+
+    expect(result.type).toBe(StepType.Loop);
+    expect(result.result.value).toHaveLength(2); // Two iterations
+    expect(result.result.iterationCount).toBe(2);
+    expect(result.result.skippedCount).toBe(0);
+
+    // Each iteration should have executed both steps
+    expect(result.result.value[0].result.value).toEqual([mockValidateResult, mockProcessResult]);
+    expect(result.result.value[1].result.value).toEqual([mockValidateResult, mockProcessResult]);
+
+    // Should have been called 4 times total (2 steps × 2 iterations)
+    expect(executeStep).toHaveBeenCalledTimes(4);
+
+    // Verify the context for each step execution
+    expect(executeStep).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'validateItem' }),
+      expect.objectContaining({ item: items[0] }),
+    );
+    expect(executeStep).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'processItem' }),
+      expect.objectContaining({ item: items[0] }),
+    );
+    expect(executeStep).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'validateItem' }),
+      expect.objectContaining({ item: items[1] }),
+    );
+    expect(executeStep).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'processItem' }),
+      expect.objectContaining({ item: items[1] }),
+    );
   });
 });

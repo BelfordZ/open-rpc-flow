@@ -102,7 +102,11 @@ export class PathAccessor {
         }
         // Check for consecutive opening brackets, but allow bracket at start
         if (i === lastBracketPos + 1 && i !== 0) {
-          throw new PathSyntaxError(`Invalid bracket syntax at position ${i}: multiple opening brackets at the same level`, path, i);
+          throw new PathSyntaxError(
+            `Invalid bracket syntax at position ${i}: multiple opening brackets at the same level`,
+            path,
+            i,
+          );
         }
         lastBracketPos = i;
         bracketDepth++;
@@ -112,7 +116,11 @@ export class PathAccessor {
         } else {
           // Only allow nested brackets in expressions that contain dots or identifiers
           if (!bracketContent.includes('.') && !/[a-zA-Z_$]/.test(bracketContent)) {
-            throw new PathSyntaxError(`Invalid bracket syntax at position ${i}: ${bracketContent}`, path, i);
+            throw new PathSyntaxError(
+              `Invalid bracket syntax at position ${i}: ${bracketContent}`,
+              path,
+              i,
+            );
           }
           bracketContent += char;
         }

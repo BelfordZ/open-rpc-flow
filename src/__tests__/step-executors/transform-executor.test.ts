@@ -301,17 +301,21 @@ describe('Transform Executors', () => {
   });
 
   describe('TransformStepExecutor', () => {
-    let executor: TransformStepExecutor;
+    let stepExecutor: TransformStepExecutor;
     let context: StepExecutionContext;
 
     beforeEach(() => {
-      context = createMockContext();
-      executor = new TransformStepExecutor(
-        context.expressionEvaluator,
-        context.referenceResolver,
-        context.context,
+      const stepResults = new Map();
+      const contextObj = {};
+      const referenceResolver = new ReferenceResolver(stepResults, contextObj, noLogger);
+      const expressionEvaluator = new SafeExpressionEvaluator(noLogger, referenceResolver);
+      stepExecutor = new TransformStepExecutor(
+        expressionEvaluator,
+        referenceResolver,
+        contextObj,
         noLogger,
       );
+      context = createMockContext();
     });
 
     it('performs map transformation', async () => {
@@ -334,7 +338,7 @@ describe('Transform Executors', () => {
         },
       };
 
-      const result = await executor.execute(step, context);
+      const result = await stepExecutor.execute(step, context);
 
       expect(result.type).toBe('transform');
       expect(result.result).toEqual([
@@ -376,7 +380,7 @@ describe('Transform Executors', () => {
         },
       };
 
-      const result = await executor.execute(step, context);
+      const result = await stepExecutor.execute(step, context);
 
       expect(result.type).toBe('transform');
       expect(result.result).toEqual([
@@ -419,7 +423,7 @@ describe('Transform Executors', () => {
         },
       };
 
-      const result = await executor.execute(step, context);
+      const result = await stepExecutor.execute(step, context);
 
       expect(result.type).toBe('transform');
       expect(result.result).toBe(60);
@@ -458,7 +462,7 @@ describe('Transform Executors', () => {
         },
       };
 
-      const result = await executor.execute(step, context);
+      const result = await stepExecutor.execute(step, context);
 
       expect(result.type).toBe('transform');
       expect(result.result).toEqual([1, 2, 3, 4, 5, 6]);
@@ -494,7 +498,7 @@ describe('Transform Executors', () => {
         },
       };
 
-      const result = await executor.execute(step, context);
+      const result = await stepExecutor.execute(step, context);
 
       expect(result.type).toBe('transform');
       expect(result.result).toBe(100); // (20 * 2) + (30 * 2)
@@ -516,7 +520,7 @@ describe('Transform Executors', () => {
         },
       };
 
-      const result = await executor.execute(step, context);
+      const result = await stepExecutor.execute(step, context);
 
       expect(result.type).toBe('transform');
       expect(result.result).toEqual([]);
@@ -539,7 +543,7 @@ describe('Transform Executors', () => {
         },
       };
 
-      const result = await executor.execute(step, context);
+      const result = await stepExecutor.execute(step, context);
 
       expect(result.metadata).toEqual({
         operations: [
@@ -584,10 +588,25 @@ describe('Transform Executors', () => {
         },
       };
 
-      const result = await executor.execute(step, context);
+      const result = await stepExecutor.execute(step, context);
 
       expect(result.type).toBe('transform');
       expect(result.result).toBe('Bob, Charlie');
+    });
+
+    it('throws error when given invalid step type', async () => {
+      const invalidStep = {
+        name: 'invalidStep',
+        request: {
+          // This makes it a RequestStep instead of a TransformStep
+          method: 'some.method',
+          params: {},
+        },
+      };
+
+      await expect(stepExecutor.execute(invalidStep as any, context)).rejects.toThrow(
+        'Invalid step type for TransformStepExecutor',
+      );
     });
   });
 });

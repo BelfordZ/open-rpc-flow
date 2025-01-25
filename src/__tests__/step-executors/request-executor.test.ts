@@ -278,4 +278,41 @@ describe('RequestStepExecutor', () => {
     expect(result?.metadata?.hasError).toBe(true);
     expect(result.result.error).toEqual({ message: 'Custom error' });
   });
+
+  it('throws error when given invalid step type', async () => {
+    const invalidStep = {
+      name: 'invalidStep',
+      loop: {
+        // This makes it a LoopStep instead of a RequestStep
+        over: '${items}',
+        as: 'item',
+        step: {
+          name: 'someStep',
+        },
+      },
+    };
+
+    await expect(executor.execute(invalidStep as any, context)).rejects.toThrow(
+      'Invalid step type for RequestStepExecutor',
+    );
+  });
+
+  it('rethrows unexpected errors', async () => {
+    const step: RequestStep = {
+      name: 'jsonRpcError',
+      request: {
+        method: 'test.method',
+        params: {},
+      },
+    };
+
+    const jsonRpcError = new Error('Kaboom');
+
+    jsonRpcHandler.mockRejectedValue(jsonRpcError);
+
+    // The error should be rethrown as-is, not wrapped in another error
+    await expect(executor.execute(step, context)).rejects.toThrow(
+      'Failed to execute request step "jsonRpcError": Kaboom',
+    );
+  });
 });

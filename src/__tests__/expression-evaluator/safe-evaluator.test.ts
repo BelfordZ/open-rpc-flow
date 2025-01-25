@@ -159,7 +159,20 @@ describe('SafeExpressionEvaluator', () => {
 
   describe('error handling', () => {
     it('throws on invalid expressions', () => {
+      // Test empty expression
       expect(() => evaluator.evaluate('', {})).toThrow(ExpressionError);
+
+      // Test malformed template literals
+      expect(() => evaluator.evaluate('${', {})).toThrow(ExpressionError);
+      expect(() => evaluator.evaluate('${incomplete', {})).toThrow(ExpressionError);
+      expect(() => evaluator.evaluate('${}', {})).toThrow(ExpressionError);
+      expect(() => evaluator.evaluate('${a', {})).toThrow(ExpressionError);
+      expect(() => evaluator.evaluate('${a.b', {})).toThrow(ExpressionError);
+
+      // Test invalid operator usage
+      expect(() => evaluator.evaluate('++', {})).toThrow(ExpressionError);
+      expect(() => evaluator.evaluate('1 ++ 2', {})).toThrow(ExpressionError);
+      expect(() => evaluator.evaluate('1 + + 2', {})).toThrow(ExpressionError);
     });
 
     it('throws on unknown operators', () => {
@@ -266,6 +279,7 @@ describe('SafeExpressionEvaluator', () => {
         [1, 2],
         [3, 4],
       ]);
+      stepResults.set('primitive', 42);
     });
 
     it('handles array indexing', () => {
@@ -282,6 +296,37 @@ describe('SafeExpressionEvaluator', () => {
     it('throws on invalid array access', () => {
       expect(() => evaluator.evaluate('${items[3]}', {})).toThrow();
       expect(() => evaluator.evaluate('${items[-1]}', {})).toThrow();
+    });
+
+    it('throws on invalid spread operator usage', () => {
+      // Test spreading primitive values
+      stepResults.set('primitive', 42);
+      expect(() => evaluator.evaluate('[1, 2, ...${primitive}]', {})).toThrow(
+        'Invalid spread operator usage: cannot spread number literal',
+      );
+
+      // Test spreading string literals
+      stepResults.set('primitive', 'foo');
+      expect(() => evaluator.evaluate('[1, 2, ...${primitive}]', {})).toThrow(
+        'Invalid spread operator usage: cannot spread string literal',
+      );
+
+      // Test spreading boolean literals
+      stepResults.set('primitive', true);
+      expect(() => evaluator.evaluate('[1, 2, ...${primitive}]', {})).toThrow(
+        'Invalid spread operator usage: cannot spread boolean literal',
+      );
+
+      // Test spreading null/undefined
+      stepResults.set('primitive', null);
+      expect(() => evaluator.evaluate('[1, 2, ...${primitive}]', {})).toThrow(
+        'Invalid spread operator usage: cannot spread null',
+      );
+
+      stepResults.set('primitive', undefined);
+      expect(() => evaluator.evaluate('[1, 2, ...${primitive}]', {})).toThrow(
+        'Invalid spread operator usage: cannot spread undefined',
+      );
     });
   });
 
@@ -304,6 +349,93 @@ describe('SafeExpressionEvaluator', () => {
     it('resolves nested references', () => {
       expect(evaluator.evaluate('${data}', {})).toEqual({ nested: { value: 42 } });
       expect(evaluator.evaluate('${data.nested}', {})).toEqual({ value: 42 });
+    });
+  });
+
+  describe('operator error handling', () => {
+    it('throws ExpressionError when operator evaluation fails', () => {
+      // Test division by zero
+      expect(() => evaluator.evaluate('1 / 0', {})).toThrow(ExpressionError);
+      expect(() => evaluator.evaluate('1 / 0', {})).toThrow('Division/modulo by zero');
+
+      // Test invalid operand types
+      expect(() => evaluator.evaluate('"hello" * 2', {})).toThrow(ExpressionError);
+      expect(() => evaluator.evaluate('"hello" * 2', {})).toThrow(
+        'Cannot perform multiplication on non-numeric values: hello * 2',
+      );
+
+      // Test undefined operands
+      expect(() => evaluator.evaluate('undefined + 1', {})).toThrow(ExpressionError);
+      expect(() => evaluator.evaluate('undefined + 1', {})).toThrow(
+        'Cannot perform addition on non-numeric values: undefined + 1',
+      );
+    });
+  });
+
+  describe('expression validation', () => {
+    it('identifies expressions with operators', () => {
+      // Test arithmetic operators
+      expect(() => evaluator.evaluate('1 + 2', {})).not.toThrow();
+      expect(() => evaluator.evaluate('3 * 4', {})).not.toThrow();
+      expect(() => evaluator.evaluate('5 / 2', {})).not.toThrow();
+
+      // Test comparison operators
+      expect(() => evaluator.evaluate('1 < 2', {})).not.toThrow();
+      expect(() => evaluator.evaluate('3 > 2', {})).not.toThrow();
+      expect(() => evaluator.evaluate('2 <= 2', {})).not.toThrow();
+      expect(() => evaluator.evaluate('3 >= 3', {})).not.toThrow();
+
+      // Test logical operators
+      expect(() => evaluator.evaluate('true && false', {})).not.toThrow();
+      expect(() => evaluator.evaluate('true || false', {})).not.toThrow();
+    });
+
+    it('identifies simple references as expressions', () => {
+      expect(() => evaluator.evaluate('${x}', { x: 1 })).not.toThrow();
+      expect(() => evaluator.evaluate('${user.name}', { user: { name: 'John' } })).not.toThrow();
+    });
+
+    it('handles invalid expressions', () => {
+      // Test empty expression
+      expect(() => evaluator.evaluate('', {})).toThrow(ExpressionError);
+
+      // Test malformed template literals
+      expect(() => evaluator.evaluate('${', {})).toThrow(ExpressionError);
+      expect(() => evaluator.evaluate('${incomplete', {})).toThrow(ExpressionError);
+      expect(() => evaluator.evaluate('${}', {})).toThrow(ExpressionError);
+      expect(() => evaluator.evaluate('${a', {})).toThrow(ExpressionError);
+      expect(() => evaluator.evaluate('${a.b', {})).toThrow(ExpressionError);
+
+      // Test invalid operator usage
+      expect(() => evaluator.evaluate('++', {})).toThrow(ExpressionError);
+      expect(() => evaluator.evaluate('1 ++ 2', {})).toThrow(ExpressionError);
+      expect(() => evaluator.evaluate('1 + + 2', {})).toThrow(ExpressionError);
+    });
+  });
+
+  describe('AST error handling', () => {
+    it('throws error for unknown AST node type', () => {
+      // Create an AST node with an unknown type
+      const ast = { type: 'unknown' };
+      expect(() => (evaluator as any).evaluateAst(ast, {}, Date.now())).toThrow(
+        'Unknown AST node type: unknown',
+      );
+    });
+
+    it('throws error for object node missing properties', () => {
+      // Create an object AST node without properties
+      const ast = { type: 'object' };
+      expect(() => (evaluator as any).evaluateAst(ast, {}, Date.now())).toThrow(
+        'Internal error: Object node missing properties',
+      );
+    });
+
+    it('throws error for array node missing elements', () => {
+      // Create an array AST node without elements
+      const ast = { type: 'array' };
+      expect(() => (evaluator as any).evaluateAst(ast, {}, Date.now())).toThrow(
+        'Internal error: Array node missing elements',
+      );
     });
   });
 });

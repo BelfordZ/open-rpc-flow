@@ -62,16 +62,19 @@ describe('PathAccessor', () => {
       });
 
       it('throws on consecutive dots', () => {
-        expect(() => PathAccessor.parsePath('foo..bar')).toThrow('Consecutive dots are not allowed');
+        expect(() => PathAccessor.parsePath('foo..bar')).toThrow(
+          'Consecutive dots are not allowed',
+        );
       });
 
       it('throws on paths that are just .', () => {
         expect(() => PathAccessor.parsePath('.')).toThrow('Path cannot start with .');
       });
 
-
       it('throws on paths that have invalid characters in property names', () => {
-        expect(() => PathAccessor.parsePath('foo.~.bar')).toThrow('Invalid character \'~\' in property name at position 4');
+        expect(() => PathAccessor.parsePath('foo.~.bar')).toThrow(
+          "Invalid character '~' in property name at position 4",
+        );
       });
 
       it('throws unclosed quotes', () => {
@@ -86,7 +89,7 @@ describe('PathAccessor', () => {
         expect(() => PathAccessor.parsePath('foo[bar')).toThrow(PathSyntaxError);
         expect(() => PathAccessor.parsePath('foo]')).toThrow(PathSyntaxError);
         expect(() => PathAccessor.parsePath('foo[[bar]]')).toThrow(PathSyntaxError);
-        
+
         // This should hit the nested bracket validation
         let error: any;
         try {
@@ -103,7 +106,7 @@ describe('PathAccessor', () => {
         expect(error.path).toBe('foo[1[2]]');
         expect(error.position).toBe(5);
       });
-    
+
       it('should throw PathSyntaxError on invalid array index notation', () => {
         // Using dot notation for array indices should throw
         expect(() => PathAccessor.parsePath('123.foo')).toThrow(
@@ -166,7 +169,9 @@ describe('PathAccessor', () => {
           }
         }
         expect(error).toBeDefined();
-        expect(error.message).toBe('Invalid bracket syntax at position 4: multiple opening brackets at the same level');
+        expect(error.message).toBe(
+          'Invalid bracket syntax at position 4: multiple opening brackets at the same level',
+        );
         expect(error.path).toBe('foo[[1]]');
         expect(error.position).toBe(4);
       });
@@ -350,8 +355,8 @@ describe('PathAccessor', () => {
             "Cannot access property 'baz' of undefined",
             'foo.bar.baz',
             { type: 'property', value: 'baz', raw: 'baz' },
-            undefined
-          )
+            undefined,
+          ),
         );
       });
     });

@@ -282,9 +282,12 @@ describe('ExpressionEvaluator', () => {
         expect(evaluator.evaluate('${complex.result["0"]}', {})).toBe('zero');
       });
 
+      it('throws on empty keys', () => {
+        expect(() => evaluator.evaluate('${complex.result[""]}', {})).toThrow();
+      })
+
       it('empty and space keys require array notation', () => {
         // Empty and space keys
-        expect(evaluator.evaluate('${complex.result[""]}', {})).toBe('empty');
         expect(evaluator.evaluate('${complex.result[" "]}', {})).toBe('space');
       });
 

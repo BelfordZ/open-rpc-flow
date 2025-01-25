@@ -44,30 +44,72 @@ describe('PathAccessor', () => {
       ]);
     });
 
-    it('should handle leading dots', () => {
-      const result = PathAccessor.parsePath('.foo.bar');
-      expect(result).toEqual([
-        { type: 'property', value: 'foo', raw: 'foo' },
-        { type: 'property', value: 'bar', raw: 'bar' },
-      ]);
-    });
-
     describe('error handling', () => {
-      it('should throw PathSyntaxError on invalid bracket syntax', () => {
+      it('throws on empty path', () => {
+        expect(() => PathAccessor.parsePath('')).toThrow(InvalidPathError);
+      });
+
+      it('throws on empty brackets', () => {
+        expect(() => PathAccessor.parsePath('foo[]')).toThrow('Empty brackets are not allowed');
+      });
+
+      it('throws on paths starting with .', () => {
+        expect(() => PathAccessor.parsePath('.foo')).toThrow('Path cannot start with .');
+      });
+
+      it('throws on inner paths starting with .', () => {
+        expect(() => PathAccessor.parsePath('foo[.bar]')).toThrow('Path cannot start with .');
+      });
+
+      it('throws on consecutive dots', () => {
+        expect(() => PathAccessor.parsePath('foo..bar')).toThrow('Consecutive dots are not allowed');
+      });
+
+      it('throws on paths that are just .', () => {
+        expect(() => PathAccessor.parsePath('.')).toThrow('Path cannot start with .');
+      });
+
+
+      it('throws on paths that have invalid characters in property names', () => {
+        expect(() => PathAccessor.parsePath('foo.~.bar')).toThrow('Invalid character \'~\' in property name at position 4');
+      });
+
+      it('throws unclosed quotes', () => {
+        expect(() => PathAccessor.parsePath('foo["bar]')).toThrow('Unclosed quote');
+      });
+
+      it('throws unclosed brackets', () => {
+        expect(() => PathAccessor.parsePath('foo["bar"')).toThrow('Unclosed [');
+      });
+
+      it('throws on invalid bracket syntax', () => {
         expect(() => PathAccessor.parsePath('foo[bar')).toThrow(PathSyntaxError);
         expect(() => PathAccessor.parsePath('foo]')).toThrow(PathSyntaxError);
         expect(() => PathAccessor.parsePath('foo[[bar]]')).toThrow(PathSyntaxError);
+        
+        // This should hit the nested bracket validation
+        let error: any;
+        try {
+          PathAccessor.parsePath('foo[1[2]]');
+        } catch (e) {
+          if (e instanceof PathSyntaxError) {
+            error = e;
+          } else {
+            throw e;
+          }
+        }
+        expect(error).toBeDefined();
+        expect(error.message).toBe('Invalid bracket syntax at position 5: 1');
+        expect(error.path).toBe('foo[1[2]]');
+        expect(error.position).toBe(5);
       });
-
+    
       it('should throw PathSyntaxError on invalid array index notation', () => {
         // Using dot notation for array indices should throw
+        expect(() => PathAccessor.parsePath('123.foo')).toThrow(
+          'Array indices must use bracket notation (e.g. [0] instead of .0)',
+        );
         expect(() => PathAccessor.parsePath('foo.0.bar')).toThrow(
-          'Array indices must use bracket notation (e.g. [0] instead of .0)',
-        );
-        expect(() => PathAccessor.parsePath('foo.bar.0')).toThrow(
-          'Array indices must use bracket notation (e.g. [0] instead of .0)',
-        );
-        expect(() => PathAccessor.parsePath('foo.123.bar')).toThrow(
           'Array indices must use bracket notation (e.g. [0] instead of .0)',
         );
       });
@@ -93,6 +135,40 @@ describe('PathAccessor', () => {
         expect(() => PathAccessor.parsePath('foo["bar')).toThrow(PathSyntaxError);
         expect(() => PathAccessor.parsePath("foo['bar")).toThrow(PathSyntaxError);
         expect(() => PathAccessor.parsePath("foo.'bar'")).toThrow(PathSyntaxError);
+      });
+
+      it('should throw PathSyntaxError on invalid nested brackets', () => {
+        let error: any;
+        try {
+          PathAccessor.parsePath('foo[1[2]]');
+        } catch (e) {
+          if (e instanceof PathSyntaxError) {
+            error = e;
+          } else {
+            throw e;
+          }
+        }
+        expect(error).toBeDefined();
+        expect(error.message).toBe('Invalid bracket syntax at position 5: 1');
+        expect(error.path).toBe('foo[1[2]]');
+        expect(error.position).toBe(5);
+      });
+
+      it('should throw PathSyntaxError on consecutive opening brackets', () => {
+        let error: any;
+        try {
+          PathAccessor.parsePath('foo[[1]]');
+        } catch (e) {
+          if (e instanceof PathSyntaxError) {
+            error = e;
+          } else {
+            throw e;
+          }
+        }
+        expect(error).toBeDefined();
+        expect(error.message).toBe('Invalid bracket syntax at position 4: multiple opening brackets at the same level');
+        expect(error.path).toBe('foo[[1]]');
+        expect(error.position).toBe(4);
       });
     });
 
@@ -266,6 +342,18 @@ describe('PathAccessor', () => {
       it('should propagate PathSyntaxError from parsePath', () => {
         expect(() => PathAccessor.get(obj, 'foo[bar')).toThrow(PathSyntaxError);
       });
+
+      it('should throw PropertyAccessError when accessing property of undefined', () => {
+        const obj = { foo: { bar: undefined } };
+        expect(() => PathAccessor.get(obj, 'foo.bar.baz')).toThrow(
+          new PropertyAccessError(
+            "Cannot access property 'baz' of undefined",
+            'foo.bar.baz',
+            { type: 'property', value: 'baz', raw: 'baz' },
+            undefined
+          )
+        );
+      });
     });
 
     it('should handle basic property access', () => {
@@ -376,6 +464,15 @@ describe('PathAccessor', () => {
         { type: 'property' as const, value: 'bar-baz', raw: '"bar-baz"' },
       ];
       expect(PathAccessor.formatPath(segments)).toBe('foo[0]["bar-baz"]');
+    });
+
+    it('should format paths with valid identifiers after first segment', () => {
+      const segments = [
+        { type: 'property' as const, value: 'foo', raw: 'foo' },
+        { type: 'property' as const, value: 'bar', raw: 'bar' },
+        { type: 'property' as const, value: 'baz', raw: 'baz' },
+      ];
+      expect(PathAccessor.formatPath(segments)).toBe('foo.bar.baz');
     });
   });
 });

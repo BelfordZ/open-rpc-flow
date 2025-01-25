@@ -82,9 +82,9 @@ export class PathAccessor {
     let bracketDepth = 0;
     let lastBracketPos = -1;
 
-    // Remove leading dot if present
+    // Check for leading dot
     if (path.startsWith('.')) {
-      path = path.slice(1);
+      throw new PathSyntaxError('Path cannot start with .', path, 0);
     }
 
     // Check for empty path
@@ -100,9 +100,9 @@ export class PathAccessor {
           segments.push({ type: 'property', value: current, raw: current });
           current = '';
         }
-        // Check for consecutive opening brackets at the same level, but allow bracket at start
-        if (bracketDepth === 0 && i === lastBracketPos + 1 && i !== 0) {
-          throw new PathSyntaxError(`Invalid bracket syntax at position ${i}`, path, i);
+        // Check for consecutive opening brackets, but allow bracket at start
+        if (i === lastBracketPos + 1 && i !== 0) {
+          throw new PathSyntaxError(`Invalid bracket syntax at position ${i}: multiple opening brackets at the same level`, path, i);
         }
         lastBracketPos = i;
         bracketDepth++;
@@ -112,7 +112,7 @@ export class PathAccessor {
         } else {
           // Only allow nested brackets in expressions that contain dots or identifiers
           if (!bracketContent.includes('.') && !/[a-zA-Z_$]/.test(bracketContent)) {
-            throw new PathSyntaxError(`Invalid bracket syntax at position ${i}`, path, i);
+            throw new PathSyntaxError(`Invalid bracket syntax at position ${i}: ${bracketContent}`, path, i);
           }
           bracketContent += char;
         }
@@ -143,9 +143,14 @@ export class PathAccessor {
             type = 'expression';
           }
 
-          // Check for invalid bracket content
-          if (!value && value !== '') {
+          // Check for empty brackets
+          if (value === '') {
             throw new PathSyntaxError('Empty brackets are not allowed', path, i);
+          }
+
+          // Check for leading dots in bracket content
+          if (value.startsWith('.')) {
+            throw new PathSyntaxError('Path cannot start with .', path, i - value.length);
           }
 
           segments.push({ type, value, raw: `[${raw}]` });
@@ -176,18 +181,8 @@ export class PathAccessor {
 
       if (char === '.' && !inBracket && !inQuote) {
         if (current) {
-          // Check if current is a number, which would indicate an attempt to use dot notation for array indices
-          if (/^[0-9]+$/.test(current)) {
-            throw new PathSyntaxError(
-              'Array indices must use bracket notation (e.g. [0] instead of .0)',
-              path,
-              i,
-            );
-          }
           segments.push({ type: 'property', value: current, raw: current });
           current = '';
-        } else if (segments.length === 0) {
-          throw new PathSyntaxError('Path cannot start with .', path, i);
         } else if (i > 0 && path[i - 1] === '.') {
           throw new PathSyntaxError('Consecutive dots are not allowed', path, i);
         }
@@ -217,19 +212,14 @@ export class PathAccessor {
       }
     }
 
-    if (bracketDepth > 0) {
-      throw new PathSyntaxError('Unclosed [', path);
-    }
     if (inQuote) {
       throw new PathSyntaxError('Unclosed quote', path);
     }
+    if (bracketDepth > 0) {
+      throw new PathSyntaxError('Unclosed [', path);
+    }
     if (current) {
       segments.push({ type: 'property', value: current, raw: current });
-    }
-
-    // Check for empty segments
-    if (segments.length === 0) {
-      throw new InvalidPathError('Path cannot be empty', path);
     }
 
     return segments;

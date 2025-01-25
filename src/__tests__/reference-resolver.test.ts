@@ -94,6 +94,23 @@ describe('ReferenceResolver', () => {
     it('throws on invalid path syntax', () => {
       expect(() => resolver.resolveReference('${step1.result[0}')).toThrow('Unclosed [');
     });
+
+    it('wraps non-standard errors in PathSyntaxError', () => {
+      // Mock PathAccessor.parsePath to throw a generic Error
+      const originalParsePath = require('../path-accessor').PathAccessor.parsePath;
+      require('../path-accessor').PathAccessor.parsePath = () => {
+        throw new Error('Some unexpected error');
+      };
+
+      try {
+        expect(() => resolver.resolveReference('${step1.result}')).toThrow(PathSyntaxError);
+        expect(() => resolver.resolveReference('${step1.result}')).toThrow('Some unexpected error');
+      } finally {
+        // Restore the original function
+        require('../path-accessor').PathAccessor.parsePath = originalParsePath;
+      }
+    });
+
     it('handles array pathing with expressions that evaluate to a string', () => {
       stepResults.set('step1', {
         result: 'test',
@@ -101,6 +118,7 @@ describe('ReferenceResolver', () => {
       });
       expect(resolver.resolveReference('${step1["result"]}')).toEqual('test');
     });
+
     it('handles objects that are inside complex strings', () => {
       stepResults.set('step1', {
         result: {
@@ -112,6 +130,7 @@ describe('ReferenceResolver', () => {
         `foo ${JSON.stringify(stepResults.get('step1').result.items)}`,
       );
     });
+
     it('handles arrays that are inside complex strings', () => {
       stepResults.set('step1', {
         result: {
@@ -195,15 +214,12 @@ describe('ReferenceResolver', () => {
     });
 
     it('should throw appropriate errors for invalid expressions', () => {
-      const stepResults = new Map([
-        [
-          'arr',
-          {
-            result: ['a', 'b', 'c'],
-            indices: [0, 1, 2],
-          },
-        ],
-      ]);
+      const stepResults = new Map();
+      stepResults.set('arr', {
+        result: ['a', 'b', 'c'],
+        indices: [0, 1, 2],
+      });
+      stepResults.set('expr', { value: {} });
       resolver = new ReferenceResolver(stepResults, {}, noLogger);
 
       // Test invalid array index - should throw UnknownReferenceError
@@ -220,6 +236,26 @@ describe('ReferenceResolver', () => {
       expect(() => {
         resolver.resolveReference('${arr.result[arr.indices[}');
       }).toThrow(PathSyntaxError);
+
+      // Test non-UnknownReferenceError during expression evaluation
+      expect(() => {
+        resolver.resolveReference('${arr.result[expr.value.nonexistent]}');
+      }).toThrow(PathSyntaxError);
+
+      // Test error during array access expression evaluation
+      stepResults.set('error', {
+        value: {
+          toString: () => {
+            throw 'Not an error object';
+          }
+        }
+      });
+      expect(() => {
+        resolver.resolveReference('${arr.result[error.value]}');
+      }).toThrow(PathSyntaxError);
+      expect(() => {
+        resolver.resolveReference('${arr.result[error.value]}');
+      }).toThrow('Not an error object');
     });
   });
 
@@ -370,6 +406,24 @@ describe('ReferenceResolver', () => {
     it('throws on invalid path syntax', () => {
       expect(() => resolver.resolvePath('[result]')).toThrow('Invalid path: [result]');
       expect(() => resolver.resolvePath('step1.result[0')).toThrow('Unclosed [');
+    });
+
+    it('wraps non-standard errors in PathSyntaxError', () => {
+      // Create an object that throws when accessed
+      const errorObj = {
+        result: ['a', 'b', 'c'],
+        get index() {
+          throw 'Not an error object';
+        }
+      };
+      stepResults.set('error', errorObj);
+
+      expect(() => {
+        resolver.resolvePath('error.result[error.index]');
+      }).toThrow(PathSyntaxError);
+      expect(() => {
+        resolver.resolvePath('error.result[error.index]');
+      }).toThrow('Not an error object');
     });
   });
 });

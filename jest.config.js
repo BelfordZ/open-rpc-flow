@@ -6,6 +6,10 @@ module.exports = {
   collectCoverage: true,
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov'],
+  coveragePathIgnorePatterns: [
+    'node_modules',
+    'src/__tests__/test-utils.ts'
+  ],
   coverageThreshold: {
     global: {
       branches: 80,

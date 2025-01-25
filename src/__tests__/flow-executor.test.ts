@@ -1,6 +1,10 @@
 import { FlowExecutor } from '../flow-executor';
 import { Flow } from '../types';
-import { noLogger } from '../util/logger';
+import { defaultLogger, noLogger } from '../util/logger';
+import { TransformStepExecutor } from '../step-executors/transform-executor';
+
+// spy on defaultLogger
+const defaultLoggerSpy = jest.spyOn(defaultLogger, 'createNested');
 
 describe('FlowExecutor', () => {
   let executor: FlowExecutor;
@@ -14,6 +18,29 @@ describe('FlowExecutor', () => {
       steps: [],
     };
     executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
+  });
+
+  it('uses the default logger if not provided', async () => {
+    const flow: Flow = {
+      name: 'Test Flow',
+      description: 'Test flow for unit tests',
+      steps: [
+        {
+          name: 'get_data',
+          request: {
+            method: 'getData',
+            params: {},
+          },
+        },
+      ],
+    };
+
+    jsonRpcHandler.mockResolvedValue({ success: true });
+    executor = new FlowExecutor(flow, jsonRpcHandler);
+    await executor.execute();
+
+    // expect defaultLogger to have been used
+    expect(defaultLoggerSpy).toHaveBeenCalled();
   });
 
   it('executes a simple request step', async () => {
@@ -176,5 +203,59 @@ describe('FlowExecutor', () => {
     jsonRpcHandler.mockRejectedValue(new Error('Test error'));
     executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
     await expect(executor.execute()).rejects.toThrow('Test error');
+  });
+
+  it('handles errors without message property', async () => {
+    // Create an error-like object without a message property
+    const customError = { toString: () => 'Custom error without message' };
+    
+    // Mock the transform executor's execute method
+    const mockExecute = jest.fn().mockRejectedValue(customError);
+    jest.spyOn(TransformStepExecutor.prototype, 'execute').mockImplementation(mockExecute);
+    
+    const flow: Flow = {
+      name: 'Test Flow',
+      description: 'Test flow for unit tests',
+      steps: [
+        {
+          name: 'error_step',
+          transform: {
+            input: '${context.nonexistent}',
+            operations: [
+              {
+                type: 'map',
+                using: '${item}'
+              }
+            ]
+          }
+        }
+      ]
+    };
+
+    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
+    await expect(executor.execute()).rejects.toThrow('Failed to execute step error_step: Custom error without message');
+    
+    // Restore original execute method
+    jest.restoreAllMocks();
+  });
+
+  it('throws error when no executor is found for step', async () => {
+    const flow: Flow = {
+      name: 'Test Flow',
+      description: 'Test flow for unit tests',
+      steps: [
+        {
+          name: 'unknown_step',
+          aggregate: {  // This is a valid property in the Step interface but has no executor
+            from: 'some_source',
+            select: ['field1', 'field2'],
+            groupBy: 'field1'
+          }
+        }
+      ]
+    };
+
+    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
+    await expect(executor.execute()).rejects.toThrow('No executor found for step unknown_step');
   });
 });

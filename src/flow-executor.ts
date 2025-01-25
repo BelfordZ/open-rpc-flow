@@ -102,17 +102,6 @@ export class FlowExecutor {
     } catch (error: any) {
       const errorMessage = error.message || String(error);
       this.logger.error(`Step execution failed: ${step.name}`, { error: errorMessage });
-
-      if (error instanceof JsonRpcRequestError) {
-        return {
-          error: error.error,
-          type: StepType.Request,
-          metadata: {
-            timestamp: new Date().toISOString(),
-          },
-        };
-      }
-
       throw new Error(`Failed to execute step ${step.name}: ${errorMessage}`);
     }
   }

@@ -1,3 +1,12 @@
+## [1.1.1](https://github.com/BelfordZ/open-rpc-flow/compare/v1.1.0...v1.1.1) (2025-01-25)
+
+
+### Bug Fixes
+
+* get close to 100% coverage ([678eaa3](https://github.com/BelfordZ/open-rpc-flow/commit/678eaa3f62c477c41a139c4209e547bfad74ff4b))
+* get test coverage numbers up ([0601655](https://github.com/BelfordZ/open-rpc-flow/commit/0601655175e3ac160171488c865d4b42c489af06))
+* run prettier ([610da7f](https://github.com/BelfordZ/open-rpc-flow/commit/610da7f8a84203b00d2beaf7b52040f3310b6d44))
+
 # [1.1.0](https://github.com/BelfordZ/open-rpc-flow/compare/v1.0.6...v1.1.0) (2025-01-24)
 
 

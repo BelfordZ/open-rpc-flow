@@ -9,6 +9,7 @@ import {
   LoopStepExecutor,
   ConditionStepExecutor,
   TransformStepExecutor,
+  StopStepExecutor,
 } from './step-executors';
 import { Logger, defaultLogger } from './util/logger';
 
@@ -51,6 +52,7 @@ export class FlowExecutor {
       new LoopStepExecutor(this.executeStep.bind(this), this.logger),
       new ConditionStepExecutor(this.executeStep.bind(this), this.logger),
       new TransformStepExecutor(expressionEvaluator, referenceResolver, this.context, this.logger),
+      new StopStepExecutor(this.logger),
     ];
   }
 
@@ -68,6 +70,12 @@ export class FlowExecutor {
     for (const step of orderedSteps) {
       const result = await this.executeStep(step);
       this.stepResults.set(step.name, result);
+
+      // Check if the step is a stop step and handle accordingly
+      if (result.type === 'stop' && result.result.endWorkflow) {
+        this.logger.log('Workflow stopped by stop step:', step.name);
+        break;
+      }
     }
     return this.stepResults;
   }

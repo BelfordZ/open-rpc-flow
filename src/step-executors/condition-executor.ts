@@ -11,6 +11,8 @@ export class ConditionStepExecutor implements StepExecutor {
       extraContext?: Record<string, any>,
     ) => Promise<StepExecutionResult>,
     logger: Logger,
+    private eventEmitter?: EventEmitter,
+    private eventOptions: Record<string, boolean> = {},
   ) {
     this.logger = logger.createNested('ConditionStepExecutor');
   }
@@ -45,6 +47,14 @@ export class ConditionStepExecutor implements StepExecutor {
         stepName: step.name,
         result: conditionValue,
       });
+
+      if (this.eventEmitter && this.eventOptions.conditionEvaluated) {
+        this.eventEmitter.emit('conditionEvaluated', {
+          condition: conditionStep.condition.if,
+          result: conditionValue,
+          context: extraContext,
+        });
+      }
 
       let value: StepExecutionResult | undefined;
       let branchTaken: 'then' | 'else' | undefined;

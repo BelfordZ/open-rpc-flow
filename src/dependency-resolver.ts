@@ -62,6 +62,8 @@ export class DependencyResolver {
   private buildDependencyGraph(): Map<string, Set<string>> {
     this.logger.debug('Building dependency graph');
     const graph = new Map<string, Set<string>>();
+    const visited = new Set<string>();
+    const stack = new Set<string>();
 
     // Initialize graph with all steps
     for (const step of this.flow.steps) {
@@ -70,17 +72,42 @@ export class DependencyResolver {
 
     // Add dependencies for each step
     for (const step of this.flow.steps) {
-      const deps = this.findStepDependencies(step);
-      for (const dep of deps) {
-        if (!graph.has(dep)) {
-          throw new Error(`Step '${step.name}' depends on unknown step '${dep}'`);
-        }
-        graph.get(step.name)?.add(dep);
-      }
-      this.logger.debug(`Added dependency: ${step.name} -> ${deps.join(', ')}`);
+      this.addDependencies(step, graph, visited, stack);
     }
 
     return graph;
+  }
+
+  /**
+   * Add dependencies for a step and detect circular dependencies
+   */
+  private addDependencies(
+    step: Step,
+    graph: Map<string, Set<string>>,
+    visited: Set<string>,
+    stack: Set<string>,
+  ): void {
+    if (stack.has(step.name)) {
+      throw new Error(`Circular dependency detected: ${Array.from(stack).join(' -> ')} -> ${step.name}`);
+    }
+
+    if (visited.has(step.name)) {
+      return;
+    }
+
+    visited.add(step.name);
+    stack.add(step.name);
+
+    const deps = this.findStepDependencies(step);
+    for (const dep of deps) {
+      if (!graph.has(dep)) {
+        throw new Error(`Step '${step.name}' depends on unknown step '${dep}'`);
+      }
+      graph.get(step.name)?.add(dep);
+      this.addDependencies(this.flow.steps.find((s) => s.name === dep)!, graph, visited, stack);
+    }
+
+    stack.delete(step.name);
   }
 
   /**

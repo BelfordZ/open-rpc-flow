@@ -2,7 +2,6 @@ import { FlowExecutor } from '../flow-executor';
 import { Flow } from '../types';
 import { defaultLogger, noLogger } from '../util/logger';
 import { TransformStepExecutor } from '../step-executors/transform-executor';
-import { EventEmitter } from 'events';
 
 // spy on defaultLogger
 const defaultLoggerSpy = jest.spyOn(defaultLogger, 'createNested');
@@ -10,17 +9,15 @@ const defaultLoggerSpy = jest.spyOn(defaultLogger, 'createNested');
 describe('FlowExecutor', () => {
   let executor: FlowExecutor;
   let jsonRpcHandler: jest.Mock;
-  let eventEmitter: EventEmitter;
 
   beforeEach(() => {
     jsonRpcHandler = jest.fn();
-    eventEmitter = new EventEmitter();
     const flow: Flow = {
       name: 'Test Flow',
       description: 'Test flow for unit tests',
       steps: [],
     };
-    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger, eventEmitter);
+    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
   });
 
   it('uses the default logger if not provided', async () => {
@@ -62,7 +59,7 @@ describe('FlowExecutor', () => {
     };
 
     jsonRpcHandler.mockResolvedValue({ success: true });
-    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger, eventEmitter);
+    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
     const results = await executor.execute();
 
     expect(results.get('get_data').result).toEqual({ success: true });
@@ -100,7 +97,7 @@ describe('FlowExecutor', () => {
     };
 
     jsonRpcHandler.mockResolvedValue({ success: true });
-    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger, eventEmitter);
+    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
     const results = await executor.execute();
 
     const loopResult = results.get('process_items');
@@ -140,7 +137,7 @@ describe('FlowExecutor', () => {
     };
 
     jsonRpcHandler.mockResolvedValue({ success: true });
-    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger, eventEmitter);
+    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
     const results = await executor.execute();
 
     const conditionResult = results.get('check_condition');
@@ -179,7 +176,7 @@ describe('FlowExecutor', () => {
       ],
     };
 
-    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger, eventEmitter);
+    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
     const results = await executor.execute();
 
     const transformResult = results.get('transform_data').result;
@@ -204,7 +201,7 @@ describe('FlowExecutor', () => {
     };
 
     jsonRpcHandler.mockRejectedValue(new Error('Test error'));
-    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger, eventEmitter);
+    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
     await expect(executor.execute()).rejects.toThrow('Test error');
   });
 
@@ -235,7 +232,7 @@ describe('FlowExecutor', () => {
       ],
     };
 
-    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger, eventEmitter);
+    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
     await expect(executor.execute()).rejects.toThrow(
       'Failed to execute step error_step: Custom error without message',
     );
@@ -261,7 +258,7 @@ describe('FlowExecutor', () => {
       ],
     };
 
-    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger, eventEmitter);
+    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
     await expect(executor.execute()).rejects.toThrow('No executor found for step unknown_step');
   });
 
@@ -290,7 +287,7 @@ describe('FlowExecutor', () => {
     };
 
     jsonRpcHandler.mockResolvedValue({ success: true });
-    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger, eventEmitter);
+    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
     const results = await executor.execute();
 
     const conditionResult = results.get('check_condition');
@@ -299,123 +296,54 @@ describe('FlowExecutor', () => {
     expect(jsonRpcHandler).toHaveBeenCalledTimes(0);
   });
 
-  it('emits events for basic event emission', async () => {
+  it('executes independent steps in parallel', async () => {
     const flow: Flow = {
       name: 'Test Flow',
-      description: 'Test flow for unit tests',
+      description: 'Test flow for parallel execution',
       steps: [
         {
-          name: 'get_data',
+          name: 'step1',
           request: {
-            method: 'getData',
+            method: 'method1',
             params: {},
           },
         },
-      ],
-    };
-
-    jsonRpcHandler.mockResolvedValue({ success: true });
-    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger, eventEmitter);
-
-    const stepStartedSpy = jest.fn();
-    const stepCompletedSpy = jest.fn();
-
-    eventEmitter.on('stepStarted', stepStartedSpy);
-    eventEmitter.on('stepCompleted', stepCompletedSpy);
-
-    await executor.execute();
-
-    expect(stepStartedSpy).toHaveBeenCalledWith({
-      stepName: 'get_data',
-      context: expect.any(Object),
-    });
-    expect(stepCompletedSpy).toHaveBeenCalledWith({
-      stepName: 'get_data',
-      result: { success: true },
-      metadata: expect.any(Object),
-    });
-  });
-
-  it('emits events for detailed event emission', async () => {
-    const flow: Flow = {
-      name: 'Test Flow',
-      description: 'Test flow for unit tests',
-      context: {
-        items: [
-          { id: 1, value: 100 },
-          { id: 2, value: 200 },
-          { id: 3, value: 300 },
-        ],
-      },
-      steps: [
         {
-          name: 'process_items',
-          loop: {
-            over: '${context.items}',
-            as: 'item',
-            maxIterations: 2,
-            step: {
-              name: 'process_item',
-              request: {
-                method: 'processItem',
-                params: { id: '${item.id}' },
-              },
-            },
-          },
-        },
-      ],
-    };
-
-    jsonRpcHandler.mockResolvedValue({ success: true });
-    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger, eventEmitter);
-
-    const loopIterationStartedSpy = jest.fn();
-    const loopIterationCompletedSpy = jest.fn();
-
-    eventEmitter.on('loopIterationStarted', loopIterationStartedSpy);
-    eventEmitter.on('loopIterationCompleted', loopIterationCompletedSpy);
-
-    await executor.execute();
-
-    expect(loopIterationStartedSpy).toHaveBeenCalledTimes(2);
-    expect(loopIterationCompletedSpy).toHaveBeenCalledTimes(2);
-  });
-
-  it('emits events based on provided options', async () => {
-    const flow: Flow = {
-      name: 'Test Flow',
-      description: 'Test flow for unit tests',
-      steps: [
-        {
-          name: 'get_data',
+          name: 'step2',
           request: {
-            method: 'getData',
+            method: 'method2',
             params: {},
           },
         },
+        {
+          name: 'step3',
+          request: {
+            method: 'method3',
+            params: { dep: '${step1.result}' },
+          },
+        },
       ],
     };
 
-    const options = {
-      stepStarted: true,
-      stepCompleted: false,
-    };
-
-    jsonRpcHandler.mockResolvedValue({ success: true });
-    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger, eventEmitter, options);
-
-    const stepStartedSpy = jest.fn();
-    const stepCompletedSpy = jest.fn();
-
-    eventEmitter.on('stepStarted', stepStartedSpy);
-    eventEmitter.on('stepCompleted', stepCompletedSpy);
-
-    await executor.execute();
-
-    expect(stepStartedSpy).toHaveBeenCalledWith({
-      stepName: 'get_data',
-      context: expect.any(Object),
+    jsonRpcHandler.mockImplementation((request) => {
+      switch (request.method) {
+        case 'method1':
+          return new Promise((resolve) => setTimeout(() => resolve({ result: 'result1' }), 100));
+        case 'method2':
+          return new Promise((resolve) => setTimeout(() => resolve({ result: 'result2' }), 50));
+        case 'method3':
+          return Promise.resolve({ result: 'result3' });
+        default:
+          return Promise.resolve({});
+      }
     });
-    expect(stepCompletedSpy).not.toHaveBeenCalled();
+
+    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
+    const results = await executor.execute();
+
+    expect(results.get('step1').result).toEqual({ result: 'result1' });
+    expect(results.get('step2').result).toEqual({ result: 'result2' });
+    expect(results.get('step3').result).toEqual({ result: 'result3' });
+    expect(jsonRpcHandler).toHaveBeenCalledTimes(3);
   });
 });

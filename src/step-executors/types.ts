@@ -53,6 +53,7 @@ export enum StepType {
   Loop = 'loop',
   Condition = 'condition',
   Transform = 'transform',
+  Stop = 'stop',
 }
 
 /**

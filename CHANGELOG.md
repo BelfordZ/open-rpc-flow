@@ -1,3 +1,15 @@
+# [1.2.0](https://github.com/BelfordZ/open-rpc-flow/compare/v1.1.2...v1.2.0) (2025-01-31)
+
+
+### Bug Fixes
+
+* linting and tests ([90c44fa](https://github.com/BelfordZ/open-rpc-flow/commit/90c44fab6760ba70040c331b1be4ac595e917fe2))
+
+
+### Features
+
+* introduce a stop step type to end workflows ([894e4ef](https://github.com/BelfordZ/open-rpc-flow/commit/894e4ef21f8dbd61f4d0055570553972abe2d9dd)), closes [#21](https://github.com/BelfordZ/open-rpc-flow/issues/21)
+
 ## [1.1.2](https://github.com/BelfordZ/open-rpc-flow/compare/v1.1.1...v1.1.2) (2025-01-31)
 
 

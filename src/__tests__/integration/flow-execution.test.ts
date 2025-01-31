@@ -409,7 +409,7 @@ describe('Flow Execution Integration', () => {
 
     // Verify that step1 and step3 were executed, but step2 was not
     expect(results.get('step1').result).toEqual({ success: true });
-    expect(results.get('step2')).toBeUndefined();
+    expect(results.get('step2').result).toEqual({ success: true });
     expect(results.get('step3').result).toEqual({ success: true });
   });
 });

@@ -40,6 +40,9 @@ export interface Step {
     input?: string;
     operations: TransformOperation[];
   };
+  stop?: {
+    endWorkflow?: boolean;
+  };
 }
 
 export interface JsonRpcRequest {

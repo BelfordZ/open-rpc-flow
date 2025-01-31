@@ -72,9 +72,14 @@ export class FlowExecutor {
       this.stepResults.set(step.name, result);
 
       // Check if the step is a stop step and handle accordingly
-      if (result.type === 'stop' && result.result.endWorkflow) {
-        this.logger.log('Workflow stopped by stop step:', step.name);
-        break;
+      if (result.type === 'stop') {
+        if (result.result.endWorkflow) {
+          this.logger.log('Workflow stopped by stop step:', step.name);
+          break;
+        } else {
+          this.logger.log('Workflow branch stopped by stop step:', step.name);
+          continue;
+        }
       }
     }
     return this.stepResults;

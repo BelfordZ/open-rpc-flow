@@ -1,15 +1,11 @@
 import { StopStepExecutor } from '../../step-executors/stop-executor';
-import { StepExecutionContext } from '../../types';
-import { createMockContext } from '../test-utils';
 import { noLogger } from '../../util/logger';
 
 describe('StopStepExecutor', () => {
   let executor: StopStepExecutor;
-  let context: StepExecutionContext;
 
   beforeEach(() => {
     executor = new StopStepExecutor(noLogger);
-    context = createMockContext();
   });
 
   it('should stop the entire workflow when endWorkflow is true', async () => {
@@ -20,11 +16,11 @@ describe('StopStepExecutor', () => {
       },
     };
 
-    const result = await executor.execute(step, context);
+    const result = await executor.execute(step);
 
     expect(result.type).toBe('stop');
     expect(result.result.endWorkflow).toBe(true);
-    expect(result.metadata.endWorkflow).toBe(true);
+    expect(result.metadata?.endWorkflow).toBe(true);
   });
 
   it('should stop the current branch when endWorkflow is false', async () => {
@@ -35,11 +31,11 @@ describe('StopStepExecutor', () => {
       },
     };
 
-    const result = await executor.execute(step, context);
+    const result = await executor.execute(step);
 
     expect(result.type).toBe('stop');
     expect(result.result.endWorkflow).toBe(false);
-    expect(result.metadata.endWorkflow).toBe(false);
+    expect(result.metadata?.endWorkflow).toBe(false);
   });
 
   it('should default to stopping the current branch when endWorkflow is not provided', async () => {
@@ -48,11 +44,11 @@ describe('StopStepExecutor', () => {
       stop: {},
     };
 
-    const result = await executor.execute(step, context);
+    const result = await executor.execute(step);
 
     expect(result.type).toBe('stop');
     expect(result.result.endWorkflow).toBe(false);
-    expect(result.metadata.endWorkflow).toBe(false);
+    expect(result.metadata?.endWorkflow).toBe(false);
   });
 
   it('should throw an error for invalid step type', async () => {
@@ -64,7 +60,7 @@ describe('StopStepExecutor', () => {
       },
     };
 
-    await expect(executor.execute(invalidStep as any, context)).rejects.toThrow(
+    await expect(executor.execute(invalidStep as any)).rejects.toThrow(
       'Invalid step type for StopStepExecutor',
     );
   });

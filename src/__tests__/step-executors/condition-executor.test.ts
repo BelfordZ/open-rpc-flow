@@ -279,4 +279,41 @@ describe('ConditionStepExecutor', () => {
     await expect(executor.execute(step, context)).rejects.toThrow();
     expect(executeStep).not.toHaveBeenCalled();
   });
+
+  it('handles condition without else branch', async () => {
+    context.stepResults.set('user', { role: 'user' });
+
+    const step: ConditionStep = {
+      name: 'checkAdmin',
+      condition: {
+        if: "${user.role} === 'admin'",
+        then: {
+          name: 'sendNotification',
+          request: {
+            method: 'notification.send',
+            params: {
+              message: 'Admin action performed',
+            },
+          },
+        },
+      },
+    };
+
+    const result = (await executor.execute(step, context)) as StepExecutionResult & {
+      metadata: {
+        branchTaken: 'then' | 'else';
+        conditionValue: boolean;
+        condition: string;
+        timestamp: string;
+      };
+    };
+
+    expect(result.type).toBe('condition');
+    expect(result.metadata.branchTaken).toBe('else');
+    expect(result.metadata.conditionValue).toBe(false);
+    expect(result.metadata.condition).toBe("${user.role} === 'admin'");
+    expect(result.metadata.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+    expect(result.result).toBeUndefined();
+    expect(executeStep).not.toHaveBeenCalled();
+  });
 });

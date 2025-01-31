@@ -309,4 +309,107 @@ describe('Flow Execution Integration', () => {
       }),
     );
   });
+
+  it('stops the entire workflow when encountering a stop step with endWorkflow set to true', async () => {
+    const flow: Flow = {
+      name: 'stop-workflow',
+      description: 'Test stopping the entire workflow',
+      steps: [
+        {
+          name: 'step1',
+          request: {
+            method: 'step1.method',
+            params: {},
+          },
+        },
+        {
+          name: 'stopStep',
+          stop: {
+            endWorkflow: true,
+          },
+        },
+        {
+          name: 'step2',
+          request: {
+            method: 'step2.method',
+            params: {},
+          },
+        },
+      ],
+    };
+
+    jsonRpcHandler.mockImplementation((request) => {
+      if (request.method === 'step1.method') {
+        return Promise.resolve({ success: true });
+      }
+      if (request.method === 'step2.method') {
+        return Promise.resolve({ success: true });
+      }
+      return Promise.resolve({});
+    });
+
+    const executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
+    const results = await executor.execute();
+
+    // Verify that step1 was executed and step2 was not
+    expect(results.get('step1').result).toEqual({ success: true });
+    expect(results.get('step2')).toBeUndefined();
+  });
+
+  it('stops the current branch when encountering a stop step with endWorkflow set to false', async () => {
+    const flow: Flow = {
+      name: 'stop-branch',
+      description: 'Test stopping the current branch',
+      steps: [
+        {
+          name: 'step1',
+          request: {
+            method: 'step1.method',
+            params: {},
+          },
+        },
+        {
+          name: 'stopStep',
+          stop: {
+            endWorkflow: false,
+          },
+        },
+        {
+          name: 'step2',
+          request: {
+            method: 'step2.method',
+            params: {},
+          },
+        },
+        {
+          name: 'step3',
+          request: {
+            method: 'step3.method',
+            params: {},
+          },
+        },
+      ],
+    };
+
+    jsonRpcHandler.mockImplementation((request) => {
+      if (request.method === 'step1.method') {
+        return Promise.resolve({ success: true });
+      }
+      if (request.method === 'step2.method') {
+        return Promise.resolve({ success: true });
+      }
+      if (request.method === 'step3.method') {
+        return Promise.resolve({ success: true });
+      }
+      return Promise.resolve({});
+    });
+
+    const executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
+    const results = await executor.execute();
+
+    // Verify that step1 and step3 were executed, but step2 was not
+    expect(results.get('step1').result).toEqual({ success: true });
+    expect(results.get('step2')).toBeUndefined();
+    expect(results.get('step3').result).toEqual({ success: true });
+  });
 });

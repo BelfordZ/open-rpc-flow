@@ -44,7 +44,8 @@
         { "$ref": "#/definitions/RequestStep" },
         { "$ref": "#/definitions/TransformStep" },
         { "$ref": "#/definitions/LoopStep" },
-        { "$ref": "#/definitions/ConditionStep" }
+        { "$ref": "#/definitions/ConditionStep" },
+        { "$ref": "#/definitions/StopStep" }
       ]
     },
     "RequestStep": {
@@ -178,6 +179,23 @@
               "description": "Optional step to execute if the condition is false."
             }
           }
+        }
+      }
+    },
+    "StopStep": {
+      "type": "object",
+      "description": "A step that signals to end the workflow, with options to end the entire workflow or just the current branch.",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "A unique identifier for the step within the flow. Used for referencing step results in expressions.",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+        },
+        "endWorkflow": {
+          "type": "boolean",
+          "description": "Indicates whether to end the entire workflow (true) or just the current branch (false).",
+          "default": false
         }
       }
     }

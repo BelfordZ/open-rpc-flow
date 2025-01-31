@@ -1,0 +1,58 @@
+import { Step, StepExecutionContext } from '../types';
+import { StepExecutor, StepExecutionResult, StepType } from './types';
+import { Logger } from '../util/logger';
+
+export interface StopStep extends Step {
+  stop: {
+    endWorkflow?: boolean;
+  };
+}
+
+export class StopStepExecutor implements StepExecutor {
+  private logger: Logger;
+
+  constructor(logger: Logger) {
+    this.logger = logger.createNested('StopStepExecutor');
+  }
+
+  canExecute(step: Step): step is StopStep {
+    return 'stop' in step;
+  }
+
+  async execute(
+    step: Step,
+    context: StepExecutionContext,
+    extraContext: Record<string, any> = {},
+  ): Promise<StepExecutionResult> {
+    if (!this.canExecute(step)) {
+      throw new Error('Invalid step type for StopStepExecutor');
+    }
+
+    const stopStep = step as StopStep;
+    const endWorkflow = stopStep.stop.endWorkflow ?? false;
+
+    this.logger.debug('Executing stop step', {
+      stepName: step.name,
+      endWorkflow,
+    });
+
+    // Perform cleanup and termination logic here
+    if (endWorkflow) {
+      this.logger.log('Terminating entire workflow', { stepName: step.name });
+      // Add logic to terminate all running steps and end the workflow
+    } else {
+      this.logger.log('Terminating current branch', { stepName: step.name });
+      // Add logic to terminate the current branch of the workflow
+    }
+
+    return {
+      type: StepType.Stop,
+      result: { endWorkflow },
+      metadata: {
+        stepName: step.name,
+        endWorkflow,
+        timestamp: new Date().toISOString(),
+      },
+    };
+  }
+}

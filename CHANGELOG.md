@@ -1,3 +1,10 @@
+## [1.1.2](https://github.com/BelfordZ/open-rpc-flow/compare/v1.1.1...v1.1.2) (2025-01-31)
+
+
+### Bug Fixes
+
+* add test for condition without else branch ([679859d](https://github.com/BelfordZ/open-rpc-flow/commit/679859d0162eb9d8a80dbe8aaafe6fe4b579389b)), closes [#18](https://github.com/BelfordZ/open-rpc-flow/issues/18)
+
 ## [1.1.1](https://github.com/BelfordZ/open-rpc-flow/compare/v1.1.0...v1.1.1) (2025-01-25)
 
 

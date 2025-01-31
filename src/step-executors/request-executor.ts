@@ -2,6 +2,7 @@ import { Step, StepExecutionContext, JsonRpcRequest } from '../types';
 import { StepExecutor, StepExecutionResult, JsonRpcRequestError, StepType } from './types';
 import { Logger } from '../util/logger';
 import { RequestStep } from './types';
+import { EventEmitter } from 'events';
 
 export class RequestStepExecutor implements StepExecutor {
   private requestId: number = 0;
@@ -10,6 +11,8 @@ export class RequestStepExecutor implements StepExecutor {
   constructor(
     private jsonRpcHandler: (request: JsonRpcRequest) => Promise<any>,
     logger: Logger,
+    private eventEmitter?: EventEmitter,
+    private eventOptions: Record<string, boolean> = {},
   ) {
     this.logger = logger.createNested('RequestStepExecutor');
   }
@@ -43,6 +46,13 @@ export class RequestStepExecutor implements StepExecutor {
       method: requestStep.request.method,
       requestId,
     });
+
+    if (this.eventEmitter && this.eventOptions.stepStarted) {
+      this.eventEmitter.emit('stepStarted', {
+        stepName: step.name,
+        context: extraContext,
+      });
+    }
 
     try {
       // Validate method name
@@ -79,6 +89,19 @@ export class RequestStepExecutor implements StepExecutor {
         requestId,
       });
 
+      if (this.eventEmitter && this.eventOptions.stepCompleted) {
+        this.eventEmitter.emit('stepCompleted', {
+          stepName: step.name,
+          result,
+          metadata: {
+            hasError: result && 'error' in result,
+            method: requestStep.request.method,
+            requestId,
+            timestamp: new Date().toISOString(),
+          },
+        });
+      }
+
       return {
         result,
         type: StepType.Request,
@@ -101,6 +124,14 @@ export class RequestStepExecutor implements StepExecutor {
         requestId,
         error: errorMessage,
       });
+
+      if (this.eventEmitter && this.eventOptions.stepFailed) {
+        this.eventEmitter.emit('stepFailed', {
+          stepName: step.name,
+          error: errorMessage,
+          context: extraContext,
+        });
+      }
 
       if (error instanceof JsonRpcRequestError) {
         throw error;

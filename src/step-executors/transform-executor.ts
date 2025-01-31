@@ -21,6 +21,8 @@ export class TransformExecutor {
     private referenceResolver: ReferenceResolver,
     private context: Record<string, any>,
     logger: Logger,
+    private eventEmitter?: EventEmitter,
+    private eventOptions: Record<string, boolean> = {},
   ) {
     this.logger = logger.createNested('TransformExecutor');
   }
@@ -44,7 +46,27 @@ export class TransformExecutor {
         isArray: Array.isArray(data),
       });
 
+      if (this.eventEmitter && this.eventOptions.transformOperationStarted) {
+        this.eventEmitter.emit('transformOperationStarted', {
+          operationType: op.type,
+          expression: op.using,
+          context: this.context,
+        });
+      }
+
       data = this.executeOperation(op, data);
+
+      if (this.eventEmitter && this.eventOptions.transformOperationCompleted) {
+        this.eventEmitter.emit('transformOperationCompleted', {
+          operationType: op.type,
+          result: data,
+          metadata: {
+            operation: op,
+            inputType: typeof input,
+            resultType: typeof data,
+          },
+        });
+      }
 
       if (op.as) {
         this.logger.debug('Storing operation result in context', {
@@ -288,6 +310,8 @@ export class TransformStepExecutor implements StepExecutor {
     referenceResolver: ReferenceResolver,
     context: Record<string, any>,
     logger: Logger,
+    private eventEmitter?: EventEmitter,
+    private eventOptions: Record<string, boolean> = {},
   ) {
     this.logger = logger.createNested('TransformStepExecutor');
     this.transformExecutor = new TransformExecutor(
@@ -295,6 +319,8 @@ export class TransformStepExecutor implements StepExecutor {
       referenceResolver,
       context,
       logger,
+      this.eventEmitter,
+      this.eventOptions,
     );
   }
 

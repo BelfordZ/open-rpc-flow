@@ -471,6 +471,25 @@ interface RequestStep {
 // More type definitions available in the source
 ```
 
+## EventEmitter integration
+
+The `FlowExecutor` allows you to pass an `EventEmitter` to receive updates during the workflow execution. You can also specify options to control the level of detail for the updates.
+
+### EventEmitter options
+
+When passing the `EventEmitter` to the `FlowExecutor`, you can provide an options object with the following properties:
+
+* `stepStarted`: A boolean indicating whether to emit events when a step starts execution.
+* `stepCompleted`: A boolean indicating whether to emit events when a step completes execution.
+* `stepFailed`: A boolean indicating whether to emit events when a step fails.
+* `loopIterationStarted`: A boolean indicating whether to emit events when a loop iteration starts.
+* `loopIterationCompleted`: A boolean indicating whether to emit events when a loop iteration completes.
+* `conditionEvaluated`: A boolean indicating whether to emit events when a condition is evaluated.
+* `transformOperationStarted`: A boolean indicating whether to emit events when a transform operation starts.
+* `transformOperationCompleted`: A boolean indicating whether to emit events when a transform operation completes.
+
+These options provide fine-grained control over the updates you receive during the workflow execution.
+
 ## Contributing
 
 Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.

@@ -13,6 +13,8 @@ export class LoopStepExecutor implements StepExecutor {
   constructor(
     private executeStep: ExecuteStep,
     logger: Logger,
+    private eventEmitter?: EventEmitter,
+    private eventOptions: Record<string, boolean> = {},
   ) {
     this.logger = logger.createNested('LoopStepExecutor');
   }
@@ -139,6 +141,14 @@ export class LoopStepExecutor implements StepExecutor {
           iteration: iterationCount,
         });
 
+        if (this.eventEmitter && this.eventOptions.loopIterationStarted) {
+          this.eventEmitter.emit('loopIterationStarted', {
+            loopName: step.name,
+            iterationIndex: iterationCount - 1,
+            context: iterationContext,
+          });
+        }
+
         if (loopStep.loop.step) {
           const result = await this.executeStep(loopStep.loop.step, iterationContext);
           results.push(result);
@@ -162,6 +172,15 @@ export class LoopStepExecutor implements StepExecutor {
             },
           });
           executedCount++;
+        }
+
+        if (this.eventEmitter && this.eventOptions.loopIterationCompleted) {
+          this.eventEmitter.emit('loopIterationCompleted', {
+            loopName: step.name,
+            iterationIndex: iterationCount - 1,
+            result: results[results.length - 1].result,
+            metadata: results[results.length - 1].metadata,
+          });
         }
       }
 

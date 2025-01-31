@@ -261,4 +261,38 @@ describe('FlowExecutor', () => {
     executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
     await expect(executor.execute()).rejects.toThrow('No executor found for step unknown_step');
   });
+
+  it('handles condition step without else branch', async () => {
+    const flow: Flow = {
+      name: 'Test Flow',
+      description: 'Test flow for condition without else branch',
+      context: {
+        value: 50,
+      },
+      steps: [
+        {
+          name: 'check_condition',
+          condition: {
+            if: '${context.value} > 100',
+            then: {
+              name: 'success',
+              request: {
+                method: 'success',
+                params: {},
+              },
+            },
+          },
+        },
+      ],
+    };
+
+    jsonRpcHandler.mockResolvedValue({ success: true });
+    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
+    const results = await executor.execute();
+
+    const conditionResult = results.get('check_condition');
+    expect(conditionResult.metadata.branchTaken).toBe('else');
+    expect(conditionResult.result).toBeUndefined();
+    expect(jsonRpcHandler).toHaveBeenCalledTimes(0);
+  });
 });

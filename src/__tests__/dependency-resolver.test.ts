@@ -353,4 +353,306 @@ describe('DependencyResolver', () => {
     const dependencies = resolver.getDependencies('group_by_value');
     expect(dependencies).toEqual(['get_data']);
   });
+
+  it('correctly generates dependency graph for mixed step types', () => {
+    const flow: Flow = {
+      name: 'Test Flow',
+      description: 'Test flow for dependency graph generation',
+      steps: [
+        {
+          name: 'getUser',
+          request: {
+            method: 'user.get',
+            params: { id: 1 },
+          },
+        },
+        {
+          name: 'processUser',
+          transform: {
+            input: '${getUser}',
+            operations: [
+              {
+                type: 'map',
+                using: '${item.name}',
+              },
+            ],
+          },
+        },
+        {
+          name: 'conditionalStep',
+          condition: {
+            if: '${processUser.length} > 0',
+            then: {
+              name: 'thenStep',
+              request: {
+                method: 'test',
+                params: {},
+              },
+            },
+          },
+        },
+      ],
+    };
+
+    const resolver = new DependencyResolver(flow, testLogger);
+    const graph = resolver.getDependencyGraph();
+
+    // Verify nodes
+    expect(graph.nodes).toHaveLength(3);
+    expect(graph.nodes).toEqual(
+      expect.arrayContaining([
+        {
+          name: 'getUser',
+          type: 'request',
+          dependencies: [],
+          dependents: ['processUser'],
+        },
+        {
+          name: 'processUser',
+          type: 'transform',
+          dependencies: ['getUser'],
+          dependents: ['conditionalStep'],
+        },
+        {
+          name: 'conditionalStep',
+          type: 'condition',
+          dependencies: ['processUser'],
+          dependents: [],
+        },
+      ])
+    );
+
+    // Verify edges
+    expect(graph.edges).toHaveLength(2);
+    expect(graph.edges).toEqual(
+      expect.arrayContaining([
+        { from: 'getUser', to: 'processUser' },
+        { from: 'processUser', to: 'conditionalStep' },
+      ])
+    );
+  });
+
+  it('correctly generates dependency graph for loop steps', () => {
+    const flow: Flow = {
+      name: 'Test Flow',
+      description: 'Test flow for loop dependency graph',
+      steps: [
+        {
+          name: 'getData',
+          request: {
+            method: 'data.get',
+            params: {},
+          },
+        },
+        {
+          name: 'processItems',
+          loop: {
+            over: '${getData}',
+            as: 'item',
+            step: {
+              name: 'processItem',
+              request: {
+                method: 'item.process',
+                params: { id: '${item.id}' },
+              },
+            },
+          },
+        },
+      ],
+    };
+
+    const resolver = new DependencyResolver(flow, testLogger);
+    const graph = resolver.getDependencyGraph();
+
+    // Verify nodes
+    expect(graph.nodes).toHaveLength(2);
+    expect(graph.nodes).toEqual(
+      expect.arrayContaining([
+        {
+          name: 'getData',
+          type: 'request',
+          dependencies: [],
+          dependents: ['processItems'],
+        },
+        {
+          name: 'processItems',
+          type: 'loop',
+          dependencies: ['getData'],
+          dependents: [],
+        },
+      ])
+    );
+
+    // Verify edges
+    expect(graph.edges).toHaveLength(1);
+    expect(graph.edges).toEqual([
+      { from: 'getData', to: 'processItems' },
+    ]);
+  });
+
+  it('generates correct Mermaid diagram syntax', () => {
+    const flow: Flow = {
+      name: 'Test Flow',
+      description: 'Test flow for Mermaid diagram generation',
+      steps: [
+        {
+          name: 'getData',
+          request: {
+            method: 'data.get',
+            params: {},
+          },
+        },
+        {
+          name: 'processData',
+          transform: {
+            input: '${getData}',
+            operations: [
+              {
+                type: 'map',
+                using: '${item}',
+              },
+            ],
+          },
+        },
+        {
+          name: 'loopItems',
+          loop: {
+            over: '${processData}',
+            as: 'item',
+            step: {
+              name: 'processItem',
+              request: {
+                method: 'process',
+                params: {},
+              },
+            },
+          },
+        },
+      ],
+    };
+
+    const resolver = new DependencyResolver(flow, testLogger);
+    const diagram = resolver.getMermaidDiagram();
+
+    // Expected Mermaid syntax
+    const expected = [
+      'flowchart LR',
+      '    %% Styles',
+      '    classDef request fill:#e1f5fe,stroke:#01579b,stroke-width:2px',
+      '    classDef transform fill:#f3e5f5,stroke:#4a148c,stroke-width:2px',
+      '    classDef condition fill:#fff3e0,stroke:#e65100,stroke-width:2px',
+      '    classDef loop fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px',
+      '',
+      '    getData_node["getData<br/>data.get"]',
+      '    click getData_node "Method: data.get"',
+      '    class getData_node request',
+      '    processData_node{{"processData<br/>map"}}',
+      '    click processData_node "Input: ${getData}\nOperations: map"',
+      '    class processData_node transform',
+      '    loopItems_node(("loopItems<br/>over processData"))',
+      '    click loopItems_node "Loop over: ${processData} as item"',
+      '    class loopItems_node loop',
+      '    loopItems_inner_node["processItem<br/>process"]',
+      '    class loopItems_inner_node request',
+      '',
+      '    getData_node --> processData_node',
+      '    processData_node --> loopItems_node',
+      '    loopItems_node -->|item| loopItems_inner_node',
+    ].join('\n');
+
+    expect(diagram).toBe(expected);
+  });
+
+  it('generates Mermaid diagram with all step types', () => {
+    const flow: Flow = {
+      name: 'Test Flow',
+      description: 'Test flow with all step types',
+      steps: [
+        {
+          name: 'getData',
+          request: {
+            method: 'data.get',
+            params: {},
+          },
+        },
+        {
+          name: 'processData',
+          transform: {
+            input: '${getData.result}',
+            operations: [
+              {
+                type: 'map',
+                using: '${item}',
+              },
+            ],
+          },
+        },
+        {
+          name: 'loopOver',
+          loop: {
+            over: '${processData}',
+            as: 'item',
+            step: {
+              name: 'processItem',
+              request: {
+                method: 'process',
+                params: {},
+              },
+            },
+          },
+        },
+        {
+          name: 'checkResult',
+          condition: {
+            if: '${processData.length} > 0',
+            then: {
+              name: 'thenStep',
+              request: {
+                method: 'test',
+                params: {},
+              },
+            },
+          },
+        },
+      ],
+    };
+
+    const resolver = new DependencyResolver(flow, testLogger);
+    const diagram = resolver.getMermaidDiagram();
+
+    // Expected Mermaid syntax
+    const expected = [
+      'flowchart LR',
+      '    %% Styles',
+      '    classDef request fill:#e1f5fe,stroke:#01579b,stroke-width:2px',
+      '    classDef transform fill:#f3e5f5,stroke:#4a148c,stroke-width:2px',
+      '    classDef condition fill:#fff3e0,stroke:#e65100,stroke-width:2px',
+      '    classDef loop fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px',
+      '',
+      '    getData_node["getData<br/>data.get"]',
+      '    click getData_node "Method: data.get"',
+      '    class getData_node request',
+      '    processData_node{{"processData<br/>map"}}',
+      '    click processData_node "Input: ${getData.result}\nOperations: map"',
+      '    class processData_node transform',
+      '    loopOver_node(("loopOver<br/>over processData"))',
+      '    click loopOver_node "Loop over: ${processData} as item"',
+      '    class loopOver_node loop',
+      '    loopOver_inner_node["processItem<br/>process"]',
+      '    class loopOver_inner_node request',
+      '    checkResult_node{checkResult}',
+      '    click checkResult_node "Condition: ${processData.length} > 0"',
+      '    class checkResult_node condition',
+      '    checkResult_then_node["thenStep<br/>test"]',
+      '    class checkResult_then_node request',
+      '',
+      '    getData_node -->|result| processData_node',
+      '    processData_node --> loopOver_node',
+      '    processData_node -->|length| checkResult_node',
+      '    loopOver_node -->|item| loopOver_inner_node',
+      '    checkResult_node -->|processData.length > 0| checkResult_then_node',
+    ].join('\n');
+
+    expect(diagram).toBe(expected);
+  });
 });

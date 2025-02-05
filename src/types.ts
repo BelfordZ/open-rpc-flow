@@ -25,12 +25,6 @@ export interface Step {
     step?: Step;
     steps?: Step[];
   };
-  aggregate?: {
-    from: string;
-    select?: string[];
-    groupBy?: string;
-    having?: string;
-  };
   condition?: {
     if: string;
     then: Step;
@@ -61,4 +55,25 @@ export interface StepExecutionContext {
   stepResults: Map<string, any>;
   context: Record<string, any>;
   logger: Logger;
+}
+
+/**
+ * Represents a node in the dependency graph
+ */
+export interface DependencyNode {
+  name: string;
+  type: 'request' | 'loop' | 'condition' | 'transform';
+  dependencies: string[];
+  dependents: string[];
+}
+
+/**
+ * Represents the complete dependency graph structure
+ */
+export interface DependencyGraph {
+  nodes: DependencyNode[];
+  edges: Array<{
+    from: string;
+    to: string;
+  }>;
 }

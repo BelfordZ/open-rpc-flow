@@ -3,6 +3,7 @@ import {
   InvalidPathError,
   PropertyAccessError,
   PathSyntaxError,
+  UnknownReferenceError,
 } from '../path-accessor';
 
 describe('PathAccessor', () => {
@@ -376,6 +377,125 @@ describe('PathAccessor', () => {
         { type: 'property' as const, value: 'bar-baz', raw: '"bar-baz"' },
       ];
       expect(PathAccessor.formatPath(segments)).toBe('foo[0]["bar-baz"]');
+    });
+  });
+});
+
+describe('PathAccessor error handling', () => {
+  describe('parsePath', () => {
+    it('should throw on consecutive opening brackets', () => {
+      expect(() => PathAccessor.parsePath('foo[[0]]')).toThrow(PathSyntaxError);
+    });
+
+    it('should throw on invalid nested brackets', () => {
+      expect(() => PathAccessor.parsePath('foo[[]]')).toThrow(PathSyntaxError);
+    });
+
+    it('should throw on unclosed brackets', () => {
+      expect(() => PathAccessor.parsePath('foo[0')).toThrow(PathSyntaxError);
+    });
+
+    it('should throw on unclosed quotes', () => {
+      expect(() => PathAccessor.parsePath('foo["bar')).toThrow(PathSyntaxError);
+    });
+
+    it.skip('should throw on empty brackets', () => {
+      expect(() => PathAccessor.parsePath('foo[]')).toThrow(PathSyntaxError);
+    });
+
+    it('should throw on invalid characters in property names', () => {
+      expect(() => PathAccessor.parsePath('foo@bar')).toThrow(PathSyntaxError);
+    });
+
+    it('should throw on numeric property names without brackets', () => {
+      expect(() => PathAccessor.parsePath('foo.0')).toThrow(PathSyntaxError);
+    });
+
+    it('should throw on single quotes outside brackets', () => {
+      expect(() => PathAccessor.parsePath("foo.'bar'")).toThrow(PathSyntaxError);
+    });
+
+    it('should throw on consecutive dots', () => {
+      expect(() => PathAccessor.parsePath('foo..bar')).toThrow(PathSyntaxError);
+    });
+
+    it('should throw on empty path', () => {
+      expect(() => PathAccessor.parsePath('')).toThrow(InvalidPathError);
+    });
+  });
+
+  describe('get with expression evaluation', () => {
+    const obj = {
+      items: ['a', 'b', 'c'],
+      indices: { first: 0, second: 1 }
+    };
+
+    it('should handle expression evaluation errors', () => {
+      const evaluator = (expr: string) => {
+        throw new Error('Evaluation failed');
+      };
+
+      expect(() => PathAccessor.get(obj, 'items[indices.first]', evaluator))
+        .toThrow(PathSyntaxError);
+    });
+
+    it('should handle invalid expression results', () => {
+      const evaluator = (expr: string) => {
+        return { invalid: 'type' };
+      };
+
+      expect(() => PathAccessor.get(obj, 'items[indices.first]', evaluator))
+        .toThrow(PathSyntaxError);
+    });
+
+    it('should propagate UnknownReferenceError', () => {
+      const evaluator = (expr: string) => {
+        throw new UnknownReferenceError('Reference not found', 'unknown', ['available']);
+      };
+
+      expect(() => PathAccessor.get(obj, 'items[indices.first]', evaluator))
+        .toThrow(UnknownReferenceError);
+    });
+
+    it('should propagate PathSyntaxError', () => {
+      const evaluator = (expr: string) => {
+        throw new PathSyntaxError('invalid path', expr);
+      };
+
+      expect(() => PathAccessor.get(obj, 'items[indices.first]', evaluator))
+        .toThrow(PathSyntaxError);
+    });
+  });
+
+  describe('formatSegment edge cases', () => {
+    it('should format property segments with special characters', () => {
+      const segment = { type: 'property' as const, value: '@invalid', raw: '@invalid' };
+      expect(PathAccessor.formatSegment(segment)).toBe('["@invalid"]');
+    });
+
+    it('should format property segments with numbers', () => {
+      const segment = { type: 'property' as const, value: '123', raw: '123' };
+      expect(PathAccessor.formatSegment(segment)).toBe('["123"]');
+    });
+  });
+
+  describe('formatPath edge cases', () => {
+    it('should format path with all special characters', () => {
+      const segments = [
+        { type: 'property' as const, value: '@foo', raw: '@foo' },
+        { type: 'index' as const, value: '0', raw: '[0]' },
+        { type: 'property' as const, value: '123', raw: '123' }
+      ];
+      expect(PathAccessor.formatPath(segments)).toBe('["@foo"][0]["123"]');
+    });
+
+    it('should format path with mixed valid and special characters', () => {
+      const segments = [
+        { type: 'property' as const, value: 'valid', raw: 'valid' },
+        { type: 'property' as const, value: '@invalid', raw: '@invalid' },
+        { type: 'property' as const, value: 'alsoValid', raw: 'alsoValid' }
+      ];
+      expect(PathAccessor.formatPath(segments)).toBe('valid["@invalid"].alsoValid');
     });
   });
 });

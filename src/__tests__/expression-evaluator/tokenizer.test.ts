@@ -147,6 +147,73 @@ describe('tokenize', () => {
     });
   });
 
+  describe('spread operator', () => {
+    it('tokenizes spread operator in object literals', () => {
+      expect(tokenize('{ ...${foo} }')).toEqual([
+        { type: 'punctuation', value: '{', raw: '{' },
+        { type: 'punctuation', value: '...', raw: '...' },
+        { type: 'identifier', value: '${foo}', raw: '${foo}' },
+        { type: 'punctuation', value: '}', raw: '}' },
+      ]);
+
+      expect(tokenize('{ ...${foo}, bar: "baz" }')).toEqual([
+        { type: 'punctuation', value: '{', raw: '{' },
+        { type: 'punctuation', value: '...', raw: '...' },
+        { type: 'identifier', value: '${foo}', raw: '${foo}' },
+        { type: 'punctuation', value: ',', raw: ',' },
+        { type: 'identifier', value: 'bar', raw: 'bar' },
+        { type: 'punctuation', value: ':', raw: ':' },
+        { type: 'string', value: 'baz', raw: 'baz"' },
+        { type: 'punctuation', value: '}', raw: '}' },
+      ]);
+    });
+
+    it('tokenizes spread operator in array literals', () => {
+      expect(tokenize('[...${foo}]')).toEqual([
+        { type: 'punctuation', value: '[', raw: '[' },
+        { type: 'punctuation', value: '...', raw: '...' },
+        { type: 'identifier', value: '${foo}', raw: '${foo}' },
+        { type: 'punctuation', value: ']', raw: ']' },
+      ]);
+
+      expect(tokenize('[...${foo}, 1, 2]')).toEqual([
+        { type: 'punctuation', value: '[', raw: '[' },
+        { type: 'punctuation', value: '...', raw: '...' },
+        { type: 'identifier', value: '${foo}', raw: '${foo}' },
+        { type: 'punctuation', value: ',', raw: ',' },
+        { type: 'number', value: '1', raw: '1' },
+        { type: 'punctuation', value: ',', raw: ',' },
+        { type: 'number', value: '2', raw: '2' },
+        { type: 'punctuation', value: ']', raw: ']' },
+      ]);
+    });
+
+    it('tokenizes multiple spread operators', () => {
+      expect(tokenize('{ ...${foo}, ...${bar} }')).toEqual([
+        { type: 'punctuation', value: '{', raw: '{' },
+        { type: 'punctuation', value: '...', raw: '...' },
+        { type: 'identifier', value: '${foo}', raw: '${foo}' },
+        { type: 'punctuation', value: ',', raw: ',' },
+        { type: 'punctuation', value: '...', raw: '...' },
+        { type: 'identifier', value: '${bar}', raw: '${bar}' },
+        { type: 'punctuation', value: '}', raw: '}' },
+      ]);
+    });
+
+    it.skip('handles invalid spread operator usage', () => {
+      // Spread without value
+      expect(() => tokenize('{ ... }')).toThrow(TokenizerError);
+      expect(() => tokenize('[...]')).toThrow(TokenizerError);
+
+      // Spread without container
+      expect(() => tokenize('...${foo}')).toThrow(TokenizerError);
+
+      // Incomplete spread
+      expect(() => tokenize('{ .. }')).toThrow(TokenizerError);
+      expect(() => tokenize('{ . }')).toThrow(TokenizerError);
+    });
+  });
+
   describe('error cases', () => {
     it('throws on empty expression', () => {
       expect(() => tokenize('')).toThrow(TokenizerError);

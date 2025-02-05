@@ -854,4 +854,114 @@ export class SafeExpressionEvaluator {
     const isSimpleReference = /^\${[^}]+}$/.test(expression);
     return operatorRegex.test(expression) || isSimpleReference;
   }
+
+  /**
+   * Extract all references from an expression without evaluating it.
+   * This is useful for dependency analysis.
+   * @param expression The expression to extract references from
+   * @returns An array of reference paths found in the expression
+   */
+  public extractReferences(expression: string): string[] {
+    try {
+      const refs = new Set<string>();
+      
+      // Handle spread operator syntax directly
+      const spreadMatches = expression.match(/\.\.\.\${([^}]+)}/g);
+      if (spreadMatches) {
+        spreadMatches.forEach(match => {
+          const ref = match.slice(5, -1); // Remove ...${} wrapper
+          const baseRef = ref.split('.')[0]; // Get the base reference
+          if (!this.isSpecialVariable(baseRef)) {
+            refs.add(baseRef);
+          }
+        });
+      }
+
+      // Handle regular references through AST
+      const tokens = tokenize(expression);
+      const ast = this.parse(tokens);
+      this.collectReferencesFromAst(ast, refs);
+      return Array.from(refs).sort(); // Sort references for consistent order
+    } catch (error) {
+      // Return empty array for invalid expressions
+      return [];
+    }
+  }
+
+  private collectReferencesFromAst(node: AstNode, refs: Set<string>): void {
+    switch (node.type) {
+      case 'reference':
+        if (node.path) {
+          // Extract base reference and any nested references in array indices
+          const baseRef = node.path.split('.')[0];
+          if (!this.isSpecialVariable(baseRef)) {
+            refs.add(baseRef);
+          }
+          
+          // Extract references from array indices
+          const arrayIndexMatches = node.path.match(/\${([^}]+)}/g);
+          if (arrayIndexMatches) {
+            arrayIndexMatches.forEach(match => {
+              const innerRef = match.slice(2, -1).split('.')[0];
+              if (!this.isSpecialVariable(innerRef)) {
+                refs.add(innerRef);
+              }
+            });
+          }
+        }
+        break;
+
+      case 'operation':
+        if (node.left) this.collectReferencesFromAst(node.left, refs);
+        if (node.right) this.collectReferencesFromAst(node.right, refs);
+        break;
+
+      case 'object':
+        if (node.properties) {
+          node.properties.forEach(prop => {
+            // Handle spread operator in object properties
+            if (prop.spread) {
+              if (prop.value.type === 'reference') {
+                const baseRef = prop.value.path?.split('.')[0];
+                if (baseRef && !this.isSpecialVariable(baseRef)) {
+                  refs.add(baseRef);
+                }
+              }
+              // Also collect any nested references in the spread value
+              this.collectReferencesFromAst(prop.value, refs);
+            } else {
+              this.collectReferencesFromAst(prop.value, refs);
+            }
+          });
+        }
+        break;
+
+      case 'array':
+        if (node.elements) {
+          node.elements.forEach(element => {
+            // Handle spread operator in array elements
+            if (element.spread) {
+              if (element.value.type === 'reference') {
+                const baseRef = element.value.path?.split('.')[0];
+                if (baseRef && !this.isSpecialVariable(baseRef)) {
+                  refs.add(baseRef);
+                }
+              }
+              // Also collect any nested references in the spread value
+              this.collectReferencesFromAst(element.value, refs);
+            } else {
+              this.collectReferencesFromAst(element.value, refs);
+            }
+          });
+        }
+        break;
+    }
+  }
+
+  /**
+   * Check if a variable name is a special variable that should be ignored
+   */
+  private isSpecialVariable(name: string): boolean {
+    return ['context', 'metadata', 'item', 'acc', 'a', 'b'].includes(name);
+  }
 }

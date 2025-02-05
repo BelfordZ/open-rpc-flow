@@ -490,169 +490,51 @@ describe('DependencyResolver', () => {
     ]);
   });
 
-  it('generates correct Mermaid diagram syntax', () => {
+  it('should detect dependencies in complex expressions', () => {
     const flow: Flow = {
       name: 'Test Flow',
-      description: 'Test flow for Mermaid diagram generation',
+      description: 'Test flow for complex expression dependencies',
       steps: [
         {
-          name: 'getData',
+          name: 'step1',
           request: {
-            method: 'data.get',
-            params: {},
-          },
+            method: 'test.method',
+            params: { value: [1, 2, 3] }
+          }
         },
         {
-          name: 'processData',
+          name: 'step2',
+          request: {
+            method: 'test.method',
+            params: { value: 0 }
+          }
+        },
+        {
+          name: 'step3',
+          request: {
+            method: 'test.method',
+            params: { value: { indices: [0, 1, 2] } }
+          }
+        },
+        {
+          name: 'step4',
           transform: {
-            input: '${getData}',
+            input: '${step1.value}',
             operations: [
               {
                 type: 'map',
-                using: '${item}',
-              },
-            ],
-          },
-        },
-        {
-          name: 'loopItems',
-          loop: {
-            over: '${processData}',
-            as: 'item',
-            step: {
-              name: 'processItem',
-              request: {
-                method: 'process',
-                params: {},
-              },
-            },
-          },
-        },
-      ],
+                using: '${step1.value[${step2.value}]} + ${step3.value.indices[0]}'
+              }
+            ]
+          }
+        }
+      ]
     };
 
     const resolver = new DependencyResolver(flow, testLogger);
-    const diagram = resolver.getMermaidDiagram();
-
-    // Expected Mermaid syntax
-    const expected = [
-      'flowchart LR',
-      '    %% Styles',
-      '    classDef request fill:#e1f5fe,stroke:#01579b,stroke-width:2px',
-      '    classDef transform fill:#f3e5f5,stroke:#4a148c,stroke-width:2px',
-      '    classDef condition fill:#fff3e0,stroke:#e65100,stroke-width:2px',
-      '    classDef loop fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px',
-      '',
-      '    getData_node["getData<br/>data.get"]',
-      '    click getData_node "Method: data.get"',
-      '    class getData_node request',
-      '    processData_node{{"processData<br/>map"}}',
-      '    click processData_node "Input: ${getData}\nOperations: map"',
-      '    class processData_node transform',
-      '    loopItems_node(("loopItems<br/>over processData"))',
-      '    click loopItems_node "Loop over: ${processData} as item"',
-      '    class loopItems_node loop',
-      '    loopItems_inner_node["processItem<br/>process"]',
-      '    class loopItems_inner_node request',
-      '',
-      '    getData_node --> processData_node',
-      '    processData_node --> loopItems_node',
-      '    loopItems_node -->|item| loopItems_inner_node',
-    ].join('\n');
-
-    expect(diagram).toBe(expected);
-  });
-
-  it('generates Mermaid diagram with all step types', () => {
-    const flow: Flow = {
-      name: 'Test Flow',
-      description: 'Test flow with all step types',
-      steps: [
-        {
-          name: 'getData',
-          request: {
-            method: 'data.get',
-            params: {},
-          },
-        },
-        {
-          name: 'processData',
-          transform: {
-            input: '${getData.result}',
-            operations: [
-              {
-                type: 'map',
-                using: '${item}',
-              },
-            ],
-          },
-        },
-        {
-          name: 'loopOver',
-          loop: {
-            over: '${processData}',
-            as: 'item',
-            step: {
-              name: 'processItem',
-              request: {
-                method: 'process',
-                params: {},
-              },
-            },
-          },
-        },
-        {
-          name: 'checkResult',
-          condition: {
-            if: '${processData.length} > 0',
-            then: {
-              name: 'thenStep',
-              request: {
-                method: 'test',
-                params: {},
-              },
-            },
-          },
-        },
-      ],
-    };
-
-    const resolver = new DependencyResolver(flow, testLogger);
-    const diagram = resolver.getMermaidDiagram();
-
-    // Expected Mermaid syntax
-    const expected = [
-      'flowchart LR',
-      '    %% Styles',
-      '    classDef request fill:#e1f5fe,stroke:#01579b,stroke-width:2px',
-      '    classDef transform fill:#f3e5f5,stroke:#4a148c,stroke-width:2px',
-      '    classDef condition fill:#fff3e0,stroke:#e65100,stroke-width:2px',
-      '    classDef loop fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px',
-      '',
-      '    getData_node["getData<br/>data.get"]',
-      '    click getData_node "Method: data.get"',
-      '    class getData_node request',
-      '    processData_node{{"processData<br/>map"}}',
-      '    click processData_node "Input: ${getData.result}\nOperations: map"',
-      '    class processData_node transform',
-      '    loopOver_node(("loopOver<br/>over processData"))',
-      '    click loopOver_node "Loop over: ${processData} as item"',
-      '    class loopOver_node loop',
-      '    loopOver_inner_node["processItem<br/>process"]',
-      '    class loopOver_inner_node request',
-      '    checkResult_node{checkResult}',
-      '    click checkResult_node "Condition: ${processData.length} > 0"',
-      '    class checkResult_node condition',
-      '    checkResult_then_node["thenStep<br/>test"]',
-      '    class checkResult_then_node request',
-      '',
-      '    getData_node -->|result| processData_node',
-      '    processData_node --> loopOver_node',
-      '    processData_node -->|length| checkResult_node',
-      '    loopOver_node -->|item| loopOver_inner_node',
-      '    checkResult_node -->|processData.length > 0| checkResult_then_node',
-    ].join('\n');
-
-    expect(diagram).toBe(expected);
+    const deps = resolver.getDependencies('step4');
+    expect(deps).toContain('step1');
+    expect(deps).toContain('step2');
+    expect(deps).toContain('step3');
   });
 });

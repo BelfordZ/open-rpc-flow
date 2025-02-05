@@ -44,7 +44,7 @@ const OPERATORS: Record<string, boolean> = {
 const UNARY_OPERATORS = new Set(['-', '+', '!']);
 
 // Define punctuation
-const PUNCTUATION = new Set(['(', ')', '[', ']', '{', '}', ':', ',']);
+const PUNCTUATION = new Set(['(', ')', '[', ']', '{', '}', ':', ',', '...']);
 
 // Define valid operator characters
 const VALID_OPERATOR_CHARS = new Set([
@@ -118,6 +118,20 @@ export function tokenize(expression: string, parentLogger: Logger): Token[] {
       logger.debug('Skipping whitespace');
       current++;
       continue;
+    }
+
+    // Handle spread operator
+    if (char === '.' && current + 2 < expression.length) {
+      const nextTwoChars = expression.slice(current + 1, current + 3);
+      if (nextTwoChars === '..') {
+        tokens.push({
+          type: 'punctuation',
+          value: '...',
+          raw: '...',
+        });
+        current += 3;
+        continue;
+      }
     }
 
     // Handle string literals

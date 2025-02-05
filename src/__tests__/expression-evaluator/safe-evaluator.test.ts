@@ -438,4 +438,63 @@ describe('SafeExpressionEvaluator', () => {
       );
     });
   });
+
+  describe('extractReferences', () => {
+    beforeEach(() => {
+      stepResults = new Map();
+      context = {};
+      referenceResolver = new ReferenceResolver(stepResults, context, logger);
+      evaluator = new SafeExpressionEvaluator(logger, referenceResolver);
+    });
+
+    it('extracts simple references', () => {
+      const refs = evaluator.extractReferences('${step1} + ${step2}');
+      expect(refs).toEqual(['step1', 'step2']);
+    });
+
+    it('extracts references from array indices', () => {
+      const refs = evaluator.extractReferences('${step1.value[${step2.value}]}');
+      expect(refs).toEqual(['step1', 'step2']);
+    });
+
+    it('extracts references from nested expressions', () => {
+      const refs = evaluator.extractReferences('${step1.data[${step2.index}].items[${step3.value}]}');
+      expect(refs).toEqual(['step1', 'step2', 'step3']);
+    });
+
+    it('ignores special variables', () => {
+      const refs = evaluator.extractReferences('${item.value} + ${context.data} + ${acc.total}');
+      expect(refs).toEqual([]);
+    });
+
+    it('extracts references from object literals', () => {
+      const refs = evaluator.extractReferences('{ value: ${step1}, nested: { data: ${step2} } }');
+      expect(refs).toEqual(['step1', 'step2']);
+    });
+
+    it('extracts references from array literals', () => {
+      const refs = evaluator.extractReferences('[${step1}, { value: ${step2} }, ${step3}]');
+      expect(refs).toEqual(['step1', 'step2', 'step3']);
+    });
+
+    it('extracts references from complex expressions', () => {
+      const refs = evaluator.extractReferences('${step1.value[${step2}]} * ${step3} + ${step4.data[${step5.index}]}');
+      expect(refs).toEqual(['step1', 'step2', 'step3', 'step4', 'step5']);
+    });
+
+    it('handles expressions with no references', () => {
+      const refs = evaluator.extractReferences('1 + 2 * 3');
+      expect(refs).toEqual([]);
+    });
+
+    it('handles invalid expressions gracefully', () => {
+      const refs = evaluator.extractReferences('${incomplete + ${invalid}');
+      expect(refs).toEqual([]);
+    });
+
+    it('extracts references from spread operators', () => {
+      const refs = evaluator.extractReferences('{ ...${step1}, value: ${step2}, items: [...${step3}] }');
+      expect(refs).toEqual(['step1', 'step2', 'step3']);
+    });
+  });
 });

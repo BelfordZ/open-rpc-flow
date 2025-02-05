@@ -2,8 +2,7 @@ import { FlowExecutor } from '../../flow-executor';
 import { Flow } from '../../types';
 import { createMockJsonRpcHandler } from '../test-utils';
 import { noLogger } from '../../util/logger';
-import * as fs from 'fs';
-import * as path from 'path';
+import { examples, simpleFlow, dataTransformFlow, nestedLoopsFlow, conditionalBranchingFlow, complexDataPipelineFlow } from '../../examples';
 
 describe('Example Flows Integration', () => {
   let jsonRpcHandler: jest.Mock;
@@ -89,20 +88,9 @@ describe('Example Flows Integration', () => {
     });
   };
 
-  const loadExampleFlow = (filename: string): Flow => {
-    const filePath = path.join(process.cwd(), 'examples', filename);
-    const fileContent = fs.readFileSync(filePath, 'utf-8');
-    return JSON.parse(fileContent);
-  };
-
-  const exampleFiles = fs
-    .readdirSync(path.join(process.cwd(), 'examples'))
-    .filter((file) => file.endsWith('.json'));
-
-  describe.each(exampleFiles)('Example: %s', (filename) => {
+  describe.each(examples)('Example: %s', (flow) => {
     it('executes successfully', async () => {
       setupMockResponses(jsonRpcHandler);
-      const flow = loadExampleFlow(filename);
       const executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
 
       const results = await executor.execute();
@@ -117,8 +105,8 @@ describe('Example Flows Integration', () => {
       });
 
       // Example-specific validations
-      switch (filename) {
-        case '01-simple-request.json': {
+      switch (flow.name) {
+        case 'simple-request': {
           const getUser = results.get('getUser').result;
           expect(getUser.id).toBe(1);
           expect(getUser.role).toBe('admin');
@@ -129,7 +117,7 @@ describe('Example Flows Integration', () => {
           break;
         }
 
-        case '02-data-transformation.json': {
+        case 'data-transformation': {
           const filterHighValue = results.get('filterHighValue').result;
           expect(Array.isArray(filterHighValue)).toBeTruthy();
           expect(filterHighValue.every((item: any) => item.total > 1000)).toBeTruthy();
@@ -147,7 +135,7 @@ describe('Example Flows Integration', () => {
           break;
         }
 
-        case '03-nested-loops.json': {
+        case 'nested-loops': {
           const getTeams = results.get('getTeams').result;
           expect(Array.isArray(getTeams)).toBeTruthy();
           expect(getTeams).toHaveLength(2);
@@ -168,7 +156,7 @@ describe('Example Flows Integration', () => {
           break;
         }
 
-        case '04-conditional-branching.json': {
+        case 'conditional-branching': {
           const checkInventory = results.get('checkInventory').result;
           expect(checkInventory.length).toBeGreaterThan(0);
           expect(checkInventory[0].inStock).toBeTruthy();
@@ -183,7 +171,7 @@ describe('Example Flows Integration', () => {
           break;
         }
 
-        case '05-complex-data-pipeline.json': {
+        case 'complex-data-pipeline': {
           const getRawData = results.get('getRawData').result;
           expect(Array.isArray(getRawData)).toBeTruthy();
 
@@ -208,4 +196,57 @@ describe('Example Flows Integration', () => {
       }
     });
   });
+});
+
+describe('Example Flow Files', () => {
+    const validateFlow = (flow: Flow) => {
+        expect(flow).toHaveProperty('name');
+        expect(typeof flow.name).toBe('string');
+        expect(flow).toHaveProperty('description');
+        expect(typeof flow.description).toBe('string');
+        expect(flow).toHaveProperty('steps');
+        expect(Array.isArray(flow.steps)).toBe(true);
+        
+        // Validate each step has required properties
+        flow.steps.forEach(step => {
+            expect(step).toHaveProperty('name');
+            expect(typeof step.name).toBe('string');
+            
+            // Validate step has at least one of: request, loop, condition, or transform
+            const hasValidStepType = Boolean(
+                step.request ||
+                step.loop ||
+                step.condition ||
+                step.transform
+            );
+            expect(hasValidStepType).toBe(true);
+        });
+    };
+
+    test('examples array contains all flows', () => {
+        expect(examples).toHaveLength(5);
+        examples.forEach(flow => {
+            validateFlow(flow);
+        });
+    });
+
+    test('simple flow is properly typed', () => {
+        validateFlow(simpleFlow);
+    });
+
+    test('data transform flow is properly typed', () => {
+        validateFlow(dataTransformFlow);
+    });
+
+    test('nested loops flow is properly typed', () => {
+        validateFlow(nestedLoopsFlow);
+    });
+
+    test('conditional branching flow is properly typed', () => {
+        validateFlow(conditionalBranchingFlow);
+    });
+
+    test('complex data pipeline flow is properly typed', () => {
+        validateFlow(complexDataPipelineFlow);
+    });
 });

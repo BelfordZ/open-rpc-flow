@@ -419,7 +419,7 @@ describe('DependencyResolver', () => {
           dependencies: ['processUser'],
           dependents: [],
         },
-      ])
+      ]),
     );
 
     // Verify edges
@@ -428,7 +428,7 @@ describe('DependencyResolver', () => {
       expect.arrayContaining([
         { from: 'getUser', to: 'processUser' },
         { from: 'processUser', to: 'conditionalStep' },
-      ])
+      ]),
     );
   });
 
@@ -480,14 +480,12 @@ describe('DependencyResolver', () => {
           dependencies: ['getData'],
           dependents: [],
         },
-      ])
+      ]),
     );
 
     // Verify edges
     expect(graph.edges).toHaveLength(1);
-    expect(graph.edges).toEqual([
-      { from: 'getData', to: 'processItems' },
-    ]);
+    expect(graph.edges).toEqual([{ from: 'getData', to: 'processItems' }]);
   });
 
   it('should detect dependencies in complex expressions', () => {
@@ -499,22 +497,22 @@ describe('DependencyResolver', () => {
           name: 'step1',
           request: {
             method: 'test.method',
-            params: { value: [1, 2, 3] }
-          }
+            params: { value: [1, 2, 3] },
+          },
         },
         {
           name: 'step2',
           request: {
             method: 'test.method',
-            params: { value: 0 }
-          }
+            params: { value: 0 },
+          },
         },
         {
           name: 'step3',
           request: {
             method: 'test.method',
-            params: { value: { indices: [0, 1, 2] } }
-          }
+            params: { value: { indices: [0, 1, 2] } },
+          },
         },
         {
           name: 'step4',
@@ -523,12 +521,12 @@ describe('DependencyResolver', () => {
             operations: [
               {
                 type: 'map',
-                using: '${step1.value[${step2.value}]} + ${step3.value.indices[0]}'
-              }
-            ]
-          }
-        }
-      ]
+                using: '${step1.value[${step2.value}]} + ${step3.value.indices[0]}',
+              },
+            ],
+          },
+        },
+      ],
     };
 
     const resolver = new DependencyResolver(flow, testLogger);

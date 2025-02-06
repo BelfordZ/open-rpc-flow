@@ -2,7 +2,14 @@ import { FlowExecutor } from '../../flow-executor';
 import { Flow } from '../../types';
 import { createMockJsonRpcHandler } from '../test-utils';
 import { noLogger } from '../../util/logger';
-import { examples, simpleFlow, dataTransformFlow, nestedLoopsFlow, conditionalBranchingFlow, complexDataPipelineFlow } from '../../examples';
+import {
+  examples,
+  simpleFlow,
+  dataTransformFlow,
+  nestedLoopsFlow,
+  conditionalBranchingFlow,
+  complexDataPipelineFlow,
+} from '../../examples';
 
 describe('Example Flows Integration', () => {
   let jsonRpcHandler: jest.Mock;
@@ -199,54 +206,51 @@ describe('Example Flows Integration', () => {
 });
 
 describe('Example Flow Files', () => {
-    const validateFlow = (flow: Flow) => {
-        expect(flow).toHaveProperty('name');
-        expect(typeof flow.name).toBe('string');
-        expect(flow).toHaveProperty('description');
-        expect(typeof flow.description).toBe('string');
-        expect(flow).toHaveProperty('steps');
-        expect(Array.isArray(flow.steps)).toBe(true);
-        
-        // Validate each step has required properties
-        flow.steps.forEach(step => {
-            expect(step).toHaveProperty('name');
-            expect(typeof step.name).toBe('string');
-            
-            // Validate step has at least one of: request, loop, condition, or transform
-            const hasValidStepType = Boolean(
-                step.request ||
-                step.loop ||
-                step.condition ||
-                step.transform
-            );
-            expect(hasValidStepType).toBe(true);
-        });
-    };
+  const validateFlow = (flow: Flow) => {
+    expect(flow).toHaveProperty('name');
+    expect(typeof flow.name).toBe('string');
+    expect(flow).toHaveProperty('description');
+    expect(typeof flow.description).toBe('string');
+    expect(flow).toHaveProperty('steps');
+    expect(Array.isArray(flow.steps)).toBe(true);
 
-    test('examples array contains all flows', () => {
-        expect(examples).toHaveLength(5);
-        examples.forEach(flow => {
-            validateFlow(flow);
-        });
-    });
+    // Validate each step has required properties
+    flow.steps.forEach((step) => {
+      expect(step).toHaveProperty('name');
+      expect(typeof step.name).toBe('string');
 
-    test('simple flow is properly typed', () => {
-        validateFlow(simpleFlow);
+      // Validate step has at least one of: request, loop, condition, or transform
+      const hasValidStepType = Boolean(
+        step.request || step.loop || step.condition || step.transform,
+      );
+      expect(hasValidStepType).toBe(true);
     });
+  };
 
-    test('data transform flow is properly typed', () => {
-        validateFlow(dataTransformFlow);
+  test('examples array contains all flows', () => {
+    expect(examples).toHaveLength(5);
+    examples.forEach((flow) => {
+      validateFlow(flow);
     });
+  });
 
-    test('nested loops flow is properly typed', () => {
-        validateFlow(nestedLoopsFlow);
-    });
+  test('simple flow is properly typed', () => {
+    validateFlow(simpleFlow);
+  });
 
-    test('conditional branching flow is properly typed', () => {
-        validateFlow(conditionalBranchingFlow);
-    });
+  test('data transform flow is properly typed', () => {
+    validateFlow(dataTransformFlow);
+  });
 
-    test('complex data pipeline flow is properly typed', () => {
-        validateFlow(complexDataPipelineFlow);
-    });
+  test('nested loops flow is properly typed', () => {
+    validateFlow(nestedLoopsFlow);
+  });
+
+  test('conditional branching flow is properly typed', () => {
+    validateFlow(conditionalBranchingFlow);
+  });
+
+  test('complex data pipeline flow is properly typed', () => {
+    validateFlow(complexDataPipelineFlow);
+  });
 });

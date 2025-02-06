@@ -927,11 +927,11 @@ export class SafeExpressionEvaluator {
   public extractReferences(expression: string): string[] {
     try {
       const refs = new Set<string>();
-      
+
       // Handle spread operator syntax directly
       const spreadMatches = expression.match(/\.\.\.\${([^}]+)}/g);
       if (spreadMatches) {
-        spreadMatches.forEach(match => {
+        spreadMatches.forEach((match) => {
           const ref = match.slice(5, -1); // Remove ...${} wrapper
           const baseRef = ref.split('.')[0]; // Get the base reference
           if (!this.isSpecialVariable(baseRef)) {
@@ -960,11 +960,11 @@ export class SafeExpressionEvaluator {
           if (!this.isSpecialVariable(baseRef)) {
             refs.add(baseRef);
           }
-          
+
           // Extract references from array indices
           const arrayIndexMatches = node.path.match(/\${([^}]+)}/g);
           if (arrayIndexMatches) {
-            arrayIndexMatches.forEach(match => {
+            arrayIndexMatches.forEach((match) => {
               const innerRef = match.slice(2, -1).split('.')[0];
               if (!this.isSpecialVariable(innerRef)) {
                 refs.add(innerRef);
@@ -981,7 +981,7 @@ export class SafeExpressionEvaluator {
 
       case 'object':
         if (node.properties) {
-          node.properties.forEach(prop => {
+          node.properties.forEach((prop) => {
             // Handle spread operator in object properties
             if (prop.spread) {
               if (prop.value.type === 'reference') {
@@ -1001,7 +1001,7 @@ export class SafeExpressionEvaluator {
 
       case 'array':
         if (node.elements) {
-          node.elements.forEach(element => {
+          node.elements.forEach((element) => {
             // Handle spread operator in array elements
             if (element.spread) {
               if (element.value.type === 'reference') {

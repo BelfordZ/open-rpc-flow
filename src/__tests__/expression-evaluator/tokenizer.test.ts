@@ -8,6 +8,11 @@ describe('tokenize', () => {
     logger = new TestLogger();
   });
 
+  afterEach(() => {
+    //logger.print();
+    logger.clear();
+  });
+
   describe('simple expressions', () => {
     it('tokenizes numbers', () => {
       expect(tokenize('42', logger)).toEqual([{ type: 'number', value: '42', raw: '42' }]);
@@ -189,14 +194,14 @@ describe('tokenize', () => {
     it('tokenizes spread operator in object literals', () => {
       expect(tokenize('{ ...${foo} }', logger)).toEqual([
         { type: 'punctuation', value: '{', raw: '{' },
-        { type: 'punctuation', value: '...', raw: '...' },
+        { type: 'operator', value: '...', raw: '...' },
         { type: 'identifier', value: '${foo}', raw: '${foo}' },
         { type: 'punctuation', value: '}', raw: '}' },
       ]);
 
       expect(tokenize('{ ...${foo}, bar: "baz" }', logger)).toEqual([
         { type: 'punctuation', value: '{', raw: '{' },
-        { type: 'punctuation', value: '...', raw: '...' },
+        { type: 'operator', value: '...', raw: '...' },
         { type: 'identifier', value: '${foo}', raw: '${foo}' },
         { type: 'punctuation', value: ',', raw: ',' },
         { type: 'identifier', value: 'bar', raw: 'bar' },
@@ -209,14 +214,14 @@ describe('tokenize', () => {
     it('tokenizes spread operator in array literals', () => {
       expect(tokenize('[...${foo}]', logger)).toEqual([
         { type: 'punctuation', value: '[', raw: '[' },
-        { type: 'punctuation', value: '...', raw: '...' },
+        { type: 'operator', value: '...', raw: '...' },
         { type: 'identifier', value: '${foo}', raw: '${foo}' },
         { type: 'punctuation', value: ']', raw: ']' },
       ]);
 
       expect(tokenize('[...${foo}, 1, 2]', logger)).toEqual([
         { type: 'punctuation', value: '[', raw: '[' },
-        { type: 'punctuation', value: '...', raw: '...' },
+        { type: 'operator', value: '...', raw: '...' },
         { type: 'identifier', value: '${foo}', raw: '${foo}' },
         { type: 'punctuation', value: ',', raw: ',' },
         { type: 'number', value: '1', raw: '1' },
@@ -229,10 +234,10 @@ describe('tokenize', () => {
     it('tokenizes multiple spread operators', () => {
       expect(tokenize('{ ...${foo}, ...${bar} }', logger)).toEqual([
         { type: 'punctuation', value: '{', raw: '{' },
-        { type: 'punctuation', value: '...', raw: '...' },
+        { type: 'operator', value: '...', raw: '...' },
         { type: 'identifier', value: '${foo}', raw: '${foo}' },
         { type: 'punctuation', value: ',', raw: ',' },
-        { type: 'punctuation', value: '...', raw: '...' },
+        { type: 'operator', value: '...', raw: '...' },
         { type: 'identifier', value: '${bar}', raw: '${bar}' },
         { type: 'punctuation', value: '}', raw: '}' },
       ]);

@@ -299,33 +299,40 @@ describe('SafeExpressionEvaluator', () => {
     });
 
     it('throws on invalid spread operator usage', () => {
+      const errorPrefix =
+        'Failed to evaluate expression: [1, 2, ...${primitive}]. Got error: Invalid spread operator usage:';
       // Test spreading primitive values
       stepResults.set('primitive', 42);
-      expect(() => evaluator.evaluate('[1, 2, ...${primitive}]', {})).toThrow(
-        'Invalid spread operator usage: can only spread arrays and objects',
+      const expression = '[1, 2, ...${primitive}]';
+      expect(() => evaluator.evaluate(expression, {})).toThrow(
+        `${errorPrefix} cannot spread number literal`,
       );
 
       // Test spreading string literals
       stepResults.set('primitive', 'foo');
-      expect(() => evaluator.evaluate('[1, 2, ...${primitive}]', {})).toThrow(
-        'Invalid spread operator usage: can only spread arrays and objects',
+      const expression2 = '[1, 2, ...${primitive}]';
+      expect(() => evaluator.evaluate(expression2, {})).toThrow(
+        `${errorPrefix} cannot spread string literal`,
       );
 
       // Test spreading boolean literals
       stepResults.set('primitive', true);
-      expect(() => evaluator.evaluate('[1, 2, ...${primitive}]', {})).toThrow(
-        'Invalid spread operator usage: can only spread arrays and objects',
+      const expression3 = '[1, 2, ...${primitive}]';
+      expect(() => evaluator.evaluate(expression3, {})).toThrow(
+        `${errorPrefix} cannot spread boolean literal`,
       );
 
       // Test spreading null/undefined
       stepResults.set('primitive', null);
-      expect(() => evaluator.evaluate('[1, 2, ...${primitive}]', {})).toThrow(
-        'Invalid spread operator usage: can only spread arrays and objects',
+      const expression4 = '[1, 2, ...${primitive}]';
+      expect(() => evaluator.evaluate(expression4, {})).toThrow(
+        `${errorPrefix} cannot spread null`,
       );
 
       stepResults.set('primitive', undefined);
-      expect(() => evaluator.evaluate('[1, 2, ...${primitive}]', {})).toThrow(
-        'Invalid spread operator usage: can only spread arrays and objects',
+      const expression5 = '[1, 2, ...${primitive}]';
+      expect(() => evaluator.evaluate(expression5, {})).toThrow(
+        `${errorPrefix} cannot spread undefined`,
       );
     });
   });
@@ -458,7 +465,9 @@ describe('SafeExpressionEvaluator', () => {
     });
 
     it('extracts references from nested expressions', () => {
-      const refs = evaluator.extractReferences('${step1.data[${step2.index}].items[${step3.value}]}');
+      const refs = evaluator.extractReferences(
+        '${step1.data[${step2.index}].items[${step3.value}]}',
+      );
       expect(refs).toEqual(['step1', 'step2', 'step3']);
     });
 
@@ -478,7 +487,9 @@ describe('SafeExpressionEvaluator', () => {
     });
 
     it('extracts references from complex expressions', () => {
-      const refs = evaluator.extractReferences('${step1.value[${step2}]} * ${step3} + ${step4.data[${step5.index}]}');
+      const refs = evaluator.extractReferences(
+        '${step1.value[${step2}]} * ${step3} + ${step4.data[${step5.index}]}',
+      );
       expect(refs).toEqual(['step1', 'step2', 'step3', 'step4', 'step5']);
     });
 
@@ -493,7 +504,9 @@ describe('SafeExpressionEvaluator', () => {
     });
 
     it('extracts references from spread operators', () => {
-      const refs = evaluator.extractReferences('{ ...${step1}, value: ${step2}, items: [...${step3}] }');
+      const refs = evaluator.extractReferences(
+        '{ ...${step1}, value: ${step2}, items: [...${step3}] }',
+      );
       expect(refs).toEqual(['step1', 'step2', 'step3']);
     });
   });

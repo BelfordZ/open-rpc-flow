@@ -139,14 +139,10 @@ export class DependencyResolver {
     if (isConditionStep(step)) {
       this.extractReferences(step.condition.if).forEach((dep) => deps.add(dep));
       if (step.condition.then) {
-        this.findStepDependencies(step.condition.then).forEach((dep) =>
-          deps.add(dep),
-        );
+        this.findStepDependencies(step.condition.then).forEach((dep) => deps.add(dep));
       }
       if (step.condition.else) {
-        this.findStepDependencies(step.condition.else).forEach((dep) =>
-          deps.add(dep),
-        );
+        this.findStepDependencies(step.condition.else).forEach((dep) => deps.add(dep));
       }
     }
 
@@ -163,19 +159,17 @@ export class DependencyResolver {
     // Extract references from transform steps
     if (isTransformStep(step)) {
       if (typeof step.transform.input === 'string') {
-        this.extractReferences(step.transform.input).forEach((dep) =>
-          deps.add(dep),
-        );
+        this.extractReferences(step.transform.input).forEach((dep) => deps.add(dep));
       }
       if (step.transform.operations) {
         // Add 'item' to loopVars temporarily for map/filter operations
         this.loopVars.add('item');
         // Add 'acc' to loopVars temporarily for reduce operations
-        if (step.transform.operations.some(op => op.type === 'reduce')) {
+        if (step.transform.operations.some((op) => op.type === 'reduce')) {
           this.loopVars.add('acc');
         }
         // Add 'a' and 'b' to loopVars temporarily for sort operations
-        if (step.transform.operations.some(op => op.type === 'sort')) {
+        if (step.transform.operations.some((op) => op.type === 'sort')) {
           this.loopVars.add('a');
           this.loopVars.add('b');
         }
@@ -205,7 +199,7 @@ export class DependencyResolver {
     try {
       const refs = this.expressionEvaluator.extractReferences(expr);
       // Filter out internal variables and loop variables
-      return refs.filter(ref => !this.internalVars.has(ref) && !this.loopVars.has(ref));
+      return refs.filter((ref) => !this.internalVars.has(ref) && !this.loopVars.has(ref));
     } catch (error) {
       // Ignore resolution errors since we only care about collecting references
       this.logger.debug(`Error extracting references (ignored): ${error}`);
@@ -264,7 +258,7 @@ export class DependencyResolver {
     for (const step of this.flow.steps) {
       const dependencies = Array.from(graph.get(step.name) || []);
       const dependents = this.getDependents(step.name);
-      
+
       // Determine step type
       let type: DependencyNode['type'] = 'request'; // default
       if (isLoopStep(step)) type = 'loop';

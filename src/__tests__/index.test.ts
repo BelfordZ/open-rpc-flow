@@ -36,7 +36,7 @@ describe('FlowExecutor', () => {
   });
 
   afterEach(() => {
-    testLogger.print();
+    //testLogger.print();
     testLogger.clear();
   });
 

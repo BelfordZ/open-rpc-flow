@@ -1,3 +1,21 @@
+# [1.3.0](https://github.com/BelfordZ/open-rpc-flow/compare/v1.2.0...v1.3.0) (2025-02-06)
+
+
+### Bug Fixes
+
+* add jest it up ([0179cdf](https://github.com/BelfordZ/open-rpc-flow/commit/0179cdf6f639a35c2429691ff4bfbc6180f8c5e2))
+* dont use stubs lol ([16a443b](https://github.com/BelfordZ/open-rpc-flow/commit/16a443b970376812a73376b072369dae3b42e56b))
+* prettier ([ae753bd](https://github.com/BelfordZ/open-rpc-flow/commit/ae753bd3e90883f33ad4a5e11e4d44fc31d86c35))
+* remove dead code ([d7785e4](https://github.com/BelfordZ/open-rpc-flow/commit/d7785e4e5ef3bb346cdbbb5f8648358d034af3f3))
+* remove funk ([9ed6fa2](https://github.com/BelfordZ/open-rpc-flow/commit/9ed6fa245fbbe0612e59b30c766c080582e36272))
+* restore stuff i should not have been touching ([45df210](https://github.com/BelfordZ/open-rpc-flow/commit/45df210d1f752c5041510eb674d5388e05760a04))
+* update lots of stuff ([52db6ec](https://github.com/BelfordZ/open-rpc-flow/commit/52db6ec0298e3a9a6858fd547cac48d923806c97))
+
+
+### Features
+
+* add mermaid diagrams ([4a95852](https://github.com/BelfordZ/open-rpc-flow/commit/4a9585224c974e17fd9cd4b2bdf3b48da95f7484))
+
 # [1.2.0](https://github.com/BelfordZ/open-rpc-flow/compare/v1.1.2...v1.2.0) (2025-01-31)
 
 

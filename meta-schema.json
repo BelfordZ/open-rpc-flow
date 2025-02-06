@@ -185,7 +185,7 @@
     "StopStep": {
       "type": "object",
       "description": "A step that signals to end the workflow, with options to end the entire workflow or just the current branch.",
-      "required": ["name"],
+      "required": ["name", "endWorkflow"],
       "properties": {
         "name": {
           "type": "string",

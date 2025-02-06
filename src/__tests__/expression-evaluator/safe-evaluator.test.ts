@@ -18,7 +18,7 @@ describe('SafeExpressionEvaluator', () => {
   });
 
   afterEach(() => {
-    logger.print();
+    //logger.print();
     logger.clear();
   });
 
@@ -302,30 +302,30 @@ describe('SafeExpressionEvaluator', () => {
       // Test spreading primitive values
       stepResults.set('primitive', 42);
       expect(() => evaluator.evaluate('[1, 2, ...${primitive}]', {})).toThrow(
-        'Invalid spread operator usage: cannot spread number literal',
+        'Invalid spread operator usage: can only spread arrays and objects',
       );
 
       // Test spreading string literals
       stepResults.set('primitive', 'foo');
       expect(() => evaluator.evaluate('[1, 2, ...${primitive}]', {})).toThrow(
-        'Invalid spread operator usage: cannot spread string literal',
+        'Invalid spread operator usage: can only spread arrays and objects',
       );
 
       // Test spreading boolean literals
       stepResults.set('primitive', true);
       expect(() => evaluator.evaluate('[1, 2, ...${primitive}]', {})).toThrow(
-        'Invalid spread operator usage: cannot spread boolean literal',
+        'Invalid spread operator usage: can only spread arrays and objects',
       );
 
       // Test spreading null/undefined
       stepResults.set('primitive', null);
       expect(() => evaluator.evaluate('[1, 2, ...${primitive}]', {})).toThrow(
-        'Invalid spread operator usage: cannot spread null',
+        'Invalid spread operator usage: can only spread arrays and objects',
       );
 
       stepResults.set('primitive', undefined);
       expect(() => evaluator.evaluate('[1, 2, ...${primitive}]', {})).toThrow(
-        'Invalid spread operator usage: cannot spread undefined',
+        'Invalid spread operator usage: can only spread arrays and objects',
       );
     });
   });

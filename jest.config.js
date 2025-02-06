@@ -5,14 +5,14 @@ module.exports = {
   testMatch: ['**/__tests__/**/*.test.ts'],
   collectCoverage: true,
   coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov'],
+  coverageReporters: ['text', 'lcov', 'json-summary'],
   coveragePathIgnorePatterns: ['node_modules', 'src/__tests__/test-utils.ts'],
   coverageThreshold: {
     global: {
-      branches: 80,
-      functions: 80,
-      lines: 80,
-      statements: 80,
+      branches: 89.93,
+      functions: 95.33,
+      lines: 93.35,
+      statements: 93.54,
     },
   },
 };

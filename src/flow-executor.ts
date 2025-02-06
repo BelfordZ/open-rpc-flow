@@ -39,7 +39,11 @@ export class FlowExecutor {
     // Initialize shared execution context
     this.referenceResolver = new ReferenceResolver(this.stepResults, this.context, this.logger);
     this.expressionEvaluator = new SafeExpressionEvaluator(this.logger, this.referenceResolver);
-    this.dependencyResolver = new DependencyResolver(this.flow, this.expressionEvaluator, this.logger);
+    this.dependencyResolver = new DependencyResolver(
+      this.flow,
+      this.expressionEvaluator,
+      this.logger,
+    );
 
     this.executionContext = {
       referenceResolver: this.referenceResolver,
@@ -54,7 +58,12 @@ export class FlowExecutor {
       new RequestStepExecutor(jsonRpcHandler, this.logger),
       new LoopStepExecutor(this.executeStep.bind(this), this.logger),
       new ConditionStepExecutor(this.executeStep.bind(this), this.logger),
-      new TransformStepExecutor(this.expressionEvaluator, this.referenceResolver, this.context, this.logger),
+      new TransformStepExecutor(
+        this.expressionEvaluator,
+        this.referenceResolver,
+        this.context,
+        this.logger,
+      ),
       new StopStepExecutor(this.logger),
     ];
   }

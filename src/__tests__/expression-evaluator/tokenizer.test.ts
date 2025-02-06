@@ -187,14 +187,14 @@ describe('tokenize', () => {
 
   describe('spread operator', () => {
     it('tokenizes spread operator in object literals', () => {
-      expect(tokenize('{ ...${foo} }')).toEqual([
+      expect(tokenize('{ ...${foo} }', logger)).toEqual([
         { type: 'punctuation', value: '{', raw: '{' },
         { type: 'punctuation', value: '...', raw: '...' },
         { type: 'identifier', value: '${foo}', raw: '${foo}' },
         { type: 'punctuation', value: '}', raw: '}' },
       ]);
 
-      expect(tokenize('{ ...${foo}, bar: "baz" }')).toEqual([
+      expect(tokenize('{ ...${foo}, bar: "baz" }', logger)).toEqual([
         { type: 'punctuation', value: '{', raw: '{' },
         { type: 'punctuation', value: '...', raw: '...' },
         { type: 'identifier', value: '${foo}', raw: '${foo}' },
@@ -207,14 +207,14 @@ describe('tokenize', () => {
     });
 
     it('tokenizes spread operator in array literals', () => {
-      expect(tokenize('[...${foo}]')).toEqual([
+      expect(tokenize('[...${foo}]', logger)).toEqual([
         { type: 'punctuation', value: '[', raw: '[' },
         { type: 'punctuation', value: '...', raw: '...' },
         { type: 'identifier', value: '${foo}', raw: '${foo}' },
         { type: 'punctuation', value: ']', raw: ']' },
       ]);
 
-      expect(tokenize('[...${foo}, 1, 2]')).toEqual([
+      expect(tokenize('[...${foo}, 1, 2]', logger)).toEqual([
         { type: 'punctuation', value: '[', raw: '[' },
         { type: 'punctuation', value: '...', raw: '...' },
         { type: 'identifier', value: '${foo}', raw: '${foo}' },
@@ -227,7 +227,7 @@ describe('tokenize', () => {
     });
 
     it('tokenizes multiple spread operators', () => {
-      expect(tokenize('{ ...${foo}, ...${bar} }')).toEqual([
+      expect(tokenize('{ ...${foo}, ...${bar} }', logger)).toEqual([
         { type: 'punctuation', value: '{', raw: '{' },
         { type: 'punctuation', value: '...', raw: '...' },
         { type: 'identifier', value: '${foo}', raw: '${foo}' },
@@ -240,15 +240,15 @@ describe('tokenize', () => {
 
     it.skip('handles invalid spread operator usage', () => {
       // Spread without value
-      expect(() => tokenize('{ ... }')).toThrow(TokenizerError);
-      expect(() => tokenize('[...]')).toThrow(TokenizerError);
+      expect(() => tokenize('{ ... }', logger)).toThrow(TokenizerError);
+      expect(() => tokenize('[...]', logger)).toThrow(TokenizerError);
 
       // Spread without container
-      expect(() => tokenize('...${foo}')).toThrow(TokenizerError);
+      expect(() => tokenize('...${foo}', logger)).toThrow(TokenizerError);
 
       // Incomplete spread
-      expect(() => tokenize('{ .. }')).toThrow(TokenizerError);
-      expect(() => tokenize('{ . }')).toThrow(TokenizerError);
+      expect(() => tokenize('{ .. }', logger)).toThrow(TokenizerError);
+      expect(() => tokenize('{ . }', logger)).toThrow(TokenizerError);
     });
   });
 

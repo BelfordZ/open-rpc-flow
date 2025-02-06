@@ -941,7 +941,7 @@ export class SafeExpressionEvaluator {
       }
 
       // Handle regular references through AST
-      const tokens = tokenize(expression);
+      const tokens = tokenize(expression, this.logger);
       const ast = this.parse(tokens);
       this.collectReferencesFromAst(ast, refs);
       return Array.from(refs).sort(); // Sort references for consistent order

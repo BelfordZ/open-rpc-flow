@@ -3,6 +3,8 @@ import { ReferenceResolver } from './reference-resolver';
 import { SafeExpressionEvaluator } from './expression-evaluator/safe-evaluator';
 import { Logger } from './util/logger';
 
+export type StepType = 'request' | 'loop' | 'condition' | 'transform' | 'stop';
+
 export interface Flow {
   name: string;
   description: string;
@@ -62,7 +64,7 @@ export interface StepExecutionContext {
  */
 export interface DependencyNode {
   name: string;
-  type: 'request' | 'loop' | 'condition' | 'transform';
+  type: StepType;
   dependencies: string[];
   dependents: string[];
 }

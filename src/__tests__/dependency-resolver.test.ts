@@ -1,16 +1,22 @@
 import { DependencyResolver } from '../dependency-resolver';
 import { Flow } from '../types';
 import { TestLogger } from '../util/logger';
+import { SafeExpressionEvaluator } from '../expression-evaluator/safe-evaluator';
+import { ReferenceResolver } from '../reference-resolver';
 
 describe('DependencyResolver', () => {
   let testLogger: TestLogger;
+  let expressionEvaluator: SafeExpressionEvaluator;
+  let referenceResolver: ReferenceResolver;
 
   beforeEach(() => {
     testLogger = new TestLogger('Test');
+    referenceResolver = new ReferenceResolver(new Map(), {}, testLogger);
+    expressionEvaluator = new SafeExpressionEvaluator(testLogger, referenceResolver);
   });
 
   afterEach(() => {
-    testLogger.print();
+    //testLogger.print();
     testLogger.clear();
   });
 
@@ -36,7 +42,7 @@ describe('DependencyResolver', () => {
       ],
     };
 
-    const resolver = new DependencyResolver(flow, testLogger);
+    const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
     expect(resolver.getDependencies('getFriends')).toEqual(['getUser']);
     expect(resolver.getDependencies('getUser')).toEqual([]);
     expect(resolver.getDependents('getUser')).toEqual(['getFriends']);
@@ -82,7 +88,7 @@ describe('DependencyResolver', () => {
       ],
     };
 
-    const resolver = new DependencyResolver(flow, testLogger);
+    const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
     expect(resolver.getDependencies('notifyFriends')).toEqual(['getFriends', 'getUser']);
     expect(resolver.getExecutionOrder().map((s) => s.name)).toEqual([
       'getUser',
@@ -119,7 +125,7 @@ describe('DependencyResolver', () => {
       ],
     };
 
-    const resolver = new DependencyResolver(flow, testLogger);
+    const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
     expect(resolver.getDependencies('notifyIfAdmin')).toEqual(['getUser']);
   });
 
@@ -145,7 +151,7 @@ describe('DependencyResolver', () => {
       ],
     };
 
-    const resolver = new DependencyResolver(flow, testLogger);
+    const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
     expect(() => resolver.getExecutionOrder()).toThrow('Circular dependency detected');
   });
 
@@ -197,7 +203,7 @@ describe('DependencyResolver', () => {
       ],
     };
 
-    const resolver = new DependencyResolver(flow, testLogger);
+    const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
     const order = resolver.getExecutionOrder().map((s) => s.name);
     expect(order).toEqual(['getUser', 'getFriends', 'filterFriends', 'notifyFriends']);
   });
@@ -234,7 +240,7 @@ describe('DependencyResolver', () => {
       ],
     };
 
-    const resolver = new DependencyResolver(flow, testLogger);
+    const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
     expect(resolver.getDependencies('notifyFriends')).toEqual(['getFriends']);
     expect(() => resolver.getExecutionOrder()).not.toThrow();
   });
@@ -254,7 +260,7 @@ describe('DependencyResolver', () => {
       ],
     };
 
-    const resolver = new DependencyResolver(flow, testLogger);
+    const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
     expect(() => resolver.getExecutionOrder()).toThrow(
       "Step 'getFriends' depends on unknown step 'nonExistentStep'",
     );
@@ -275,7 +281,7 @@ describe('DependencyResolver', () => {
       ],
     };
 
-    const resolver = new DependencyResolver(flow, testLogger);
+    const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
     expect(() => resolver.getDependencies('nonExistentStep')).toThrow(
       "Step 'nonExistentStep' not found in dependency graph",
     );
@@ -296,7 +302,7 @@ describe('DependencyResolver', () => {
       ],
     };
 
-    const resolver = new DependencyResolver(flow, testLogger);
+    const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
     // Access the private methods for testing
     const graph = new Map<string, Set<string>>();
     // Add a node that depends on a non-existent node
@@ -347,7 +353,7 @@ describe('DependencyResolver', () => {
         },
       ],
     };
-    const resolver = new DependencyResolver(flow, testLogger);
+    const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
     const order = resolver.getExecutionOrder().map((s) => s.name);
     expect(order).toEqual(['get_data', 'select_fields', 'group_by_value']);
     const dependencies = resolver.getDependencies('group_by_value');
@@ -394,7 +400,7 @@ describe('DependencyResolver', () => {
       ],
     };
 
-    const resolver = new DependencyResolver(flow, testLogger);
+    const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
     const graph = resolver.getDependencyGraph();
 
     // Verify nodes
@@ -461,7 +467,7 @@ describe('DependencyResolver', () => {
       ],
     };
 
-    const resolver = new DependencyResolver(flow, testLogger);
+    const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
     const graph = resolver.getDependencyGraph();
 
     // Verify nodes
@@ -529,7 +535,7 @@ describe('DependencyResolver', () => {
       ],
     };
 
-    const resolver = new DependencyResolver(flow, testLogger);
+    const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
     const deps = resolver.getDependencies('step4');
     expect(deps).toContain('step1');
     expect(deps).toContain('step2');

@@ -17,11 +17,14 @@ import { Logger, defaultLogger } from './util/logger';
  * Main executor for JSON-RPC flows
  */
 export class FlowExecutor {
+  public dependencyResolver: DependencyResolver;
+  public referenceResolver: ReferenceResolver;
+  public expressionEvaluator: SafeExpressionEvaluator;
+
   private context: Record<string, any>;
   private stepResults: Map<string, any>;
   private executionContext: StepExecutionContext;
   private stepExecutors: StepExecutor[];
-  private dependencyResolver: DependencyResolver;
   private logger: Logger;
 
   constructor(
@@ -32,15 +35,15 @@ export class FlowExecutor {
     this.logger = logger || defaultLogger;
     this.context = flow.context || {};
     this.stepResults = new Map();
-    this.dependencyResolver = new DependencyResolver(this.flow, this.logger);
 
     // Initialize shared execution context
-    const referenceResolver = new ReferenceResolver(this.stepResults, this.context, this.logger);
-    const expressionEvaluator = new SafeExpressionEvaluator(this.logger, referenceResolver);
+    this.referenceResolver = new ReferenceResolver(this.stepResults, this.context, this.logger);
+    this.expressionEvaluator = new SafeExpressionEvaluator(this.logger, this.referenceResolver);
+    this.dependencyResolver = new DependencyResolver(this.flow, this.expressionEvaluator, this.logger);
 
     this.executionContext = {
-      referenceResolver,
-      expressionEvaluator,
+      referenceResolver: this.referenceResolver,
+      expressionEvaluator: this.expressionEvaluator,
       stepResults: this.stepResults,
       context: this.context,
       logger: this.logger,
@@ -51,7 +54,7 @@ export class FlowExecutor {
       new RequestStepExecutor(jsonRpcHandler, this.logger),
       new LoopStepExecutor(this.executeStep.bind(this), this.logger),
       new ConditionStepExecutor(this.executeStep.bind(this), this.logger),
-      new TransformStepExecutor(expressionEvaluator, referenceResolver, this.context, this.logger),
+      new TransformStepExecutor(this.expressionEvaluator, this.referenceResolver, this.context, this.logger),
       new StopStepExecutor(this.logger),
     ];
   }

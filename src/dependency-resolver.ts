@@ -7,22 +7,18 @@ import {
   isTransformStep,
 } from './step-executors/types';
 import { SafeExpressionEvaluator } from './expression-evaluator/safe-evaluator';
-import { ReferenceResolver } from './reference-resolver';
 
 export class DependencyResolver {
   private logger: Logger;
-  private expressionEvaluator: SafeExpressionEvaluator;
   private internalVars = new Set(['context', 'metadata']);
   private loopVars = new Set<string>();
 
   constructor(
     private flow: Flow,
+    private expressionEvaluator: SafeExpressionEvaluator,
     logger: Logger,
   ) {
     this.logger = logger.createNested('DependencyResolver');
-    // Create a dummy ReferenceResolver since we only need the extractReferences functionality
-    const dummyResolver = new ReferenceResolver(new Map(), {}, this.logger);
-    this.expressionEvaluator = new SafeExpressionEvaluator(this.logger, dummyResolver);
   }
 
   /**

@@ -1,3 +1,10 @@
+## [1.3.1](https://github.com/BelfordZ/open-rpc-flow/compare/v1.3.0...v1.3.1) (2025-02-06)
+
+
+### Bug Fixes
+
+* require "endWorkflow" in stop step ([9d214b5](https://github.com/BelfordZ/open-rpc-flow/commit/9d214b5530f37f54141f330d6040055eccc10cc4))
+
 # [1.3.0](https://github.com/BelfordZ/open-rpc-flow/compare/v1.2.0...v1.3.0) (2025-02-06)
 
 

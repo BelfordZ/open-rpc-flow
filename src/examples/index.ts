@@ -14,18 +14,18 @@ const complexDataPipelineFlow = complexDataPipeline as Flow;
 
 // Export with unique names
 export {
-    simpleFlow,
-    dataTransformFlow,
-    nestedLoopsFlow,
-    conditionalBranchingFlow,
-    complexDataPipelineFlow
+  simpleFlow,
+  dataTransformFlow,
+  nestedLoopsFlow,
+  conditionalBranchingFlow,
+  complexDataPipelineFlow,
 };
 
 // Export the array of examples with proper typing
 export const examples: Flow[] = [
-    simpleFlow,
-    dataTransformFlow,
-    nestedLoopsFlow,
-    conditionalBranchingFlow,
-    complexDataPipelineFlow
+  simpleFlow,
+  dataTransformFlow,
+  nestedLoopsFlow,
+  conditionalBranchingFlow,
+  complexDataPipelineFlow,
 ];

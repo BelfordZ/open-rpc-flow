@@ -529,34 +529,37 @@ describe('PathAccessor error handling', () => {
   describe('get with expression evaluation', () => {
     const obj = {
       items: ['a', 'b', 'c'],
-      indices: { first: 0, second: 1 }
+      indices: { first: 0, second: 1 },
     };
 
     it('should handle expression evaluation errors', () => {
-      const evaluator = (expr: string) => {
+      const evaluator = () => {
         throw new Error('Evaluation failed');
       };
 
-      expect(() => PathAccessor.get(obj, 'items[indices.first]', evaluator))
-        .toThrow(PathSyntaxError);
+      expect(() => PathAccessor.get(obj, 'items[indices.first]', evaluator)).toThrow(
+        PathSyntaxError,
+      );
     });
 
     it('should handle invalid expression results', () => {
-      const evaluator = (expr: string) => {
+      const evaluator = () => {
         return { invalid: 'type' };
       };
 
-      expect(() => PathAccessor.get(obj, 'items[indices.first]', evaluator))
-        .toThrow(PathSyntaxError);
+      expect(() => PathAccessor.get(obj, 'items[indices.first]', evaluator)).toThrow(
+        PathSyntaxError,
+      );
     });
 
     it('should propagate UnknownReferenceError', () => {
-      const evaluator = (expr: string) => {
+      const evaluator = () => {
         throw new UnknownReferenceError('Reference not found', 'unknown', ['available']);
       };
 
-      expect(() => PathAccessor.get(obj, 'items[indices.first]', evaluator))
-        .toThrow(UnknownReferenceError);
+      expect(() => PathAccessor.get(obj, 'items[indices.first]', evaluator)).toThrow(
+        UnknownReferenceError,
+      );
     });
 
     it('should propagate PathSyntaxError', () => {
@@ -564,8 +567,9 @@ describe('PathAccessor error handling', () => {
         throw new PathSyntaxError('invalid path', expr);
       };
 
-      expect(() => PathAccessor.get(obj, 'items[indices.first]', evaluator))
-        .toThrow(PathSyntaxError);
+      expect(() => PathAccessor.get(obj, 'items[indices.first]', evaluator)).toThrow(
+        PathSyntaxError,
+      );
     });
   });
 
@@ -586,7 +590,7 @@ describe('PathAccessor error handling', () => {
       const segments = [
         { type: 'property' as const, value: '@foo', raw: '@foo' },
         { type: 'index' as const, value: '0', raw: '[0]' },
-        { type: 'property' as const, value: '123', raw: '123' }
+        { type: 'property' as const, value: '123', raw: '123' },
       ];
       expect(PathAccessor.formatPath(segments)).toBe('["@foo"][0]["123"]');
     });
@@ -595,7 +599,7 @@ describe('PathAccessor error handling', () => {
       const segments = [
         { type: 'property' as const, value: 'valid', raw: 'valid' },
         { type: 'property' as const, value: '@invalid', raw: '@invalid' },
-        { type: 'property' as const, value: 'alsoValid', raw: 'alsoValid' }
+        { type: 'property' as const, value: 'alsoValid', raw: 'alsoValid' },
       ];
       expect(PathAccessor.formatPath(segments)).toBe('valid["@invalid"].alsoValid');
     });

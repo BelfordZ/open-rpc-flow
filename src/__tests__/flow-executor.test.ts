@@ -242,7 +242,7 @@ describe('FlowExecutor', () => {
   });
 
   it('throws error when no executor is found for step', async () => {
-    const flow: Flow = {
+    const flow: any = {
       name: 'Test Flow',
       description: 'Test flow for unit tests',
       steps: [

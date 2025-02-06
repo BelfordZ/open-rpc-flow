@@ -9,7 +9,7 @@ describe('ExpressionEvaluator', () => {
   let stepResults: Map<string, any>;
   let context: Record<string, any>;
   let logger: TestLogger;
-  
+
   beforeEach(() => {
     stepResults = new Map();
     stepResults.set('step1', {

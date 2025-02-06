@@ -192,15 +192,9 @@ export class DependencyResolver {
    * Extract step references from an expression
    */
   private extractReferences(expr: string): string[] {
-    try {
-      const refs = this.expressionEvaluator.extractReferences(expr);
-      // Filter out internal variables and loop variables
-      return refs.filter((ref) => !this.internalVars.has(ref) && !this.loopVars.has(ref));
-    } catch (error) {
-      // Ignore resolution errors since we only care about collecting references
-      this.logger.debug(`Error extracting references (ignored): ${error}`);
-      return [];
-    }
+    const refs = this.expressionEvaluator.extractReferences(expr);
+    // Filter out internal variables and loop variables
+    return refs.filter((ref) => !this.internalVars.has(ref) && !this.loopVars.has(ref));
   }
 
   /**

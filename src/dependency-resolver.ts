@@ -180,19 +180,6 @@ export class DependencyResolver {
    */
   private extractReferences(expr: string, transformVars: Set<string> = new Set()): string[] {
     const refs = new Set<string>();
-    // Handle expressions that start with $. directly
-    if (expr.startsWith('$.')) {
-      const parts = expr.split('.');
-      if (
-        parts[1] &&
-        !this.internalVars.has(parts[1]) &&
-        !this.loopVars.has(parts[1]) &&
-        !transformVars.has(parts[1])
-      ) {
-        refs.add(parts[1]);
-      }
-      return Array.from(refs);
-    }
     // Extract all step references from the expression
     const stepRefRegex = /\${([\w]+)(?=\.|[}[\]]|$)/g;
     let match;

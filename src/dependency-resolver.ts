@@ -25,11 +25,8 @@ export class DependencyResolver {
    * Get the execution order for all steps in the flow
    */
   getExecutionOrder(): Step[] {
-    console.log('DependencyResolver - Starting getExecutionOrder');
     this.logger.debug('Getting execution order');
-    console.log('DependencyResolver - Building dependency graph');
     const graph = this.buildDependencyGraph();
-    console.log('DependencyResolver - Graph built, performing topological sort');
     return this.topologicalSort(graph);
   }
 
@@ -67,22 +64,16 @@ export class DependencyResolver {
    * Build a dependency graph for all steps in the flow
    */
   private buildDependencyGraph(): Map<string, Set<string>> {
-    console.log('DependencyResolver - Starting buildDependencyGraph');
     this.logger.debug('Building dependency graph');
     const graph = new Map<string, Set<string>>();
 
     // Initialize graph with all steps
-    console.log(
-      'DependencyResolver - Initializing graph with steps:',
-      this.flow.steps.map((s) => s.name),
-    );
     for (const step of this.flow.steps) {
       graph.set(step.name, new Set());
     }
 
     // Add dependencies for each step
     for (const step of this.flow.steps) {
-      console.log('DependencyResolver - Finding dependencies for step:', step.name);
       const deps = this.findStepDependencies(step);
       for (const dep of deps) {
         if (!graph.has(dep)) {
@@ -93,10 +84,6 @@ export class DependencyResolver {
       this.logger.debug(`Added dependency: ${step.name} -> ${deps.join(', ')}`);
     }
 
-    console.log(
-      'DependencyResolver - Graph built:',
-      Object.fromEntries([...graph.entries()].map(([k, v]) => [k, [...v]])),
-    );
     return graph;
   }
 
@@ -104,12 +91,6 @@ export class DependencyResolver {
    * Find all dependencies for a step
    */
   private findStepDependencies(step: Step): string[] {
-    console.log(
-      'DependencyResolver - Finding dependencies for step:',
-      step.name,
-      'type:',
-      Object.keys(step).find((k) => k !== 'name'),
-    );
     this.logger.debug(`Finding dependencies for step: ${step.name}`);
     const deps = new Set<string>();
 
@@ -152,21 +133,17 @@ export class DependencyResolver {
 
     // Extract references from condition steps
     if (isConditionStep(step)) {
-      console.log('DependencyResolver - Processing condition step:', step.name);
       this.extractReferences(step.condition.if).forEach((dep) => deps.add(dep));
       if (step.condition.then) {
-        console.log('DependencyResolver - Processing condition then branch:', step.name);
         this.findStepDependencies(step.condition.then).forEach((dep) => deps.add(dep));
       }
       if (step.condition.else) {
-        console.log('DependencyResolver - Processing condition else branch:', step.name);
         this.findStepDependencies(step.condition.else).forEach((dep) => deps.add(dep));
       }
     }
 
     // Extract references from request steps
     if (isRequestStep(step)) {
-      console.log('DependencyResolver - Processing request step:', step.name);
       const params = step.request.params;
       for (const value of Object.values(params)) {
         if (typeof value === 'string') {
@@ -177,7 +154,6 @@ export class DependencyResolver {
 
     // Extract references from transform steps
     if (isTransformStep(step)) {
-      console.log('DependencyResolver - Processing transform step:', step.name);
       // Handle input reference
       if (typeof step.transform.input === 'string') {
         const inputRefs = this.extractReferences(step.transform.input);
@@ -194,11 +170,8 @@ export class DependencyResolver {
           }
         }
       }
-
-      console.log('DependencyResolver - Transform step dependencies found:', [...deps]);
     }
 
-    console.log('DependencyResolver - Found dependencies for step:', step.name, 'deps:', [...deps]);
     return Array.from(deps);
   }
 

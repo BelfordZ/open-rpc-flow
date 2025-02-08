@@ -97,26 +97,21 @@ describe('Example Flows Integration', () => {
 
   describe.each(examples)('Example: %s', (flow) => {
     it('executes successfully', async () => {
-      console.log('Starting test for flow:', flow.name);
       setupMockResponses(jsonRpcHandler);
       const executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
 
-      console.log('Executing flow:', flow.name);
       const results = await executor.execute();
-      console.log('Flow execution completed:', flow.name);
 
       // Verify that execution completed
       expect(results).toBeDefined();
 
       // Verify that all steps have results
       flow.steps.forEach((step) => {
-        console.log('Checking step:', step.name, 'for flow:', flow.name);
         expect(results.get(step.name)).toBeDefined();
         expect(results.get(step.name).metadata.hasError).toBeFalsy();
       });
 
       // Example-specific validations
-      console.log('Running specific validations for flow:', flow.name);
       switch (flow.name) {
         case 'simple-request': {
           const getUser = results.get('getUser').result;
@@ -212,7 +207,6 @@ describe('Example Flows Integration', () => {
           break;
         }
       }
-      console.log('Completed test for flow:', flow.name);
     });
   });
 });
@@ -278,34 +272,26 @@ describe('Example Flow Files', () => {
     });
 
     test('continues execution when user is admin', async () => {
-      console.log('Starting admin test');
       setupMockResponses(jsonRpcHandler);
       const executor = new FlowExecutor(stopFlowExample, jsonRpcHandler, noLogger);
 
-      console.log('Executing admin flow');
       const results = await executor.execute();
-      console.log('Admin flow execution completed');
 
       // Verify all steps executed
-      console.log('Verifying admin flow steps');
       expect(results.get('checkPermissions')).toBeDefined();
       expect(results.get('stopIfBlocked')).toBeDefined();
       expect(results.get('getData')).toBeDefined();
 
       // Verify data was fetched
-      console.log('Verifying admin flow data');
       const getData = results.get('getData').result;
       expect(Array.isArray(getData)).toBeTruthy();
       expect(getData).toHaveLength(2);
-      console.log('Admin test completed');
     });
 
     test('stops execution when user is not admin', async () => {
-      console.log('Starting non-admin test');
       setupMockResponses(jsonRpcHandler);
       // Override the permissions.get response for this test
       jsonRpcHandler.mockImplementation((request) => {
-        console.log('Mock handler called with method:', request.method);
         if (request.method === 'permissions.get') {
           return Promise.resolve({
             userId: 1,
@@ -317,18 +303,14 @@ describe('Example Flow Files', () => {
       });
 
       const executor = new FlowExecutor(stopFlowExample, jsonRpcHandler, noLogger);
-      console.log('Executing non-admin flow');
       const results = await executor.execute();
-      console.log('Non-admin flow execution completed');
 
       // Verify initial steps executed
-      console.log('Verifying non-admin flow steps');
       expect(results.get('checkPermissions')).toBeDefined();
       expect(results.get('stopIfBlocked')).toBeDefined();
 
       // Verify getData was not executed due to stop
       expect(results.get('getData')).toBeUndefined();
-      console.log('Non-admin test completed');
     });
   });
 });

@@ -25,8 +25,11 @@ export class DependencyResolver {
    * Get the execution order for all steps in the flow
    */
   getExecutionOrder(): Step[] {
+    console.log('DependencyResolver - Starting getExecutionOrder');
     this.logger.debug('Getting execution order');
+    console.log('DependencyResolver - Building dependency graph');
     const graph = this.buildDependencyGraph();
+    console.log('DependencyResolver - Graph built, performing topological sort');
     return this.topologicalSort(graph);
   }
 
@@ -64,16 +67,22 @@ export class DependencyResolver {
    * Build a dependency graph for all steps in the flow
    */
   private buildDependencyGraph(): Map<string, Set<string>> {
+    console.log('DependencyResolver - Starting buildDependencyGraph');
     this.logger.debug('Building dependency graph');
     const graph = new Map<string, Set<string>>();
 
     // Initialize graph with all steps
+    console.log(
+      'DependencyResolver - Initializing graph with steps:',
+      this.flow.steps.map((s) => s.name),
+    );
     for (const step of this.flow.steps) {
       graph.set(step.name, new Set());
     }
 
     // Add dependencies for each step
     for (const step of this.flow.steps) {
+      console.log('DependencyResolver - Finding dependencies for step:', step.name);
       const deps = this.findStepDependencies(step);
       for (const dep of deps) {
         if (!graph.has(dep)) {
@@ -84,6 +93,10 @@ export class DependencyResolver {
       this.logger.debug(`Added dependency: ${step.name} -> ${deps.join(', ')}`);
     }
 
+    console.log(
+      'DependencyResolver - Graph built:',
+      Object.fromEntries([...graph.entries()].map(([k, v]) => [k, [...v]])),
+    );
     return graph;
   }
 
@@ -91,6 +104,12 @@ export class DependencyResolver {
    * Find all dependencies for a step
    */
   private findStepDependencies(step: Step): string[] {
+    console.log(
+      'DependencyResolver - Finding dependencies for step:',
+      step.name,
+      'type:',
+      Object.keys(step).find((k) => k !== 'name'),
+    );
     this.logger.debug(`Finding dependencies for step: ${step.name}`);
     const deps = new Set<string>();
 
@@ -133,17 +152,21 @@ export class DependencyResolver {
 
     // Extract references from condition steps
     if (isConditionStep(step)) {
+      console.log('DependencyResolver - Processing condition step:', step.name);
       this.extractReferences(step.condition.if).forEach((dep) => deps.add(dep));
       if (step.condition.then) {
+        console.log('DependencyResolver - Processing condition then branch:', step.name);
         this.findStepDependencies(step.condition.then).forEach((dep) => deps.add(dep));
       }
       if (step.condition.else) {
+        console.log('DependencyResolver - Processing condition else branch:', step.name);
         this.findStepDependencies(step.condition.else).forEach((dep) => deps.add(dep));
       }
     }
 
     // Extract references from request steps
     if (isRequestStep(step)) {
+      console.log('DependencyResolver - Processing request step:', step.name);
       const params = step.request.params;
       for (const value of Object.values(params)) {
         if (typeof value === 'string') {
@@ -154,47 +177,63 @@ export class DependencyResolver {
 
     // Extract references from transform steps
     if (isTransformStep(step)) {
+      console.log('DependencyResolver - Processing transform step:', step.name);
+      // Handle input reference
       if (typeof step.transform.input === 'string') {
-        this.extractReferences(step.transform.input).forEach((dep) => deps.add(dep));
+        const inputRefs = this.extractReferences(step.transform.input);
+        inputRefs.forEach((ref) => deps.add(ref));
       }
-      if (step.transform.operations) {
-        // Add 'item' to loopVars temporarily for map/filter operations
-        this.loopVars.add('item');
-        // Add 'acc' to loopVars temporarily for reduce operations
-        if (step.transform.operations.some((op) => op.type === 'reduce')) {
-          this.loopVars.add('acc');
-        }
-        // Add 'a' and 'b' to loopVars temporarily for sort operations
-        if (step.transform.operations.some((op) => op.type === 'sort')) {
-          this.loopVars.add('a');
-          this.loopVars.add('b');
-        }
 
+      // Handle operations
+      if (step.transform.operations) {
+        const transformVars = new Set(['item', 'acc', 'a', 'b']); // Common transform operation variables
         for (const op of step.transform.operations) {
           if (op.using && typeof op.using === 'string') {
-            this.extractReferences(op.using).forEach((dep) => deps.add(dep));
+            const opRefs = this.extractReferences(op.using, transformVars);
+            opRefs.forEach((ref) => deps.add(ref));
           }
         }
-
-        // Remove temporary loop variables
-        this.loopVars.delete('item');
-        this.loopVars.delete('acc');
-        this.loopVars.delete('a');
-        this.loopVars.delete('b');
       }
+
+      console.log('DependencyResolver - Transform step dependencies found:', [...deps]);
     }
 
-    this.logger.debug(`Found dependencies: ${Array.from(deps).join(', ')}`);
+    console.log('DependencyResolver - Found dependencies for step:', step.name, 'deps:', [...deps]);
     return Array.from(deps);
   }
 
   /**
    * Extract step references from an expression
    */
-  private extractReferences(expr: string): string[] {
-    const refs = this.expressionEvaluator.extractReferences(expr);
-    // Filter out internal variables and loop variables
-    return refs.filter((ref) => !this.internalVars.has(ref) && !this.loopVars.has(ref));
+  private extractReferences(expr: string, transformVars: Set<string> = new Set()): string[] {
+    const refs = new Set<string>();
+    // Handle expressions that start with $. directly
+    if (expr.startsWith('$.')) {
+      const parts = expr.split('.');
+      if (
+        parts[1] &&
+        !this.internalVars.has(parts[1]) &&
+        !this.loopVars.has(parts[1]) &&
+        !transformVars.has(parts[1])
+      ) {
+        refs.add(parts[1]);
+      }
+      return Array.from(refs);
+    }
+    // Extract all step references from the expression
+    const stepRefRegex = /\${([\w]+)(?=\.|[}[\]]|$)/g;
+    let match;
+    while ((match = stepRefRegex.exec(expr)) !== null) {
+      const stepName = match[1];
+      if (
+        !this.internalVars.has(stepName) &&
+        !this.loopVars.has(stepName) &&
+        !transformVars.has(stepName)
+      ) {
+        refs.add(stepName);
+      }
+    }
+    return Array.from(refs);
   }
 
   /**

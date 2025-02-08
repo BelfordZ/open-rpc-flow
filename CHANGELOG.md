@@ -1,3 +1,10 @@
+## [1.3.2](https://github.com/BelfordZ/open-rpc-flow/compare/v1.3.1...v1.3.2) (2025-02-08)
+
+
+### Bug Fixes
+
+* bump release ([#33](https://github.com/BelfordZ/open-rpc-flow/issues/33)) ([0c53dec](https://github.com/BelfordZ/open-rpc-flow/commit/0c53decc6326f5da604444305712a7e253e2f4c8))
+
 ## [1.3.1](https://github.com/BelfordZ/open-rpc-flow/compare/v1.3.0...v1.3.1) (2025-02-06)
 
 

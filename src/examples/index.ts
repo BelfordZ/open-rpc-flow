@@ -3,6 +3,7 @@ import dataTransform from './02-data-transformation.json';
 import nestedLoops from './03-nested-loops.json';
 import conditionalBranching from './04-conditional-branching.json';
 import complexDataPipeline from './05-complex-data-pipeline.json';
+import stopFlow from './06-stop-flow.json';
 import { Flow } from '../types';
 
 // Assert the type of each imported JSON
@@ -11,6 +12,7 @@ const dataTransformFlow = dataTransform as Flow;
 const nestedLoopsFlow = nestedLoops as Flow;
 const conditionalBranchingFlow = conditionalBranching as Flow;
 const complexDataPipelineFlow = complexDataPipeline as Flow;
+const stopFlowExample = stopFlow as Flow;
 
 // Export with unique names
 export {
@@ -19,6 +21,7 @@ export {
   nestedLoopsFlow,
   conditionalBranchingFlow,
   complexDataPipelineFlow,
+  stopFlowExample,
 };
 
 // Export the array of examples with proper typing
@@ -28,4 +31,5 @@ export const examples: Flow[] = [
   nestedLoopsFlow,
   conditionalBranchingFlow,
   complexDataPipelineFlow,
+  stopFlowExample,
 ];

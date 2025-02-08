@@ -541,4 +541,171 @@ describe('DependencyResolver', () => {
     expect(deps).toContain('step2');
     expect(deps).toContain('step3');
   });
+
+  describe('error handling', () => {
+    test('throws error for non-existent step', () => {
+      const flow: Flow = {
+        name: 'test-flow',
+        description: 'Test flow for error handling',
+        steps: [
+          {
+            name: 'step1',
+            request: {
+              method: 'test.method',
+              params: {},
+            },
+          },
+        ],
+      };
+
+      const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
+      expect(() => resolver.getDependencies('nonexistent')).toThrow(
+        "Step 'nonexistent' not found in dependency graph",
+      );
+    });
+
+    test('handles circular dependencies', () => {
+      const flow: Flow = {
+        name: 'test-flow',
+        description: 'Test flow for circular dependencies',
+        steps: [
+          {
+            name: 'step1',
+            transform: {
+              input: '${step2}',
+              operations: [],
+            },
+          },
+          {
+            name: 'step2',
+            transform: {
+              input: '${step1}',
+              operations: [],
+            },
+          },
+        ],
+      };
+
+      const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
+      expect(() => resolver.getExecutionOrder()).toThrow('Circular dependency detected');
+    });
+
+    test('handles loop step dependencies', () => {
+      const flow: Flow = {
+        name: 'test-flow',
+        description: 'Test flow for loop dependencies',
+        steps: [
+          {
+            name: 'step1',
+            request: {
+              method: 'test.method',
+              params: {},
+            },
+          },
+          {
+            name: 'loopStep',
+            loop: {
+              over: '${step1}',
+              as: 'item',
+              condition: '${item.value} > ${step1.threshold}',
+              step: {
+                name: 'processItem',
+                transform: {
+                  input: '${item}',
+                  operations: [
+                    {
+                      type: 'map',
+                      using: '${step1.multiplier} * ${item.value}',
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        ],
+      };
+
+      const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
+      const deps = resolver.getDependencies('loopStep');
+      expect(deps).toContain('step1');
+    });
+  });
+
+  describe('transform step dependencies', () => {
+    test('resolves transform step dependencies correctly', () => {
+      const flow: Flow = {
+        name: 'test-flow',
+        description: 'Test flow for transform step dependencies',
+        steps: [
+          {
+            name: 'step1',
+            request: {
+              method: 'test.method',
+              params: {},
+            },
+          },
+          {
+            name: 'step2',
+            transform: {
+              input: '$.step1',
+              operations: [
+                {
+                  type: 'map',
+                  using: '$.step1.result',
+                },
+              ],
+            },
+          },
+        ],
+      };
+
+      const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
+      const deps = resolver.getDependencies('step2');
+      expect(deps).toContain('step1');
+    });
+
+    test('resolves complex transform step dependencies', () => {
+      const flow: Flow = {
+        name: 'test-flow',
+        description: 'Test flow for complex transform dependencies',
+        steps: [
+          {
+            name: 'step1',
+            request: {
+              method: 'test.method',
+              params: {},
+            },
+          },
+          {
+            name: 'step2',
+            request: {
+              method: 'test.method',
+              params: {},
+            },
+          },
+          {
+            name: 'step3',
+            transform: {
+              input: '${step1}',
+              operations: [
+                {
+                  type: 'map',
+                  using: '${step1.value} + ${step2.value}',
+                },
+                {
+                  type: 'filter',
+                  using: '${item} > ${step2.threshold}',
+                },
+              ],
+            },
+          },
+        ],
+      };
+
+      const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
+      const deps = resolver.getDependencies('step3');
+      expect(deps).toContain('step1');
+      expect(deps).toContain('step2');
+    });
+  });
 });

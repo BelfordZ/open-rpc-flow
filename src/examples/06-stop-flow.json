@@ -1,0 +1,33 @@
+{
+  "name": "stop-flow",
+  "description": "A flow that demonstrates stopping execution based on a condition",
+  "steps": [
+    {
+      "name": "checkPermissions",
+      "request": {
+        "method": "permissions.get",
+        "params": {
+          "userId": 1
+        }
+      }
+    },
+    {
+      "name": "stopIfBlocked",
+      "condition": {
+        "if": "${checkPermissions.result.role} != 'admin'",
+        "then": {
+          "stop": {
+            "endWorkflow": true
+          }
+        }
+      }
+    },
+    {
+      "name": "getData",
+      "request": {
+        "method": "data.fetch",
+        "params": {}
+      }
+    }
+  ]
+}

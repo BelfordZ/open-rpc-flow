@@ -9,7 +9,84 @@ import {
   nestedLoopsFlow,
   conditionalBranchingFlow,
   complexDataPipelineFlow,
+  stopFlowExample,
 } from '../../examples';
+
+// Mock responses for different methods
+const setupMockResponses = (handler: jest.Mock) => {
+  handler.mockImplementation((request) => {
+    switch (request.method) {
+      case 'orders.list':
+        return Promise.resolve([
+          { id: 1, total: 1500, status: 'pending' },
+          { id: 2, total: 800, status: 'pending' },
+          { id: 3, total: 2000, status: 'pending' },
+        ]);
+      case 'user.get':
+        return Promise.resolve({
+          id: 1,
+          name: 'John Doe',
+          email: 'john@example.com',
+          role: 'admin',
+        });
+      case 'permissions.get':
+        return Promise.resolve({
+          userId: 1,
+          role: 'admin',
+          permissions: ['read', 'write', 'delete'],
+        });
+      case 'teams.list':
+        return Promise.resolve([
+          {
+            id: 1,
+            name: 'Team A',
+            members: [
+              { id: 1, name: 'Member 1' },
+              { id: 2, name: 'Member 2' },
+            ],
+          },
+          {
+            id: 2,
+            name: 'Team B',
+            members: [{ id: 3, name: 'Member 3' }],
+          },
+        ]);
+      case 'notification.send':
+        return Promise.resolve({ success: true, notificationId: '123' });
+      case 'inventory.check':
+        return Promise.resolve([
+          {
+            inStock: true,
+            quantity: 15,
+            productId: 123,
+          },
+          {
+            inStock: false,
+            quantity: 5,
+            productId: 123,
+          },
+        ]);
+      case 'orders.create':
+        return Promise.resolve({
+          orderId: 'ORD123',
+          status: 'created',
+        });
+      case 'data.fetch':
+        return Promise.resolve([
+          { id: 1, value: 100, confidence: 0.9, timestamp: '2024-01-01T00:00:00Z' },
+          { id: 2, value: 200, confidence: 0.85, timestamp: '2024-01-01T00:01:00Z' },
+        ]);
+      case 'analysis.process':
+        return Promise.resolve({
+          results: [{ id: 1, analysis: 'complete' }],
+        });
+      case 'results.store':
+        return Promise.resolve({ success: true, storedAt: new Date().toISOString() });
+      default:
+        return Promise.resolve({ result: 'default' });
+    }
+  });
+};
 
 describe('Example Flows Integration', () => {
   let jsonRpcHandler: jest.Mock;
@@ -17,83 +94,6 @@ describe('Example Flows Integration', () => {
   beforeEach(() => {
     jsonRpcHandler = createMockJsonRpcHandler();
   });
-
-  // Mock responses for different methods
-  const setupMockResponses = (handler: jest.Mock) => {
-    handler.mockImplementation((request) => {
-      switch (request.method) {
-        case 'orders.list':
-          return Promise.resolve([
-            { id: 1, total: 1500, status: 'pending' },
-            { id: 2, total: 800, status: 'pending' },
-            { id: 3, total: 2000, status: 'pending' },
-          ]);
-        case 'user.get':
-          return Promise.resolve({
-            id: 1,
-            name: 'John Doe',
-            email: 'john@example.com',
-            role: 'admin',
-          });
-        case 'permissions.get':
-          return Promise.resolve({
-            userId: 1,
-            role: 'admin',
-            permissions: ['read', 'write', 'delete'],
-          });
-        case 'teams.list':
-          return Promise.resolve([
-            {
-              id: 1,
-              name: 'Team A',
-              members: [
-                { id: 1, name: 'Member 1' },
-                { id: 2, name: 'Member 2' },
-              ],
-            },
-            {
-              id: 2,
-              name: 'Team B',
-              members: [{ id: 3, name: 'Member 3' }],
-            },
-          ]);
-        case 'notification.send':
-          return Promise.resolve({ success: true, notificationId: '123' });
-        case 'inventory.check':
-          return Promise.resolve([
-            {
-              inStock: true,
-              quantity: 15,
-              productId: 123,
-            },
-            {
-              inStock: false,
-              quantity: 5,
-              productId: 123,
-            },
-          ]);
-        case 'orders.create':
-          return Promise.resolve({
-            orderId: 'ORD123',
-            status: 'created',
-          });
-        case 'data.fetch':
-          return Promise.resolve([
-            { id: 1, value: 100, confidence: 0.9, timestamp: '2024-01-01T00:00:00Z' },
-            { id: 2, value: 200, confidence: 0.85, timestamp: '2024-01-01T00:01:00Z' },
-            { id: 3, value: 300, confidence: 0.75, timestamp: '2024-01-01T00:02:00Z' },
-          ]);
-        case 'analysis.process':
-          return Promise.resolve({
-            results: [{ id: 1, analysis: 'complete' }],
-          });
-        case 'results.store':
-          return Promise.resolve({ success: true, storedAt: new Date().toISOString() });
-        default:
-          return Promise.resolve({ result: 'default' });
-      }
-    });
-  };
 
   describe.each(examples)('Example: %s', (flow) => {
     it('executes successfully', async () => {
@@ -200,6 +200,12 @@ describe('Example Flows Integration', () => {
           expect(storeResults.storedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
           break;
         }
+        case 'stop-flow': {
+          const checkPermissions = results.get('checkPermissions').result;
+          expect(checkPermissions.userId).toBe(1);
+          expect(checkPermissions.role).toBe('admin');
+          break;
+        }
       }
     });
   });
@@ -221,14 +227,14 @@ describe('Example Flow Files', () => {
 
       // Validate step has at least one of: request, loop, condition, or transform
       const hasValidStepType = Boolean(
-        step.request || step.loop || step.condition || step.transform,
+        step.request || step.loop || step.condition || step.transform || step.stop,
       );
       expect(hasValidStepType).toBe(true);
     });
   };
 
   test('examples array contains all flows', () => {
-    expect(examples).toHaveLength(5);
+    expect(examples).toHaveLength(6);
     examples.forEach((flow) => {
       validateFlow(flow);
     });
@@ -252,5 +258,59 @@ describe('Example Flow Files', () => {
 
   test('complex data pipeline flow is properly typed', () => {
     validateFlow(complexDataPipelineFlow);
+  });
+
+  test('stop flow is properly typed', () => {
+    validateFlow(stopFlowExample);
+  });
+
+  describe('Stop Flow Integration', () => {
+    let jsonRpcHandler: jest.Mock;
+
+    beforeEach(() => {
+      jsonRpcHandler = createMockJsonRpcHandler();
+    });
+
+    test('continues execution when user is admin', async () => {
+      setupMockResponses(jsonRpcHandler);
+      const executor = new FlowExecutor(stopFlowExample, jsonRpcHandler, noLogger);
+
+      const results = await executor.execute();
+
+      // Verify all steps executed
+      expect(results.get('checkPermissions')).toBeDefined();
+      expect(results.get('stopIfBlocked')).toBeDefined();
+      expect(results.get('getData')).toBeDefined();
+
+      // Verify data was fetched
+      const getData = results.get('getData').result;
+      expect(Array.isArray(getData)).toBeTruthy();
+      expect(getData).toHaveLength(2);
+    });
+
+    test('stops execution when user is not admin', async () => {
+      setupMockResponses(jsonRpcHandler);
+      // Override the permissions.get response for this test
+      jsonRpcHandler.mockImplementation((request) => {
+        if (request.method === 'permissions.get') {
+          return Promise.resolve({
+            userId: 1,
+            role: 'user',
+            permissions: ['read'],
+          });
+        }
+        return Promise.resolve({ result: 'default' });
+      });
+
+      const executor = new FlowExecutor(stopFlowExample, jsonRpcHandler, noLogger);
+      const results = await executor.execute();
+
+      // Verify initial steps executed
+      expect(results.get('checkPermissions')).toBeDefined();
+      expect(results.get('stopIfBlocked')).toBeDefined();
+
+      // Verify getData was not executed due to stop
+      expect(results.get('getData')).toBeUndefined();
+    });
   });
 });

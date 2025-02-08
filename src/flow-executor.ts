@@ -10,6 +10,7 @@ import {
   ConditionStepExecutor,
   TransformStepExecutor,
   StopStepExecutor,
+  StepType,
 } from './step-executors';
 import { Logger, defaultLogger } from './util/logger';
 
@@ -74,6 +75,7 @@ export class FlowExecutor {
   async execute(): Promise<Map<string, any>> {
     // Get steps in dependency order
     const orderedSteps = this.dependencyResolver.getExecutionOrder();
+
     this.logger.log(
       'Executing steps in order:',
       orderedSteps.map((s) => s.name),
@@ -83,15 +85,12 @@ export class FlowExecutor {
       const result = await this.executeStep(step);
       this.stepResults.set(step.name, result);
 
-      // Check if the step is a stop step and handle accordingly
-      if (result.type === 'stop') {
-        if (result.result.endWorkflow) {
-          this.logger.log('Workflow stopped by stop step:', step.name);
-          break;
-        } else {
-          this.logger.log('Workflow branch stopped by stop step:', step.name);
-          continue;
-        }
+      // Check if the step or any nested step resulted in a stop
+      const shouldStop = this.checkForStopResult(result);
+
+      if (shouldStop) {
+        this.logger.log('Workflow stopped by step:', step.name);
+        break;
       }
     }
     return this.stepResults;
@@ -121,7 +120,8 @@ export class FlowExecutor {
         executor: executor.constructor.name,
       });
 
-      return await executor.execute(step, this.executionContext, extraContext);
+      const result = await executor.execute(step, this.executionContext, extraContext);
+      return result;
     } catch (error: any) {
       const errorMessage = error.message || String(error);
       this.logger.error(`Step execution failed: ${step.name}`, { error: errorMessage });
@@ -145,5 +145,22 @@ export class FlowExecutor {
       }
     }
     return undefined;
+  }
+
+  /**
+   * Check if a step result or any nested step result indicates a stop
+   */
+  private checkForStopResult(result: StepExecutionResult): boolean {
+    // Direct stop result
+    if (result.type === StepType.Stop && result.result.endWorkflow) {
+      return true;
+    }
+
+    // Check nested results (e.g. in condition or loop steps)
+    if (result.result?.type === StepType.Stop && result.result.result.endWorkflow) {
+      return true;
+    }
+
+    return false;
   }
 }

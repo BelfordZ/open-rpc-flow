@@ -647,11 +647,11 @@ describe('DependencyResolver', () => {
           {
             name: 'step2',
             transform: {
-              input: '$.step1',
+              input: '${step1}',
               operations: [
                 {
                   type: 'map',
-                  using: '$.step1.result',
+                  using: '${step1.result}',
                 },
               ],
             },

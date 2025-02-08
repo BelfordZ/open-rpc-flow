@@ -43,17 +43,16 @@ describe('Flow Execution Integration', () => {
               name: 'processData',
               transform: {
                 input: '${getData.result}',
-                operations: [
-                  {
-                    type: 'filter',
-                    using: '${item.value} > ${context.minValue}',
-                  },
-                  {
-                    type: 'map',
-                    using: '{ ...${item}, processed: true }',
-                  },
-                ],
-              },
+              operations: [
+                {
+                  type: 'filter',
+                  using: '${item.value} > ${context.minValue}',
+                },
+                {
+                  type: 'map',
+                  using: '{ ...${item}, processed: true }',
+                },
+              ],
             },
           },
         },

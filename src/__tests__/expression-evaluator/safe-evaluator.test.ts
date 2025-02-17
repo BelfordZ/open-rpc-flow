@@ -176,7 +176,7 @@ describe('SafeExpressionEvaluator', () => {
     });
 
     it('throws on unknown operators', () => {
-      expect(() => evaluator.evaluate('a @ b', {})).toThrow('Failed to evaluate expression: a @ b');
+      expect(() => evaluator.evaluate('a @ b', {})).toThrow('Unexpected identifier');
     });
 
     it('throws on invalid references', () => {

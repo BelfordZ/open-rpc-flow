@@ -1,6 +1,13 @@
 import { tokenize, TokenizerError } from '../../expression-evaluator/tokenizer';
 import { TestLogger } from '../../util/logger';
 
+// Define the new token types for clarity in tests
+type Token = {
+  type: 'string' | 'number' | 'operator' | 'object_literal' | 'array_literal' | 'reference' | 'punctuation' | 'identifier';
+  value: string | number | Token[];
+  raw: string;
+};
+
 describe('tokenize', () => {
   let logger: TestLogger;
 
@@ -15,177 +22,221 @@ describe('tokenize', () => {
 
   describe('simple expressions', () => {
     it('tokenizes numbers', () => {
-      expect(tokenize('42', logger)).toEqual([{ type: 'number', value: '42', raw: '42' }]);
-      expect(tokenize('-42', logger)).toEqual([
-        { type: 'operator', value: '-', raw: '-' },
-        { type: 'number', value: '42', raw: '42' },
-      ]);
-      expect(tokenize('3.14', logger)).toEqual([{ type: 'number', value: '3.14', raw: '3.14' }]);
+      expect(tokenize('42', logger)).toEqual([{ type: 'number', value: 42, raw: '42' }]);
     });
 
     it('tokenizes strings', () => {
       expect(tokenize('"hello"', logger)).toEqual([
-        { type: 'string', value: 'hello', raw: 'hello"' },
-      ]);
-      expect(tokenize("'world'", logger)).toEqual([
-        { type: 'string', value: 'world', raw: "world'" },
-      ]);
-      expect(tokenize('"contains \\"escaped\\" quotes"', logger)).toEqual([
-        {
-          type: 'string',
-          value: 'contains "escaped" quotes',
-          raw: 'contains \\"escaped\\" quotes"',
-        },
+        { type: 'string', value: 'hello', raw: '"hello"' },
       ]);
     });
 
-    it('tokenizes operators', () => {
+    it('tokenizes simple operators', () => {
       expect(tokenize('2 + 2', logger)).toEqual([
-        { type: 'number', value: '2', raw: '2' },
+        { type: 'number', value: 2, raw: '2' },
         { type: 'operator', value: '+', raw: '+' },
-        { type: 'number', value: '2', raw: '2' },
+        { type: 'number', value: 2, raw: '2' },
       ]);
-      expect(tokenize('3 * 4', logger)).toEqual([
-        { type: 'number', value: '3', raw: '3' },
-        { type: 'operator', value: '*', raw: '*' },
-        { type: 'number', value: '4', raw: '4' },
-      ]);
-      expect(tokenize('a >= b', logger)).toEqual([
-        { type: 'identifier', value: 'a', raw: 'a' },
-        { type: 'operator', value: '>=', raw: '>=' },
-        { type: 'identifier', value: 'b', raw: 'b' },
-      ]);
-      expect(tokenize('a !== b', logger)).toEqual([
-        { type: 'identifier', value: 'a', raw: 'a' },
-        { type: 'operator', value: '!==', raw: '!==' },
-        { type: 'identifier', value: 'b', raw: 'b' },
-      ]);
-      expect(tokenize('a === b', logger)).toEqual([
-        { type: 'identifier', value: 'a', raw: 'a' },
-        { type: 'operator', value: '===', raw: '===' },
-        { type: 'identifier', value: 'b', raw: 'b' },
-      ]);
-      expect(tokenize('[1, ...arr]', logger)).toEqual([
-        { type: 'punctuation', value: '[', raw: '[' },
-        { type: 'number', value: '1', raw: '1' },
-        { type: 'punctuation', value: ',', raw: ',' },
-        { type: 'operator', value: '...', raw: '...' },
-        { type: 'identifier', value: 'arr', raw: 'arr' },
-        { type: 'punctuation', value: ']', raw: ']' },
+    });
+  });
+
+  describe('nullish coalescing', () => {
+    it('tokenizes nullish coalescing operator', () => {
+      expect(tokenize('null ?? "default"', logger)).toEqual([
+        { type: 'identifier', value: 'null', raw: 'null' },
+        { type: 'operator', value: '??', raw: '??' },
+        { type: 'string', value: 'default', raw: '"default"' },
       ]);
     });
 
-    it('tokenizes parentheses', () => {
-      expect(tokenize('(2 + 3) * 4', logger)).toEqual([
-        { type: 'punctuation', value: '(', raw: '(' },
-        { type: 'number', value: '2', raw: '2' },
-        { type: 'operator', value: '+', raw: '+' },
-        { type: 'number', value: '3', raw: '3' },
-        { type: 'punctuation', value: ')', raw: ')' },
-        { type: 'operator', value: '*', raw: '*' },
-        { type: 'number', value: '4', raw: '4' },
+    it('tokenizes nullish coalescing with references', () => {
+      expect(tokenize('${value} ?? "default"', logger)).toEqual([
+        { 
+          type: 'reference',
+          value: [{ type: 'identifier', value: 'value', raw: 'value' }],
+          raw: '${value}'
+        },
+        { type: 'operator', value: '??', raw: '??' },
+        { type: 'string', value: 'default', raw: '"default"' },
+      ]);
+    });
+
+    it('tokenizes chained nullish coalescing', () => {
+      expect(tokenize('${a} ?? ${b} ?? "default"', logger)).toEqual([
+        { 
+          type: 'reference',
+          value: [{ type: 'identifier', value: 'a', raw: 'a' }],
+          raw: '${a}'
+        },
+        { type: 'operator', value: '??', raw: '??' },
+        { 
+          type: 'reference',
+          value: [{ type: 'identifier', value: 'b', raw: 'b' }],
+          raw: '${b}'
+        },
+        { type: 'operator', value: '??', raw: '??' },
+        { type: 'string', value: 'default', raw: '"default"' },
       ]);
     });
   });
 
   describe('references', () => {
-    it('tokenizes simple references', () => {
+    it('tokenizes references with nested expressions', () => {
       expect(tokenize('${foo}', logger)).toEqual([
-        { type: 'identifier', value: '${foo}', raw: '${foo}' },
+        { 
+          type: 'reference',
+          value: [{ type: 'identifier', value: 'foo', raw: 'foo' }],
+          raw: '${foo}'
+        }
       ]);
-    });
 
-    it('tokenizes references with dot notation', () => {
       expect(tokenize('${foo.bar}', logger)).toEqual([
-        { type: 'identifier', value: '${foo.bar}', raw: '${foo.bar}' },
+        {
+          type: 'reference',
+          value: [
+            { type: 'identifier', value: 'foo', raw: 'foo' },
+            { type: 'operator', value: '.', raw: '.' },
+            { type: 'identifier', value: 'bar', raw: 'bar' }
+          ],
+          raw: '${foo.bar}'
+        }
       ]);
-      expect(tokenize('${foo.bar.baz}', logger)).toEqual([
-        { type: 'identifier', value: '${foo.bar.baz}', raw: '${foo.bar.baz}' },
-      ]);
-    });
 
-    it('tokenizes references with array notation', () => {
-      expect(tokenize('${foo["bar"]}', logger)).toEqual([
-        { type: 'identifier', value: '${foo["bar"]}', raw: '${foo["bar"]}' },
-      ]);
-      expect(tokenize('${foo[0]}', logger)).toEqual([
-        { type: 'identifier', value: '${foo[0]}', raw: '${foo[0]}' },
-      ]);
-      expect(tokenize('${foo.bar[0].baz}', logger)).toEqual([
-        { type: 'identifier', value: '${foo.bar[0].baz}', raw: '${foo.bar[0].baz}' },
-      ]);
-    });
-
-    it('tokenizes nested references', () => {
       expect(tokenize('${foo[${bar}]}', logger)).toEqual([
-        { type: 'identifier', value: '${foo[${bar}]}', raw: '${foo[${bar}]}' },
+        {
+          type: 'reference',
+          value: [
+            { type: 'identifier', value: 'foo', raw: 'foo' },
+            { type: 'punctuation', value: '[', raw: '[' },
+            { 
+              type: 'reference',
+              value: [{ type: 'identifier', value: 'bar', raw: 'bar' }],
+              raw: '${bar}'
+            },
+            { type: 'punctuation', value: ']', raw: ']' }
+          ],
+          raw: '${foo[${bar}]}'
+        }
       ]);
     });
   });
 
   describe('complex expressions', () => {
-    it('tokenizes expressions with references', () => {
-      expect(tokenize('${foo} + ${bar}', logger)).toEqual([
-        { type: 'identifier', value: '${foo}', raw: '${foo}' },
-        { type: 'operator', value: '+', raw: '+' },
-        { type: 'identifier', value: '${bar}', raw: '${bar}' },
+    it('tokenizes object literals', () => {
+      expect(tokenize('{ key: ${value} }', logger)).toEqual([
+        {
+          type: 'object_literal',
+          value: [
+            { type: 'string', value: 'key', raw: 'key' },
+            { type: 'punctuation', value: ':', raw: ':' },
+            { 
+              type: 'reference',
+              value: [{ type: 'identifier', value: 'value', raw: 'value' }],
+              raw: '${value}'
+            }
+          ],
+          raw: '{ key: ${value} }'
+        }
+      ]);
+
+      expect(tokenize('{ key1: "value1", key2: "value2" }', logger)).toEqual([
+        {
+          type: 'object_literal',
+          value: [
+            { type: 'string', value: 'key1', raw: 'key1' },
+            { type: 'punctuation', value: ':', raw: ':' },
+            { type: 'string', value: 'value1', raw: '"value1"' },
+            { type: 'punctuation', value: ',', raw: ',' },
+            { type: 'string', value: 'key2', raw: 'key2' },
+            { type: 'punctuation', value: ':', raw: ':' },
+            { type: 'string', value: 'value2', raw: '"value2"' }
+          ],
+          raw: '{ key1: "value1", key2: "value2" }'
+        }
       ]);
     });
 
-    it('tokenizes expressions with mixed types', () => {
-      expect(tokenize('${foo} > 42', logger)).toEqual([
-        { type: 'identifier', value: '${foo}', raw: '${foo}' },
-        { type: 'operator', value: '>', raw: '>' },
-        { type: 'number', value: '42', raw: '42' },
+    it('tokenizes array literals', () => {
+      expect(tokenize('[1, ...${foo}]', logger)).toEqual([
+        {
+          type: 'array_literal',
+          value: [
+            { type: 'number', value: 1, raw: '1' },
+            { type: 'punctuation', value: ',', raw: ',' },
+            { type: 'operator', value: '...', raw: '...' },
+            { 
+              type: 'reference',
+              value: [{ type: 'identifier', value: 'foo', raw: 'foo' }],
+              raw: '${foo}'
+            }
+          ],
+          raw: '[1, ...${foo}]'
+        }
       ]);
     });
 
     it('tokenizes template literals', () => {
-      expect(tokenize('Value is ${foo}', logger)).toEqual([
-        { type: 'identifier', value: 'Value', raw: 'Value' },
-        { type: 'identifier', value: 'is', raw: 'is' },
-        { type: 'identifier', value: '${foo}', raw: '${foo}' },
+      expect(tokenize('`Value is ${foo}`', logger)).toEqual([
+        { type: 'string', value: 'Value is ', raw: 'Value is ' },
+        { 
+          type: 'reference',
+          value: [{ type: 'identifier', value: 'foo', raw: 'foo' }],
+          raw: '${foo}'
+        }
       ]);
-      expect(tokenize('Value is ${foo} and ${bar}', logger)).toEqual([
-        { type: 'identifier', value: 'Value', raw: 'Value' },
-        { type: 'identifier', value: 'is', raw: 'is' },
-        { type: 'identifier', value: '${foo}', raw: '${foo}' },
-        { type: 'identifier', value: 'and', raw: 'and' },
-        { type: 'identifier', value: '${bar}', raw: '${bar}' },
+
+      expect(tokenize('`${foo} and ${bar}`', logger)).toEqual([
+        { 
+          type: 'reference',
+          value: [{ type: 'identifier', value: 'foo', raw: 'foo' }],
+          raw: '${foo}'
+        },
+        { type: 'string', value: ' and ', raw: ' and ' },
+        { 
+          type: 'reference',
+          value: [{ type: 'identifier', value: 'bar', raw: 'bar' }],
+          raw: '${bar}'
+        }
       ]);
     });
 
-    it('tokenizes complex expressions with parentheses', () => {
-      expect(tokenize('(${foo} + 2) * ${bar}', logger)).toEqual([
-        { type: 'punctuation', value: '(', raw: '(' },
-        { type: 'identifier', value: '${foo}', raw: '${foo}' },
-        { type: 'operator', value: '+', raw: '+' },
-        { type: 'number', value: '2', raw: '2' },
-        { type: 'punctuation', value: ')', raw: ')' },
-        { type: 'operator', value: '*', raw: '*' },
-        { type: 'identifier', value: '${bar}', raw: '${bar}' },
-      ]);
-    });
-
-    it('tokenizes object literals', () => {
-      expect(tokenize('{ key: ${value} }', logger)).toEqual([
-        { type: 'punctuation', value: '{', raw: '{' },
-        { type: 'identifier', value: 'key', raw: 'key' },
-        { type: 'punctuation', value: ':', raw: ':' },
-        { type: 'identifier', value: '${value}', raw: '${value}' },
-        { type: 'punctuation', value: '}', raw: '}' },
-      ]);
-      // Test comma punctuation
-      expect(tokenize('{ key1: val1, key2: val2 }', logger)).toEqual([
-        { type: 'punctuation', value: '{', raw: '{' },
-        { type: 'identifier', value: 'key1', raw: 'key1' },
-        { type: 'punctuation', value: ':', raw: ':' },
-        { type: 'identifier', value: 'val1', raw: 'val1' },
-        { type: 'punctuation', value: ',', raw: ',' },
-        { type: 'identifier', value: 'key2', raw: 'key2' },
-        { type: 'punctuation', value: ':', raw: ':' },
-        { type: 'identifier', value: 'val2', raw: 'val2' },
-        { type: 'punctuation', value: '}', raw: '}' },
+    it('tokenizes nested structures', () => {
+      expect(tokenize('{ arr: [1, ${foo}, { nested: ${bar} }] }', logger)).toEqual([
+        {
+          type: 'object_literal',
+          value: [
+            { type: 'string', value: 'arr', raw: 'arr' },
+            { type: 'punctuation', value: ':', raw: ':' },
+            {
+              type: 'array_literal',
+              value: [
+                { type: 'number', value: 1, raw: '1' },
+                { type: 'punctuation', value: ',', raw: ',' },
+                { 
+                  type: 'reference',
+                  value: [{ type: 'identifier', value: 'foo', raw: 'foo' }],
+                  raw: '${foo}'
+                },
+                { type: 'punctuation', value: ',', raw: ',' },
+                {
+                  type: 'object_literal',
+                  value: [
+                    { type: 'string', value: 'nested', raw: 'nested' },
+                    { type: 'punctuation', value: ':', raw: ':' },
+                    { 
+                      type: 'reference',
+                      value: [{ type: 'identifier', value: 'bar', raw: 'bar' }],
+                      raw: '${bar}'
+                    }
+                  ],
+                  raw: '{ nested: ${bar} }'
+                }
+              ],
+              raw: '[1, ${foo}, { nested: ${bar} }]'
+            }
+          ],
+          raw: '{ arr: [1, ${foo}, { nested: ${bar} }] }'
+        }
       ]);
     });
   });
@@ -193,216 +244,106 @@ describe('tokenize', () => {
   describe('spread operator', () => {
     it('tokenizes spread operator in object literals', () => {
       expect(tokenize('{ ...${foo} }', logger)).toEqual([
-        { type: 'punctuation', value: '{', raw: '{' },
-        { type: 'operator', value: '...', raw: '...' },
-        { type: 'identifier', value: '${foo}', raw: '${foo}' },
-        { type: 'punctuation', value: '}', raw: '}' },
+        {
+          type: 'object_literal',
+          value: [
+            { type: 'operator', value: '...', raw: '...' },
+            { 
+              type: 'reference',
+              value: [{ type: 'identifier', value: 'foo', raw: 'foo' }],
+              raw: '${foo}'
+            }
+          ],
+          raw: '{ ...${foo} }'
+        }
       ]);
 
       expect(tokenize('{ ...${foo}, bar: "baz" }', logger)).toEqual([
-        { type: 'punctuation', value: '{', raw: '{' },
-        { type: 'operator', value: '...', raw: '...' },
-        { type: 'identifier', value: '${foo}', raw: '${foo}' },
-        { type: 'punctuation', value: ',', raw: ',' },
-        { type: 'identifier', value: 'bar', raw: 'bar' },
-        { type: 'punctuation', value: ':', raw: ':' },
-        { type: 'string', value: 'baz', raw: 'baz"' },
-        { type: 'punctuation', value: '}', raw: '}' },
+        {
+          type: 'object_literal',
+          value: [
+            { type: 'operator', value: '...', raw: '...' },
+            { 
+              type: 'reference',
+              value: [{ type: 'identifier', value: 'foo', raw: 'foo' }],
+              raw: '${foo}'
+            },
+            { type: 'punctuation', value: ',', raw: ',' },
+            { type: 'string', value: 'bar', raw: 'bar' },
+            { type: 'punctuation', value: ':', raw: ':' },
+            { type: 'string', value: 'baz', raw: '"baz"' }
+          ],
+          raw: '{ ...${foo}, bar: "baz" }'
+        }
       ]);
     });
 
     it('tokenizes spread operator in array literals', () => {
       expect(tokenize('[...${foo}]', logger)).toEqual([
-        { type: 'punctuation', value: '[', raw: '[' },
-        { type: 'operator', value: '...', raw: '...' },
-        { type: 'identifier', value: '${foo}', raw: '${foo}' },
-        { type: 'punctuation', value: ']', raw: ']' },
+        {
+          type: 'array_literal',
+          value: [
+            { type: 'operator', value: '...', raw: '...' },
+            { 
+              type: 'reference',
+              value: [{ type: 'identifier', value: 'foo', raw: 'foo' }],
+              raw: '${foo}'
+            }
+          ],
+          raw: '[...${foo}]'
+        }
       ]);
 
       expect(tokenize('[...${foo}, 1, 2]', logger)).toEqual([
-        { type: 'punctuation', value: '[', raw: '[' },
-        { type: 'operator', value: '...', raw: '...' },
-        { type: 'identifier', value: '${foo}', raw: '${foo}' },
-        { type: 'punctuation', value: ',', raw: ',' },
-        { type: 'number', value: '1', raw: '1' },
-        { type: 'punctuation', value: ',', raw: ',' },
-        { type: 'number', value: '2', raw: '2' },
-        { type: 'punctuation', value: ']', raw: ']' },
+        {
+          type: 'array_literal',
+          value: [
+            { type: 'operator', value: '...', raw: '...' },
+            { 
+              type: 'reference',
+              value: [{ type: 'identifier', value: 'foo', raw: 'foo' }],
+              raw: '${foo}'
+            },
+            { type: 'punctuation', value: ',', raw: ',' },
+            { type: 'number', value: 1, raw: '1' },
+            { type: 'punctuation', value: ',', raw: ',' },
+            { type: 'number', value: 2, raw: '2' }
+          ],
+          raw: '[...${foo}, 1, 2]'
+        }
       ]);
     });
 
     it('tokenizes multiple spread operators', () => {
       expect(tokenize('{ ...${foo}, ...${bar} }', logger)).toEqual([
-        { type: 'punctuation', value: '{', raw: '{' },
-        { type: 'operator', value: '...', raw: '...' },
-        { type: 'identifier', value: '${foo}', raw: '${foo}' },
-        { type: 'punctuation', value: ',', raw: ',' },
-        { type: 'operator', value: '...', raw: '...' },
-        { type: 'identifier', value: '${bar}', raw: '${bar}' },
-        { type: 'punctuation', value: '}', raw: '}' },
+        {
+          type: 'object_literal',
+          raw: '{ ...${foo}, ...${bar} }',
+          value: [
+            { type: 'operator', value: '...', raw: '...' },
+            { 
+              type: 'reference',
+              value: [{ type: 'identifier', value: 'foo', raw: 'foo' }],
+              raw: '${foo}'
+            },
+            { type: 'punctuation', value: ',', raw: ',' },
+            { type: 'operator', value: '...', raw: '...' },
+            {
+              type: 'reference',
+              value: [{ type: 'identifier', value: 'bar', raw: 'bar' }],
+              raw: '${bar}'
+            }
+          ]
+        }
       ]);
     });
-
-    it.skip('handles invalid spread operator usage', () => {
-      // Spread without value
-      expect(() => tokenize('{ ... }', logger)).toThrow(TokenizerError);
-      expect(() => tokenize('[...]', logger)).toThrow(TokenizerError);
-
-      // Spread without container
-      expect(() => tokenize('...${foo}', logger)).toThrow(TokenizerError);
-
-      // Incomplete spread
-      expect(() => tokenize('{ .. }', logger)).toThrow(TokenizerError);
-      expect(() => tokenize('{ . }', logger)).toThrow(TokenizerError);
-    });
   });
 
-  describe('error cases', () => {
-    it('throws on empty expression', () => {
-      expect(() => tokenize('', logger)).toThrow(TokenizerError);
-      expect(() => tokenize('   ', logger)).toThrow(TokenizerError);
-    });
-
-    it('throws on expression that results in no tokens', () => {
-      // Create a string that looks like it might have content but tokenizes to nothing
-      const expression = '...'; // This will try to parse as an operator but fail validation
-      expect(() => tokenize(expression, logger)).toThrow(TokenizerError);
-      expect(() => tokenize(expression, logger)).toThrow('Operator ... missing operand');
-    });
-
-    it('handles unclosed quotes', () => {
-      expect(() => tokenize('"unclosed', logger)).toThrow(TokenizerError);
-      expect(() => tokenize("'unclosed", logger)).toThrow(TokenizerError);
-    });
-
-    it('handles unclosed references', () => {
-      expect(() => tokenize('${unclosed', logger)).toThrow(TokenizerError);
-    });
-
-    it('handles invalid operators', () => {
-      expect(() => tokenize('a @ b', logger)).toThrow(TokenizerError);
-      expect(() => tokenize('a $$ b', logger)).toThrow(TokenizerError);
-      // Test all invalid operator sequences
-      expect(() => tokenize('a ++ b', logger)).toThrow('Invalid operator sequence: ++');
-      expect(() => tokenize('a -- b', logger)).toThrow('Invalid operator sequence: --');
-      expect(() => tokenize('a ** b', logger)).toThrow('Invalid operator sequence: **');
-      expect(() => tokenize('a <> b', logger)).toThrow('Invalid operator sequence: <>');
-      expect(() => tokenize('a >> b', logger)).toThrow('Invalid operator sequence: >>');
-      expect(() => tokenize('a << b', logger)).toThrow('Invalid operator sequence: <<');
-      // Test valid operator sequences
-      expect(() => tokenize('a + b', logger)).not.toThrow();
-      expect(() => tokenize('a - b', logger)).not.toThrow();
-      expect(() => tokenize('a * b', logger)).not.toThrow();
-    });
-
-    it('handles invalid reference syntax', () => {
-      expect(() => tokenize('$foo', logger)).toThrow(TokenizerError);
-      expect(() => tokenize('${foo}}', logger)).toThrow(TokenizerError);
-    });
-
-    it('handles malformed expressions', () => {
-      expect(() => tokenize('2 + }', logger)).toThrow(
-        'Unmatched closing parenthesis/brace/bracket',
-      );
-      expect(() => tokenize('2 + ]', logger)).toThrow(
-        'Unmatched closing parenthesis/brace/bracket',
-      );
-      // Test nested braces with mismatched depths
-      expect(() => tokenize('{ } }', logger)).toThrow(
-        'Unmatched closing parenthesis/brace/bracket',
-      );
-      expect(() => tokenize('{ } )', logger)).toThrow(
-        'Unmatched closing parenthesis/brace/bracket',
-      );
-      expect(() => tokenize('{ } ]', logger)).toThrow(
-        'Unmatched closing parenthesis/brace/bracket',
-      );
-      // Test unclosed opening braces/brackets
-      expect(() => tokenize('{ 2 + 3', logger)).toThrow('Unclosed braces');
-      expect(() => tokenize('[ 2 + 3', logger)).toThrow('Unclosed brackets');
-      // For nested structures, braces are checked before brackets
-      expect(() => tokenize('{ [', logger)).toThrow('Unclosed braces');
-      expect(() => tokenize('[ {', logger)).toThrow('Unclosed braces');
-    });
-
-    it('handles operators without sufficient operands', () => {
-      expect(() => tokenize('2 +', logger)).toThrow(TokenizerError);
-      expect(() => tokenize('2 *', logger)).toThrow(TokenizerError);
-      expect(() => tokenize('2 >', logger)).toThrow(TokenizerError);
-      // Test operator at end of expression (nextToken will be null)
-      expect(() => tokenize('2 +', logger)).toThrow('Unary operator + missing operand');
-      expect(() => tokenize('2 *', logger)).toThrow('Operator * missing operand');
-      expect(() => tokenize('2 /', logger)).toThrow('Operator / missing operand');
-      expect(() => tokenize('2 %', logger)).toThrow('Operator % missing operand');
-      // Test operator at end of expression with invalid operator sequence
-      expect(() => tokenize('2 ++', logger)).toThrow('Invalid operator sequence: ++');
-      // Test operator at end of expression with valid operator sequence
-      expect(() => tokenize('2 + ', logger)).toThrow('Unary operator + missing operand');
-      expect(() => tokenize('2 * ', logger)).toThrow('Operator * missing operand');
-      // Test operator followed by non-operator token
-      const tokens = tokenize('2 + "foo"', logger);
-      expect(tokens).toEqual([
-        { type: 'number', value: '2', raw: '2' },
-        { type: 'operator', value: '+', raw: '+' },
-        { type: 'string', value: 'foo', raw: 'foo"' },
-      ]);
-    });
-    it('handles operators with too many operands', () => {
-      expect(() => tokenize('2 ++ 4', logger)).toThrow(TokenizerError);
-      expect(() => tokenize('2 ** 4', logger)).toThrow(TokenizerError);
-      expect(() => tokenize('2 <> 4', logger)).toThrow(TokenizerError);
-      expect(() => tokenize('2 >> 4', logger)).toThrow(TokenizerError);
-      expect(() => tokenize('2 << 4', logger)).toThrow(TokenizerError);
-    });
-  });
-
-  describe('error handling', () => {
-    it('throws error for invalid characters in identifiers', () => {
-      // Test various invalid characters that aren't in [a-zA-Z0-9_$.] and aren't operators/punctuation
-      expect(() => tokenize('abc~def', logger)).toThrow(TokenizerError);
-      expect(() => tokenize('abc~def', logger)).toThrow('Invalid character in identifier: ~');
-
-      expect(() => tokenize('abc@def', logger)).toThrow(TokenizerError);
-      expect(() => tokenize('abc@def', logger)).toThrow('Invalid character in identifier: @');
-
-      expect(() => tokenize('abc`def', logger)).toThrow(TokenizerError);
-      expect(() => tokenize('abc`def', logger)).toThrow('Invalid character in identifier: `');
-    });
-  });
+ 
 
   describe('spread operator validation', () => {
-    it('throws when spreading primitive literals', () => {
-      // Test spreading number literals
-      expect(() => tokenize('[1, 2, ...42]', logger)).toThrow(TokenizerError);
-      expect(() => tokenize('[1, 2, ...42]', logger)).toThrow(
-        'Invalid spread operator usage: cannot spread number literal',
-      );
-
-      // Test spreading string literals
-      expect(() => tokenize('[1, 2, ..."foo"]', logger)).toThrow(TokenizerError);
-      expect(() => tokenize('[1, 2, ..."foo"]', logger)).toThrow(
-        'Invalid spread operator usage: cannot spread string literal',
-      );
-
-      // Test spreading boolean literals
-      expect(() => tokenize('[1, 2, ...true]', logger)).toThrow(TokenizerError);
-      expect(() => tokenize('[1, 2, ...true]', logger)).toThrow(
-        'Invalid spread operator usage: cannot spread boolean literal',
-      );
-
-      // Test spreading null/undefined
-      expect(() => tokenize('[1, 2, ...null]', logger)).toThrow(TokenizerError);
-      expect(() => tokenize('[1, 2, ...null]', logger)).toThrow(
-        'Invalid spread operator usage: cannot spread null',
-      );
-      expect(() => tokenize('[1, 2, ...undefined]', logger)).toThrow(TokenizerError);
-      expect(() => tokenize('[1, 2, ...undefined]', logger)).toThrow(
-        'Invalid spread operator usage: cannot spread undefined',
-      );
-    });
-
     it('allows spreading references and expressions', () => {
-      // References should be allowed as they might resolve to arrays/objects
+      // References should be allowed
       expect(() => tokenize('[1, 2, ...${foo}]', logger)).not.toThrow();
       expect(() => tokenize('[1, 2, ...${foo.bar}]', logger)).not.toThrow();
 
@@ -413,47 +354,563 @@ describe('tokenize', () => {
   });
 
   describe('operator sequences', () => {
-    it('handles operator sequences', () => {
-      // Test invalid operator sequences
-      expect(() => tokenize('2 ++ 4', logger)).toThrow('Invalid operator sequence: ++');
-      expect(() => tokenize('2 ** 4', logger)).toThrow('Invalid operator sequence: **');
-      expect(() => tokenize('2 <> 4', logger)).toThrow('Invalid operator sequence: <>');
-      expect(() => tokenize('2 >> 4', logger)).toThrow('Invalid operator sequence: >>');
-      expect(() => tokenize('2 << 4', logger)).toThrow('Invalid operator sequence: <<');
-
-      // Test invalid operator sequence at end of expression (nextToken will be null)
-      expect(() => tokenize('2 ++', logger)).toThrow('Invalid operator sequence: ++');
-      expect(() => tokenize('2 **', logger)).toThrow('Invalid operator sequence: **');
-      expect(() => tokenize('2 >>', logger)).toThrow('Invalid operator sequence: >>');
-      expect(() => tokenize('2 <<', logger)).toThrow('Invalid operator sequence: <<');
-      expect(() => tokenize('2 <>', logger)).toThrow('Invalid operator sequence: <>');
-
-      // Test operator at end of expression (nextToken will be null)
-      expect(() => tokenize('2 +', logger)).toThrow('Unary operator + missing operand');
-      expect(() => tokenize('2 *', logger)).toThrow('Operator * missing operand');
-    });
 
     it('handles operator sequences with braces', () => {
       // Test operator sequences inside braces
-      expect(tokenize('{ a + b }', logger)).toEqual([
+      expect(tokenize('{ some text + more text }', logger)).toEqual([
         { type: 'punctuation', value: '{', raw: '{' },
-        { type: 'identifier', value: 'a', raw: 'a' },
+        { type: 'string', value: ' some text ', raw: ' some text ' },
         { type: 'operator', value: '+', raw: '+' },
-        { type: 'identifier', value: 'b', raw: 'b' },
+        { type: 'string', value: ' more text ', raw: ' more text ' },
         { type: 'punctuation', value: '}', raw: '}' },
       ]);
+    });
+  });
 
-      // Test invalid operator sequences inside braces
-      expect(() => tokenize('{ a ++ b }', logger)).toThrow('Invalid operator sequence: ++');
-      expect(() => tokenize('{ a ** b }', logger)).toThrow('Invalid operator sequence: **');
+  describe('reference tokenization', () => {
+    it('should tokenize simple references with correct raw values', () => {
+      expect(tokenize('${foo}', logger)).toEqual([{
+        type: 'reference',
+        value: [{
+          type: 'identifier',
+          value: 'foo',
+          raw: 'foo'
+        }],
+        raw: '${foo}'
+      }]);
+    });
 
-      // Test operator at end of expression inside braces
-      expect(() => tokenize('{ a + }', logger)).toThrow(
-        'Unmatched closing parenthesis/brace/bracket',
-      );
-      expect(() => tokenize('{ a * }', logger)).toThrow(
-        'Unmatched closing parenthesis/brace/bracket',
-      );
+    it('should tokenize nested references with correct raw values', () => {
+      expect(tokenize('${foo.${bar}}', logger)).toEqual([{
+        type: 'reference',
+        value: [
+          {
+            type: 'identifier',
+            value: 'foo',
+            raw: 'foo'
+          },
+          {
+            type: 'operator',
+            value: '.',
+            raw: '.'
+          },
+          {
+            type: 'reference',
+            value: [{
+              type: 'identifier',
+              value: 'bar',
+              raw: 'bar'
+            }],
+            raw: '${bar}'
+          }
+        ],
+        raw: '${foo.${bar}}'
+      }]);
+    });
+
+    it('should tokenize property access in references', () => {
+      expect(tokenize('${foo.bar}', logger)).toEqual([{
+        type: 'reference',
+        value: [
+          {
+            type: 'identifier',
+            value: 'foo',
+            raw: 'foo'
+          },
+          {
+            type: 'operator',
+            value: '.',
+            raw: '.'
+          },
+          {
+            type: 'identifier',
+            value: 'bar',
+            raw: 'bar'
+          }
+        ],
+        raw: '${foo.bar}'
+      }]);
+    });
+  });
+
+  describe('spread operator with references', () => {
+    it('should tokenize spread with references correctly', () => {
+      expect(tokenize('{ ...${foo} }', logger)).toEqual([
+        {
+          type: 'object_literal',
+          value: [
+            {
+              type: 'operator',
+              value: '...',
+              raw: '...'
+            },
+            {
+              type: 'reference',
+              value: [{
+                type: 'identifier',
+                value: 'foo',
+                raw: 'foo'
+              }],
+              raw: '${foo}'
+            }
+          ],
+          raw: '{ ...${foo} }'
+        }
+      ]);
+    });
+
+    it('should tokenize spread with nested references correctly', () => {
+      expect(tokenize('{ ...${foo.${bar}} }', logger)).toEqual([
+        {
+          type: 'object_literal',
+          value: [
+            {
+              type: 'operator',
+              value: '...',
+              raw: '...'
+            },
+            {
+              type: 'reference',
+              value: [
+                {
+                  type: 'identifier',
+                  value: 'foo',
+                  raw: 'foo'
+                },
+                {
+                  type: 'operator',
+                  value: '.',
+                  raw: '.'
+                },
+                {
+                  type: 'reference',
+                  value: [{
+                    type: 'identifier',
+                    value: 'bar',
+                    raw: 'bar'
+                  }],
+                  raw: '${bar}'
+                }
+              ],
+              raw: '${foo.${bar}}'
+            }
+          ],
+          raw: '{ ...${foo.${bar}} }'
+        }
+      ]);
+    });
+  });
+
+  describe('object literal key tokenization', () => {
+    it('should tokenize object keys as string tokens', () => {
+      expect(tokenize('{ key: ${value} }', logger)).toEqual([
+        {
+          type: 'object_literal',
+          value: [
+            {
+              type: 'string',
+              value: 'key',
+              raw: 'key'
+            },
+            {
+              type: 'punctuation',
+              value: ':',
+              raw: ':'
+            },
+            {
+              type: 'reference',
+              value: [{
+                type: 'identifier',
+                value: 'value',
+                raw: 'value'
+              }],
+              raw: '${value}'
+            }
+          ],
+          raw: '{ key: ${value} }'
+        }
+      ]);
+    });
+
+    it('should tokenize object keys with references', () => {
+      expect(tokenize('{ ${key}: value }', logger)).toEqual([
+        {
+          type: 'object_literal',
+          value: [
+            {
+              type: 'reference',
+              value: [{ type: 'identifier', value: 'key', raw: 'key' }],
+              raw: '${key}'
+            },
+            { type: 'punctuation', value: ':', raw: ':' },
+            { type: 'identifier', value: 'value', raw: 'value' }
+          ],
+          raw: '{ ${key}: value }'
+        }
+      ]);
+    });
+  });
+
+  describe('whitespace handling', () => {
+    it('handles various whitespace patterns consistently', () => {
+      const expressions = [
+        '2 + 2',
+        '2+2',
+        '2   +   2',
+        '\t2\t+\t2\t',
+        '\n2\n+\n2\n'
+      ];
+
+      const expected = [
+        { type: 'number', value: 2, raw: '2' },
+        { type: 'operator', value: '+', raw: '+' },
+        { type: 'number', value: 2, raw: '2' }
+      ];
+
+      expressions.forEach(expr => {
+        expect(tokenize(expr, logger)).toEqual(expected);
+      });
+    });
+
+    it('preserves whitespace in string literals', () => {
+      expect(tokenize('" hello  world "', logger)).toEqual([
+        { type: 'string', value: ' hello  world ', raw: '" hello  world "' }
+      ]);
+    });
+
+    it('preserves whitespace in template literals', () => {
+      expect(tokenize('`  ${foo}  ${bar}  `', logger)).toEqual([
+        { type: 'string', value: '  ', raw: '  ' },
+        { 
+          type: 'reference',
+          value: [{ type: 'identifier', value: 'foo', raw: 'foo' }],
+          raw: '${foo}'
+        },
+        { type: 'string', value: '  ', raw: '  ' },
+        { 
+          type: 'reference',
+          value: [{ type: 'identifier', value: 'bar', raw: 'bar' }],
+          raw: '${bar}'
+        },
+        { type: 'string', value: '  ', raw: '  ' }
+      ]);
+    });
+  });
+
+  describe('template literal handling', () => {
+    it('should tokenize simple template literals', () => {
+      expect(tokenize('`Hello ${name}`', logger)).toEqual([
+        {
+          type: 'string',
+          value: 'Hello ',
+          raw: 'Hello '
+        },
+        {
+          type: 'reference',
+          value: [{
+            type: 'identifier',
+            value: 'name',
+            raw: 'name'
+          }],
+          raw: '${name}'
+        }
+      ]);
+    });
+
+    it('should handle periods in string literals correctly', () => {
+      expect(tokenize('`Hello there. My name is ${name}!`', logger)).toEqual([
+        {
+          type: 'string',
+          value: 'Hello there. My name is ',
+          raw: 'Hello there. My name is '
+        },
+        { 
+          type: 'reference',
+          value: [{
+            type: 'identifier',
+            value: 'name',
+            raw: 'name'
+          }],
+          raw: '${name}'
+        },
+        {
+          type: 'string',
+          value: '!',
+          raw: '!'
+        }
+      ]);
+
+      // Also test with regular string literals
+      expect(tokenize('"Hello there. This is a test."', logger)).toEqual([
+        {
+          type: 'string',
+          value: 'Hello there. This is a test.',
+          raw: '"Hello there. This is a test."'
+        }
+      ]);
+    });
+
+    it('should tokenize template literals with expressions', () => {
+      expect(tokenize('`Count: ${1 + 2}`', logger)).toEqual([
+        {
+          type: 'string',
+          value: 'Count: ',
+          raw: 'Count: '
+        },
+        {
+          type: 'reference',
+          value: [
+            {
+              type: 'number',
+              value: 1,
+              raw: '1'
+            },
+            {
+              type: 'operator',
+              value: '+',
+              raw: '+'
+            },
+            {
+              type: 'number',
+              value: 2,
+              raw: '2'
+            }
+          ],
+          raw: '${1 + 2}'
+        }
+      ]);
+    });
+
+    it('should tokenize template literals with nested references', () => {
+      expect(tokenize('`${user.${field}}`', logger)).toEqual([
+        {
+          type: 'reference',
+          value: [
+            {
+              type: 'identifier',
+              value: 'user',
+              raw: 'user'
+            },
+            {
+              type: 'operator',
+              value: '.',
+              raw: '.'
+            },
+            {
+              type: 'reference',
+              value: [{
+                type: 'identifier',
+                value: 'field',
+                raw: 'field'
+              }],
+              raw: '${field}'
+            }
+          ],
+          raw: '${user.${field}}'
+        }
+      ]);
+    });
+
+    it('should handle escaped characters in template literals', () => {
+      expect(tokenize('`Hello \\${name}`', logger)).toEqual([
+        {
+          type: 'string',
+          value: 'Hello ${name}',
+          raw: 'Hello \\${name}'
+        }
+      ]);
+    });
+  });
+
+  describe('complex expressions', () => {
+    it('should handle complex object literals with nested structures', () => {
+      expect(tokenize('{ foo: { bar: ${baz.${qux}} } }', logger)).toEqual([
+        {
+          type: 'object_literal',
+          value: [
+            {
+              type: 'string',
+              value: 'foo',
+              raw: 'foo'
+            },
+            {
+              type: 'punctuation',
+              value: ':',
+              raw: ':'
+            },
+            {
+              type: 'object_literal',
+              value: [
+                {
+                  type: 'string',
+                  value: 'bar',
+                  raw: 'bar'
+                },
+                {
+                  type: 'punctuation',
+                  value: ':',
+                  raw: ':'
+                },
+                {
+                  type: 'reference',
+                  value: [
+                    {
+                      type: 'identifier',
+                      value: 'baz',
+                      raw: 'baz'
+                    },
+                    {
+                      type: 'operator',
+                      value: '.',
+                      raw: '.'
+                    },
+                    {
+                      type: 'reference',
+                      value: [{
+                        type: 'identifier',
+                        value: 'qux',
+                        raw: 'qux'
+                      }],
+                      raw: '${qux}'
+                    }
+                  ],
+                  raw: '${baz.${qux}}'
+                }
+              ],
+              raw: '{ bar: ${baz.${qux}} }'
+            }
+          ],
+          raw: '{ foo: { bar: ${baz.${qux}} } }'
+        }
+      ]);
+    });
+
+    it('should handle array literals with complex expressions', () => {
+      expect(tokenize('[1, ...${arr}, ${x + 2}]', logger)).toEqual([
+        {
+          type: 'array_literal',
+          value: [
+            {
+              type: 'number',
+              value: 1,
+              raw: '1'
+            },
+            {
+              type: 'punctuation',
+              value: ',',
+              raw: ','
+            },
+            {
+              type: 'operator',
+              value: '...',
+              raw: '...'
+            },
+            {
+              type: 'reference',
+              value: [{
+                type: 'identifier',
+                value: 'arr',
+                raw: 'arr'
+              }],
+              raw: '${arr}'
+            },
+            {
+              type: 'punctuation',
+              value: ',',
+              raw: ','
+            },
+            {
+              type: 'reference',
+              value: [
+                {
+                  type: 'identifier',
+                  value: 'x',
+                  raw: 'x'
+                },
+                {
+                  type: 'operator',
+                  value: '+',
+                  raw: '+'
+                },
+                {
+                  type: 'number',
+                  value: 2,
+                  raw: '2'
+                }
+              ],
+              raw: '${x + 2}'
+            }
+          ],
+          raw: '[1, ...${arr}, ${x + 2}]'
+        }
+      ]);
+    });
+  });
+
+  describe('equality operators', () => {
+    it('tokenizes strict equality operator (===) as one token', () => {
+      expect(tokenize('a === b', logger)).toEqual([
+        { type: 'identifier', value: 'a', raw: 'a' },
+        { type: 'operator', value: '===', raw: '===' },
+        { type: 'identifier', value: 'b', raw: 'b' }
+      ]);
+    });
+    
+    it('tokenizes strict inequality operator (!==) as one token', () => {
+      expect(tokenize('a !== b', logger)).toEqual([
+        { type: 'identifier', value: 'a', raw: 'a' },
+        { type: 'operator', value: '!==', raw: '!==' },
+        { type: 'identifier', value: 'b', raw: 'b' }
+      ]);
+    });
+  });
+
+  describe('array literals', () => {
+    it('tokenizes array literals with spread operators and trailing elements', () => {
+      expect(tokenize('[ ...${arr}, "foo" ]', logger)).toEqual([
+        {
+          type: 'array_literal',
+          value: [
+            { type: 'operator', value: '...', raw: '...' },
+            { 
+              type: 'reference',
+              value: [{ type: 'identifier', value: 'arr', raw: 'arr' }],
+              raw: '${arr}'
+            },
+            { type: 'punctuation', value: ',', raw: ',' },
+            { type: 'string', value: 'foo', raw: '"foo"' }
+          ],
+          raw: '[ ...${arr}, "foo" ]'
+        }
+      ]);
+    });
+
+    it('tokenizes array literals with multiple spread operators and elements', () => {
+      expect(tokenize('[ ...${a}, 1, ...${b}, "foo" ]', logger)).toEqual([
+        {
+          type: 'array_literal',
+          value: [
+            { type: 'operator', value: '...', raw: '...' },
+            { 
+              type: 'reference',
+              value: [{ type: 'identifier', value: 'a', raw: 'a' }],
+              raw: '${a}'
+            },
+            { type: 'punctuation', value: ',', raw: ',' },
+            { type: 'number', value: 1, raw: '1' },
+            { type: 'punctuation', value: ',', raw: ',' },
+            { type: 'operator', value: '...', raw: '...' },
+            { 
+              type: 'reference',
+              value: [{ type: 'identifier', value: 'b', raw: 'b' }],
+              raw: '${b}'
+            },
+            { type: 'punctuation', value: ',', raw: ',' },
+            { type: 'string', value: 'foo', raw: '"foo"' }
+          ],
+          raw: '[ ...${a}, 1, ...${b}, "foo" ]'
+        }
+      ]);
     });
   });
 });

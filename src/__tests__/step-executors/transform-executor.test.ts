@@ -3,7 +3,7 @@ import { TransformStep, TransformOperation } from '../../step-executors/types';
 import { StepExecutionContext } from '../../types';
 import { SafeExpressionEvaluator } from '../../expression-evaluator/safe-evaluator';
 import { ReferenceResolver } from '../../reference-resolver';
-import { noLogger } from '../../util/logger';
+import { TestLogger } from '../../util/logger';
 import { createMockContext } from '../test-utils';
 
 describe('Transform Executors', () => {
@@ -13,13 +13,20 @@ describe('Transform Executors', () => {
     let referenceResolver: ReferenceResolver;
     let context: Record<string, any>;
     let stepResults: Map<string, any>;
+    const logger = new TestLogger('TransformExecutorTest');
 
     beforeEach(() => {
       stepResults = new Map();
       context = {};
-      referenceResolver = new ReferenceResolver(stepResults, context, noLogger);
-      expressionEvaluator = new SafeExpressionEvaluator(noLogger, referenceResolver);
-      executor = new TransformExecutor(expressionEvaluator, referenceResolver, context, noLogger);
+
+      referenceResolver = new ReferenceResolver(stepResults, context, logger);
+      expressionEvaluator = new SafeExpressionEvaluator(logger, referenceResolver);
+      executor = new TransformExecutor(expressionEvaluator, referenceResolver, context, logger);
+    });
+
+    afterEach(() => {
+      //logger.print();
+      logger.clear();
     });
 
     describe('map operation', () => {
@@ -303,19 +310,25 @@ describe('Transform Executors', () => {
   describe('TransformStepExecutor', () => {
     let stepExecutor: TransformStepExecutor;
     let context: StepExecutionContext;
-
+    const logger = new TestLogger('TransformStepExecutorTest');
     beforeEach(() => {
       const stepResults = new Map();
       const contextObj = {};
-      const referenceResolver = new ReferenceResolver(stepResults, contextObj, noLogger);
-      const expressionEvaluator = new SafeExpressionEvaluator(noLogger, referenceResolver);
+
+      const referenceResolver = new ReferenceResolver(stepResults, contextObj, logger);
+      const expressionEvaluator = new SafeExpressionEvaluator(logger, referenceResolver);
       stepExecutor = new TransformStepExecutor(
         expressionEvaluator,
         referenceResolver,
         contextObj,
-        noLogger,
+        logger,
       );
       context = createMockContext();
+    });
+
+    afterEach(() => {
+      //logger.print();
+      logger.clear();
     });
 
     it('performs map transformation', async () => {

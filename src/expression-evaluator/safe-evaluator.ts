@@ -7,6 +7,7 @@ import { tokenize, Token } from './tokenizer';
 import { TokenizerError } from './tokenizer';
 
 type Operator = keyof typeof SafeExpressionEvaluator.OPERATORS;
+type StackOperator = Operator | '(' | ')';
 
 interface AstNode {
   type: 'literal' | 'reference' | 'operation' | 'object' | 'array';
@@ -53,7 +54,7 @@ export class SafeExpressionEvaluator {
         throw new ExpressionError(`Cannot perform division on non-numeric values: ${a} / ${b}`);
       }
       if (b === 0) {
-        throw new Error('Failed to evaluate operation /');
+        throw new ExpressionError('Division/modulo by zero');
       }
       return a / b;
     },
@@ -62,7 +63,7 @@ export class SafeExpressionEvaluator {
         throw new ExpressionError(`Cannot perform modulo on non-numeric values: ${a} % ${b}`);
       }
       if (b === 0) {
-        throw new Error('Failed to evaluate operation %');
+        throw new ExpressionError('Division/modulo by zero');
       }
       return a % b;
     },
@@ -112,6 +113,7 @@ export class SafeExpressionEvaluator {
     this.validateExpression(expression);
     const startTime = Date.now();
     this.logger.debug(`Expression validated at: ${startTime}`);
+
     try {
       this.checkTimeout(startTime);
 
@@ -120,163 +122,62 @@ export class SafeExpressionEvaluator {
         this.logger.debug('Evaluating numeric literal:', expression);
         return Number(expression);
       }
-      if (expression === 'true') {
-        this.logger.debug('Evaluating boolean literal: true');
-        return true;
-      }
-      if (expression === 'false') {
-        this.logger.debug('Evaluating boolean literal: false');
-        return false;
-      }
-      if (expression === 'null') {
-        this.logger.debug('Evaluating null literal');
-        return null;
-      }
-      if (expression === 'undefined') {
-        this.logger.debug('Evaluating undefined literal');
-        return undefined;
-      }
+      if (expression === 'true') return true;
+      if (expression === 'false') return false;
+      if (expression === 'null') return null;
+      if (expression === 'undefined') return undefined;
 
-      // Handle array literals with references
-      if (expression.trim().startsWith('[') && expression.trim().endsWith(']')) {
-        this.logger.debug('Found array literal with references:', expression);
-        // First resolve any references in the expression
-        const resolvedExpression = expression.replace(/\${([^}]+)}/g, (match, path) => {
-          try {
-            const value = this.referenceResolver.resolvePath(path, context);
-            return JSON.stringify(value);
-          } catch (error) {
-            this.logger.error('Error resolving reference in array literal:', error);
-            if (error instanceof PropertyAccessError) {
-              throw new ExpressionError(error.message);
-            }
-            throw error;
+      // Tokenize the expression
+      const tokens = tokenize(expression, this.logger);
+      this.logger.debug('Tokens:', tokens);
+
+      // Handle template literals
+      if (expression.startsWith('`') && expression.endsWith('`')) {
+        return tokens.map(token => {
+          if (token.type === 'string') {
+            return token.value;
           }
-        });
-
-        // Then tokenize and parse as normal
-        const tokens = tokenize(resolvedExpression, this.logger);
-        this.logger.debug('Tokens:', tokens);
-        const ast = this.parse(tokens);
-        this.logger.debug('AST:', ast);
-        return this.evaluateAst(ast, context, startTime);
-      }
-
-      // Handle object literals with references
-      if (expression.trim().startsWith('{') && expression.trim().endsWith('}')) {
-        this.logger.debug('Found object literal with references:', expression);
-        // First resolve any references in the expression
-        const resolvedExpression = expression.replace(/\${([^}]+)}/g, (match, path) => {
-          try {
-            const value = this.referenceResolver.resolvePath(path, context);
-            return JSON.stringify(value);
-          } catch (error) {
-            this.logger.error('Error resolving reference in object literal:', error);
-            if (error instanceof PropertyAccessError) {
-              throw new ExpressionError(error.message);
-            }
-            throw error;
-          }
-        });
-
-        // Then tokenize and parse as normal
-        const tokens = tokenize(resolvedExpression, this.logger);
-        this.logger.debug('Tokens:', tokens);
-        const ast = this.parse(tokens);
-        this.logger.debug('AST:', ast);
-        return this.evaluateAst(ast, context, startTime);
-      }
-
-      // Handle string literals with references
-      if (expression.includes('${')) {
-        // If it's a single reference expression (e.g., ${context.config.threshold})
-        if (
-          expression.startsWith('${') &&
-          expression.endsWith('}') &&
-          expression.indexOf('${', 2) === -1
-        ) {
-          const path = expression.slice(2, -1);
-          try {
-            return this.referenceResolver.resolvePath(path, context);
-          } catch (error: any) {
-            this.logger.error('Error resolving reference:', error);
-            // Re-throw UnknownReferenceError and PropertyAccessError as is
-            if (error instanceof UnknownReferenceError || error instanceof PropertyAccessError) {
-              throw error;
-            }
-            throw new ExpressionError(error.message);
-          }
-        }
-
-        // If it's an expression containing references (e.g., ${context.config.threshold} > 50 or ${step1.data.value} * 2)
-        if (
-          /\${[^}]+}(?:\s*[><=!+\-*/%]+\s*(?:\d+|"[^"]*"|'[^']*'|\${[^}]+}|\btrue\b|\bfalse\b))/.test(
-            expression,
-          )
-        ) {
-          const resolvedExpression = expression.replace(/\${([^}]+)}/g, (match, path) => {
+          if (token.type === 'reference') {
+            const path = this.buildReferencePath(token.value);
             try {
               const value = this.referenceResolver.resolvePath(path, context);
-              if (typeof value === 'string') {
-                return `"${value}"`;
-              }
               return String(value);
-            } catch (error: any) {
-              this.logger.error('Error resolving reference in expression:', error);
+            } catch (error) {
               if (error instanceof PropertyAccessError) {
                 throw new ExpressionError(error.message);
               }
               throw error;
             }
-          });
-          const tokens = tokenize(resolvedExpression, this.logger);
-          this.logger.debug('Tokens:', tokens);
-          const ast = this.parse(tokens);
-          this.logger.debug('AST:', ast);
-          return this.evaluateAst(ast, context, startTime);
-        }
-
-        // Otherwise, treat it as a template literal
-        this.logger.debug('Found template literal:', expression);
-        return expression.replace(/\${([^}]+)}/g, (match, path) => {
-          try {
-            const value = this.referenceResolver.resolvePath(path, context);
-            return String(value);
-          } catch (error: any) {
-            this.logger.error('Error resolving reference in template literal:', error);
-            if (error instanceof PropertyAccessError) {
-              throw new ExpressionError(error.message);
-            }
-            throw error;
           }
-        });
+          throw new ExpressionError(`Unexpected token in template literal: ${JSON.stringify(token)}`);
+        }).join('');
       }
 
-      const tokens = tokenize(expression, this.logger);
-      this.logger.debug('Tokens:', tokens);
+      // Handle single references
+      if (tokens.length === 1 && tokens[0].type === 'reference') {
+        const path = this.buildReferencePath(tokens[0].value);
+        try {
+          return this.referenceResolver.resolvePath(path, context);
+        } catch (error) {
+          if (error instanceof PropertyAccessError) {
+            throw new ExpressionError(error.message);
+          }
+          throw error;
+        }
+      }
+
+      // Parse and evaluate the AST
       const ast = this.parse(tokens);
       this.logger.debug('AST:', ast);
       return this.evaluateAst(ast, context, startTime);
     } catch (error) {
-      this.logger.error('Error evaluating expression:', error);
-      // Re-throw UnknownReferenceError and PropertyAccessError as is
-      if (
-        error instanceof ExpressionError ||
-        error instanceof UnknownReferenceError ||
-        error instanceof PropertyAccessError
-      ) {
-        throw error;
+      if (error instanceof TokenizerError ||
+          error instanceof PathSyntaxError ||
+          error instanceof PropertyAccessError ||
+          error instanceof ExpressionError) {
+        throw new ExpressionError(`Failed to evaluate expression: ${expression}. Got error: ${error.message}`);
       }
-      // Wrap TokenizerError in ExpressionError
-      if (error instanceof TokenizerError) {
-        throw new ExpressionError(
-          `Failed to evaluate expression: ${expression}. Got error: ${error.message}`,
-        );
-      }
-      throw new ExpressionError(
-        `Failed to evaluate expression: ${expression}. got error: ${error}`,
-        error instanceof Error ? error : undefined,
-      );
+      throw error;
     }
   }
 
@@ -353,371 +254,345 @@ export class SafeExpressionEvaluator {
   }
 
   private parse(tokens: Token[]): AstNode {
-    this.logger.debug('Starting to parse tokens:', tokens);
-    // Handle parentheses first
-    const stack: (Token | string)[][] = [[]];
-    let current = stack[0];
-
-    for (const token of tokens) {
-      if (token.type === 'punctuation' && token.value === '(') {
-        stack.push([]);
-        current = stack[stack.length - 1];
-      } else if (token.type === 'punctuation' && token.value === ')') {
-        if (stack.length === 1) {
-          throw new ExpressionError('Unmatched closing parenthesis');
-        }
-        const completed = stack.pop()!;
-        current = stack[stack.length - 1];
-        // Parse the contents of the parentheses into an AST node and convert to string
-        const innerAst = this.parseTokens(
-          completed.map((t) => (typeof t === 'string' ? t : t.value)),
-        );
-        current.push(`__expr_${JSON.stringify(innerAst)}`);
-      } else {
-        current.push(token);
-      }
-    }
-
-    if (stack.length > 1) {
-      throw new ExpressionError('Unclosed parenthesis');
-    }
-
-    // Convert the final tokens to values for parsing
-    const finalTokens = stack[0].map((t) => (typeof t === 'string' ? t : t.value));
-    return this.parseTokens(finalTokens);
-  }
-
-  private parseTokens(tokens: string[]): AstNode {
-    const logger = this.logger.createNested('parseTokens');
-    logger.debug('Parsing tokens:', tokens);
     if (tokens.length === 0) {
-      logger.error('Empty expression');
-      throw new ExpressionError('Empty expression');
+        throw new ExpressionError('Empty expression');
+    }
+
+    // Handle literals
+    if (tokens.length === 1) {
+        const token = tokens[0];
+        if (token.type === 'number') {
+            return { type: 'literal', value: Number(token.value) };
+        }
+        if (token.type === 'string') {
+            return { type: 'literal', value: token.value };
+        }
+        if (token.type === 'identifier') {
+            if (token.value === 'true') return { type: 'literal', value: true };
+            if (token.value === 'false') return { type: 'literal', value: false };
+            if (token.value === 'null') return { type: 'literal', value: null };
+            if (token.value === 'undefined') return { type: 'literal', value: undefined };
+            return { type: 'literal', value: token.value };
+        }
+        if (token.type === 'reference') {
+            return { type: 'reference', path: this.buildReferencePath(token.value) };
+        }
+        // New: handle object and array literal tokens
+        if (token.type === 'object_literal') {
+            const properties = this.parseObjectProperties(token.value);
+            return { type: 'object', properties };
+        }
+        if (token.type === 'array_literal') {
+            const elements = this.parseArrayElements(token.value);
+            return { type: 'array', elements };
+        }
     }
 
     // Handle array literals
-    if (tokens[0] === '[') {
-      logger.debug('Parsing array literal');
-      return this.parseArrayLiteral(tokens);
+    if (tokens[0]?.value === '[' && tokens[tokens.length - 1]?.value === ']') {
+        const elements = this.parseArrayElements(tokens.slice(1, -1));
+        return { type: 'array', elements };
     }
 
     // Handle object literals
-    if (tokens[0] === '{') {
-      logger.debug('Parsing object literal');
-      return this.parseObjectLiteral(tokens);
+    if (tokens[0]?.value === '{' && tokens[tokens.length - 1]?.value === '}') {
+        const properties = this.parseObjectProperties(tokens.slice(1, -1));
+        return { type: 'object', properties };
     }
 
-    // Handle special expression tokens
-    if (tokens.length === 1) {
-      const token = tokens[0];
-      if (token.startsWith('__expr_')) {
-        logger.debug('Parsing expression:', token);
-        return JSON.parse(token.slice(7));
-      }
-      logger.debug('Parsing value:', token);
-      return this.parseValue(token);
-    }
+    // Handle operators with precedence
+    return this.parseExpression(tokens);
+  }
 
-    // Find the operator with lowest precedence
-    let lowestPrecedenceIndex = -1;
-    let lowestPrecedence = Infinity;
+  private parseExpression(tokens: Token[]): AstNode {
+    const operatorStack: StackOperator[] = [];
+    const outputQueue: AstNode[] = [];
+    let expectOperator = false;
 
     for (let i = 0; i < tokens.length; i++) {
       const token = tokens[i];
-      if (token.startsWith('__expr_')) continue;
 
-      // Skip operators that are part of a multi-character operator
-      if (i < tokens.length - 1) {
-        const nextToken = tokens[i + 1];
-        const combined = token + nextToken;
-        if (
-          combined === '===' ||
-          combined === '!==' ||
-          combined === '==' ||
-          combined === '!=' ||
-          combined === '>=' ||
-          combined === '<=' ||
-          combined === '||' ||
-          combined === '&&' ||
-          combined === '??'
-        ) {
-          continue;
+      // Handle parentheses tokens first, regardless of token type
+      if (token.value === '(') {
+        if (expectOperator) {
+          throw new ExpressionError('Unexpected opening parenthesis');
         }
+        operatorStack.push('(');
+        continue;
       }
-
-      const precedence = this.getOperatorPrecedence(token);
-      if (precedence > 0 && precedence <= lowestPrecedence) {
-        lowestPrecedence = precedence;
-        lowestPrecedenceIndex = i;
-      }
-    }
-
-    if (lowestPrecedenceIndex === -1) {
-      // If no operator found, concatenate adjacent tokens with +
-      let result = this.parseValue(tokens[0]);
-      for (let i = 1; i < tokens.length; i++) {
-        const right = this.parseValue(tokens[i]);
-        result = {
-          type: 'operation',
-          operator: '+',
-          left: result,
-          right,
-        };
-      }
-      return result;
-    }
-
-    const operator = tokens[lowestPrecedenceIndex] as Operator;
-    const left = tokens.slice(0, lowestPrecedenceIndex);
-    const right = tokens.slice(lowestPrecedenceIndex + 1);
-
-    logger.debug(`Parsed operation: ${operator} with left: ${left} and right: ${right}`);
-    return {
-      type: 'operation',
-      operator,
-      left: this.parseTokens(left),
-      right: this.parseTokens(right),
-    };
-  }
-
-  private parseObjectLiteral(tokens: string[]): AstNode {
-    const logger = this.logger.createNested('parseObjectLiteral');
-    logger.debug('Parsing object literal:', tokens);
-    if (tokens[0] !== '{' || tokens[tokens.length - 1] !== '}') {
-      logger.error('Invalid object literal syntax');
-      throw new ExpressionError('Invalid object literal syntax');
-    }
-
-    const properties: { key: string; value: AstNode; spread?: boolean }[] = [];
-    let i = 1; // Skip opening brace
-
-    while (i < tokens.length - 1) {
-      // Stop before closing brace
-      logger.debug('Parsing property:', tokens[i]);
-
-      // Handle spread operator
-      if (tokens[i] === '...') {
-        i++;
-        if (i >= tokens.length - 1) {
-          logger.error('Invalid spread operator usage: missing value');
-          throw new ExpressionError('Invalid spread operator usage: missing value');
+      if (token.value === ')') {
+        if (!expectOperator) {
+          throw new ExpressionError('Unexpected closing parenthesis');
         }
-
-        // Get value tokens for the spread
-        const valueTokens: string[] = [];
-        let braceCount = 0;
-
-        while (i < tokens.length - 1) {
-          const token = tokens[i];
-          if (token === '{') braceCount++;
-          if (token === '}') braceCount--;
-          if (token === ',' && braceCount === 0) {
-            i++; // Skip the comma
+        let foundMatching = false;
+        while (operatorStack.length > 0) {
+          const operator = operatorStack.pop()!;
+          if (operator === '(') {
+            foundMatching = true;
             break;
           }
-          valueTokens.push(token);
-          i++;
+          // Ensure operator is a valid operation operator
+          if (operator === ')') {
+            throw new ExpressionError('Invalid operator: found closing parenthesis');
+          }
+          const right = outputQueue.pop()!;
+          const left = outputQueue.pop()!;
+          outputQueue.push({ type: 'operation', operator: operator as Operator, left, right });
         }
-
-        if (valueTokens.length === 0) {
-          logger.error('Invalid spread operator usage: empty value');
-          throw new ExpressionError('Invalid spread operator usage: empty value');
+        if (!foundMatching) {
+          throw new ExpressionError('Mismatched parentheses');
         }
-
-        // Parse the spread value
-        const value = this.parseTokens(valueTokens);
-        properties.push({ key: '', value, spread: true });
         continue;
       }
 
-      // Get key
-      const key = tokens[i].endsWith(':') ? tokens[i].slice(0, -1) : tokens[i];
-      i++;
-
-      // Skip colon if it's a separate token
-      if (tokens[i] === ':') {
-        i++;
-      }
-
-      if (i >= tokens.length - 1) {
-        logger.error('Invalid object literal syntax: missing value');
-        throw new ExpressionError('Invalid object literal syntax: missing value');
-      }
-
-      // Get value tokens
-      const valueTokens: string[] = [];
-      let braceCount = 0;
-
-      while (i < tokens.length - 1) {
-        const token = tokens[i];
-        if (token === '{') braceCount++;
-        if (token === '}') braceCount--;
-        if (token === ',' && braceCount === 0) {
-          i++; // Skip the comma
-          break;
+      if (token.type === 'number') {
+        if (expectOperator) {
+          throw new ExpressionError('Unexpected number');
         }
-        valueTokens.push(token);
-        i++;
-      }
-
-      if (valueTokens.length === 0) {
-        const errorMessage = `Invalid object literal syntax: empty value at key: ${key}`;
-        logger.error(errorMessage);
-        throw new ExpressionError(errorMessage);
-      }
-
-      // Parse value - if it's a single token, try parsing it as a literal first
-      let value: AstNode;
-      if (valueTokens.length === 1) {
-        const token = valueTokens[0];
-        if (/^-?\d+(\.\d+)?$/.test(token)) {
-          logger.debug('Parsed number:', token);
-          value = { type: 'literal', value: Number(token) };
-        } else if (token === 'true') {
-          logger.debug('Parsed boolean:', token);
-          value = { type: 'literal', value: true };
-        } else if (token === 'false') {
-          logger.debug('Parsed boolean:', token);
-          value = { type: 'literal', value: false };
-        } else if (token === 'null') {
-          logger.debug('Parsed null:', token);
-          value = { type: 'literal', value: null };
-        } else if (token === 'undefined') {
-          logger.debug('Parsed undefined:', token);
-          value = { type: 'literal', value: undefined };
-        } else if (/^["'].*["']$/.test(token)) {
-          logger.debug('Parsed string:', token);
-          value = { type: 'literal', value: token.slice(1, -1) };
+        outputQueue.push({ type: 'literal', value: Number(token.value) });
+        expectOperator = true;
+      } else if (token.type === 'string') {
+        if (expectOperator) {
+          throw new ExpressionError('Unexpected string');
+        }
+        outputQueue.push({ type: 'literal', value: token.value });
+        expectOperator = true;
+      } else if (token.type === 'identifier') {
+        // If the identifier is actually an operator symbol (e.g., '*', '/', '+', '-', etc.), treat it as an operator
+        if (['*', '/', '%', '+', '-', '==', '===', '!=', '!==', '>', '>=', '<', '<='].includes(token.value)) {
+          if (!expectOperator) {
+            throw new ExpressionError('Unexpected operator');
+          }
+          const op = token.value as Operator;
+          while (operatorStack.length > 0) {
+            const topOperator = operatorStack[operatorStack.length - 1];
+            if (topOperator === '(' || topOperator === ')') break;
+            if (this.getPrecedence(topOperator as Operator) >= this.getPrecedence(op)) {
+              const operator = operatorStack.pop() as Operator;
+              const right = outputQueue.pop()!;
+              const left = outputQueue.pop()!;
+              outputQueue.push({ type: 'operation', operator, left, right });
+            } else {
+              break;
+            }
+          }
+          operatorStack.push(op);
+          expectOperator = false;
         } else {
-          logger.debug('Parsing nested expression:', valueTokens);
-          value = this.parseTokens(valueTokens);
+          // Treat as a literal value, converting known keywords to proper types
+          if (expectOperator) {
+            throw new ExpressionError('Unexpected identifier');
+          }
+          let literalValue: any = token.value;
+          if (token.value === 'true') literalValue = true;
+          else if (token.value === 'false') literalValue = false;
+          else if (token.value === 'null') literalValue = null;
+          else if (token.value === 'undefined') literalValue = undefined;
+          outputQueue.push({ type: 'literal', value: literalValue });
+          expectOperator = true;
         }
+      } else if (token.type === 'reference') {
+        if (expectOperator) {
+          throw new ExpressionError('Unexpected reference');
+        }
+        outputQueue.push({ type: 'reference', path: this.buildReferencePath(token.value) });
+        expectOperator = true;
+      } else if (token.type === 'operator' || ['&&', '||', '??', '==', '===', '!=', '!==', '>', '>=', '<', '<='].includes(token.value)) {
+        if (!expectOperator) {
+          throw new ExpressionError('Unexpected operator');
+        }
+        const op = token.value as Operator;
+        while (operatorStack.length > 0) {
+          const topOperator = operatorStack[operatorStack.length - 1];
+          if (topOperator === '(' || topOperator === ')') break;
+          if (this.getPrecedence(topOperator as Operator) >= this.getPrecedence(op)) {
+            const operator = operatorStack.pop() as Operator;
+            const right = outputQueue.pop()!;
+            const left = outputQueue.pop()!;
+            outputQueue.push({ type: 'operation', operator, left, right });
+          } else {
+            break;
+          }
+        }
+        operatorStack.push(op);
+        expectOperator = false;
       } else {
-        logger.debug('Parsing nested expression:', valueTokens);
-        value = this.parseTokens(valueTokens);
+        throw new ExpressionError(`Unexpected token: ${JSON.stringify(token)}`);
       }
-
-      properties.push({ key, value });
     }
 
-    logger.debug('Parsed object:', properties);
-    return {
-      type: 'object',
-      properties,
-    };
+    while (operatorStack.length > 0) {
+      const operator = operatorStack.pop()!;
+      if (operator === '(' || operator === ')') {
+        throw new ExpressionError('Mismatched parentheses');
+      }
+      const right = outputQueue.pop()!;
+      const left = outputQueue.pop()!;
+      outputQueue.push({ type: 'operation', operator: operator as Operator, left, right });
+    }
+
+    if (outputQueue.length !== 1) {
+      throw new ExpressionError('Invalid expression');
+    }
+
+    return outputQueue[0];
   }
 
-  private parseArrayLiteral(tokens: string[]): AstNode {
-    const logger = this.logger.createNested('parseArrayLiteral');
-    logger.debug('Parsing array literal:', tokens);
-    if (tokens[0] !== '[' || tokens[tokens.length - 1] !== ']') {
-      logger.error('Invalid array literal syntax');
-      throw new ExpressionError('Invalid array literal syntax');
+  private getPrecedence(operator: Operator): number {
+    switch (operator) {
+        case '||':
+            return 1;
+        case '&&':
+            return 2;
+        case '==':
+        case '===':
+        case '!=':
+        case '!==':
+            return 3;
+        case '<':
+        case '<=':
+        case '>':
+        case '>=':
+            return 4;
+        case '+':
+        case '-':
+            return 5;
+        case '*':
+        case '/':
+        case '%':
+            return 6;
+        case '??':
+            return 7;
+        default:
+            return 0;
     }
+  }
+
+  private parseArrayElements(tokens: Token[]): { value: AstNode; spread?: boolean }[] {
+    if (tokens.length === 0) return [];
 
     const elements: { value: AstNode; spread?: boolean }[] = [];
-    let i = 1; // Skip opening bracket
+    let currentTokens: Token[] = [];
+    let depth = 0;
+    let isSpread = false;
 
-    while (i < tokens.length - 1) {
-      // Stop before closing bracket
-      logger.debug('Parsing element:', tokens[i]);
-
-      // Handle spread operator
-      if (tokens[i] === '...') {
-        logger.debug('Found spread operator');
-        i++;
-        if (i >= tokens.length - 1) {
-          logger.error('Invalid spread operator usage: missing value');
-          throw new ExpressionError('Invalid spread operator usage: missing value');
-        }
-
-        // Get value tokens for the spread
-        const valueTokens: string[] = [];
-        let braceCount = 0;
-        let bracketCount = 0;
-
-        while (i < tokens.length - 1) {
-          const token = tokens[i];
-          if (token === '{') braceCount++;
-          if (token === '}') braceCount--;
-          if (token === '[') bracketCount++;
-          if (token === ']') bracketCount--;
-          if (token === ',' && braceCount === 0 && bracketCount === 0) {
-            i++; // Skip the comma
-            break;
-          }
-          valueTokens.push(token);
-          i++;
-        }
-
-        if (valueTokens.length === 0) {
-          logger.error('Invalid spread operator usage: empty value');
-          throw new ExpressionError('Invalid spread operator usage: empty value');
-        }
-
-        // Parse the spread value
-        const value = this.parseTokens(valueTokens);
-        elements.push({ value, spread: true });
-        continue;
-      }
-
-      // Get element tokens
-      const elementTokens: string[] = [];
-      let braceCount = 0;
-      let bracketCount = 0;
-
-      while (i < tokens.length - 1) {
+    for (let i = 0; i < tokens.length; i++) {
         const token = tokens[i];
-        if (token === '{') braceCount++;
-        if (token === '}') braceCount--;
-        if (token === '[') bracketCount++;
-        if (token === ']') bracketCount--;
-        if (token === ',' && braceCount === 0 && bracketCount === 0) {
-          i++; // Skip the comma
-          break;
+
+        if (token.value === ',' && depth === 0) {
+            if (currentTokens.length > 0) {
+                elements.push({
+                    value: this.parse(currentTokens),
+                    spread: isSpread
+                });
+                currentTokens = [];
+                isSpread = false;
+            }
+            continue;
         }
-        elementTokens.push(token);
-        i++;
-      }
 
-      if (elementTokens.length === 0) {
-        logger.error('Invalid array literal syntax: empty element');
-        throw new ExpressionError('Invalid array literal syntax: empty element');
-      }
+        if (token.value === '...' && depth === 0) {
+            isSpread = true;
+            continue;
+        }
 
-      // Parse the element value
-      const value = this.parseTokens(elementTokens);
-      elements.push({ value });
+        if (token.value === '[' || token.value === '{' || token.value === '(') {
+            depth++;
+        } else if (token.value === ']' || token.value === '}' || token.value === ')') {
+            depth--;
+        }
+
+        currentTokens.push(token);
     }
 
-    logger.debug('Parsed array:', elements);
-    return {
-      type: 'array',
-      elements,
-    };
+    if (currentTokens.length > 0) {
+        elements.push({
+            value: this.parse(currentTokens),
+            spread: isSpread
+        });
+    }
+
+    return elements;
   }
 
-  private getOperatorPrecedence(operator: string): number {
-    const precedenceMap: Record<Operator, number> = {
-      '||': 1,
-      '&&': 2,
-      '==': 3,
-      '===': 3,
-      '!=': 3,
-      '!==': 3,
-      '<': 4,
-      '<=': 4,
-      '>': 4,
-      '>=': 4,
-      '+': 5,
-      '-': 5,
-      '*': 6,
-      '/': 6,
-      '%': 6,
-      '??': 1,
-    };
+  private parseObjectProperties(tokens: Token[]): { key: string; value: AstNode; spread?: boolean }[] {
+    if (tokens.length === 0) return [];
 
-    return precedenceMap[operator as Operator] || 0;
+    const properties: { key: string; value: AstNode; spread?: boolean }[] = [];
+    let currentTokens: Token[] = [];
+    let depth = 0;
+    let isSpread = false;
+    let key: string | null = null;
+
+    for (let i = 0; i < tokens.length; i++) {
+        const token = tokens[i];
+
+        if (token.value === ',' && depth === 0) {
+            if (currentTokens.length > 0) {
+                if (key === null && !isSpread) {
+                    throw new ExpressionError('Invalid object literal: missing key');
+                }
+                properties.push({
+                    key: key || '',
+                    value: this.parse(currentTokens),
+                    spread: isSpread
+                });
+                currentTokens = [];
+                key = null;
+                isSpread = false;
+            }
+            continue;
+        }
+
+        if (token.value === ':' && depth === 0 && !isSpread) {
+            if (currentTokens.length !== 1) {
+                throw new ExpressionError('Invalid object literal: invalid key');
+            }
+            key = currentTokens[0].value;
+            currentTokens = [];
+            continue;
+        }
+
+        if (token.value === '...' && depth === 0) {
+            isSpread = true;
+            continue;
+        }
+
+        if (token.value === '[' || token.value === '{' || token.value === '(') {
+            depth++;
+        } else if (token.value === ']' || token.value === '}' || token.value === ')') {
+            depth--;
+        }
+
+        currentTokens.push(token);
+    }
+
+    if (currentTokens.length > 0) {
+        if (key === null && !isSpread) {
+            throw new ExpressionError('Invalid object literal: missing key');
+        }
+        properties.push({
+            key: key || '',
+            value: this.parse(currentTokens),
+            spread: isSpread
+        });
+    }
+
+    return properties;
+  }
+
+  private buildReferencePath(tokens: Token[]): string {
+    return tokens.map(token => {
+        if (token.type === 'operator' && token.value === '.') {
+            return '.';
+        }
+        if (token.type === 'punctuation') {
+            if (token.value === '[') return '[';
+            if (token.value === ']') return ']';
+            return '';
+        }
+        return token.raw;
+    }).join('');
   }
 
   private parseValue(token: string): AstNode {
@@ -783,139 +658,94 @@ export class SafeExpressionEvaluator {
   }
 
   private evaluateAst(ast: AstNode, context: Record<string, unknown>, startTime: number): unknown {
-    const logger = this.logger.createNested('evaluateAst');
-    logger.debug('Evaluating AST node:', { ...ast });
     this.checkTimeout(startTime);
 
-    if (ast.type === 'literal') {
-      logger.debug('Evaluating literal value:', ast.value);
-      // If the literal is a string, check for references to interpolate
-      if (typeof ast.value === 'string' && ast.value.includes('${')) {
-        logger.debug('Found reference in string literal, interpolating:', ast.value);
-        // Replace all ${...} references with their evaluated values
-        return ast.value.replace(/\${([^}]+)}/g, (match, path) => {
-          try {
-            const value = this.referenceResolver.resolvePath(path, context);
-            logger.debug(`Interpolated reference ${path} with value:`, value);
-            return String(value);
-          } catch (error) {
-            logger.error(`Error resolving reference ${path} in string:`, error);
-            throw error;
-          }
-        });
-      }
-      return ast.value;
+    switch (ast.type) {
+        case 'literal':
+            return ast.value;
+
+        case 'reference':
+            if (!ast.path) {
+                throw new ExpressionError('Reference node missing path');
+            }
+            try {
+                return this.referenceResolver.resolvePath(ast.path, context);
+            } catch (error) {
+                if (error instanceof PropertyAccessError) {
+                    throw new ExpressionError(error.message);
+                }
+                throw error;
+            }
+
+        case 'operation':
+            if (!ast.operator || !ast.left || !ast.right) {
+                throw new ExpressionError('Invalid operation node');
+            }
+            const operator = SafeExpressionEvaluator.OPERATORS[ast.operator];
+            if (!operator) {
+                throw new ExpressionError(`Failed to evaluate expression: unknown operator '${ast.operator}'`);
+            }
+            const left = this.evaluateAst(ast.left, context, startTime);
+            const right = this.evaluateAst(ast.right, context, startTime);
+            try {
+                return operator(left, right);
+            } catch (error: unknown) {
+                if (error instanceof ExpressionError) {
+                    throw error;
+                }
+                if (error instanceof Error) {
+                    if (error.message.toLowerCase().includes('division') && error.message.toLowerCase().includes('zero')) {
+                        throw new ExpressionError('Division/modulo by zero');
+                    }
+                    throw new ExpressionError(`Failed to evaluate operation: ${error.message}`);
+                }
+                throw new ExpressionError('Failed to evaluate operation: Unknown error');
+            }
+
+        case 'object':
+            if (!ast.properties) {
+                throw new ExpressionError('Internal error: Object node missing properties');
+            }
+            const obj: Record<string, unknown> = {};
+            for (const prop of ast.properties) {
+                if (prop.spread) {
+                    const spreadValue = this.evaluateAst(prop.value, context, startTime);
+                    if (typeof spreadValue === 'object' && spreadValue !== null) {
+                        Object.assign(obj, spreadValue);
+                    } else {
+                        throw new ExpressionError('Invalid spread operator usage: can only spread objects');
+                    }
+                } else {
+                    obj[prop.key] = this.evaluateAst(prop.value, context, startTime);
+                }
+            }
+            return obj;
+
+        case 'array':
+            if (!ast.elements) {
+                throw new ExpressionError('Internal error: Array node missing elements');
+            }
+            const result: unknown[] = [];
+            for (const elem of ast.elements) {
+                if (elem.spread) {
+                    const spreadValue = this.evaluateAst(elem.value, context, startTime);
+                    if (Array.isArray(spreadValue)) {
+                        result.push(...spreadValue);
+                    } else if (spreadValue !== null && typeof spreadValue === 'object') {
+                        result.push(...Object.values(spreadValue));
+                    } else {
+                        const valueType = spreadValue === null ? 'null' : typeof spreadValue;
+                        throw new ExpressionError(`Invalid spread operator usage: cannot spread ${valueType} literal`);
+                    }
+                } else {
+                    result.push(this.evaluateAst(elem.value, context, startTime));
+                }
+            }
+            return result;
+
+        default:
+            throw new ExpressionError(`Unknown AST node type: ${(ast as AstNode).type}`);
     }
-
-    if (ast.type === 'reference') {
-      logger.debug('Evaluating reference path:', ast.path);
-      if (!ast.path) {
-        logger.error('Internal error: Reference node missing path');
-        throw new ExpressionError('Internal error: Reference node missing path');
-      }
-      try {
-        const value = this.referenceResolver.resolvePath(ast.path, context);
-        logger.debug(`Resolved reference ${ast.path} to value:`, value);
-        return value;
-      } catch (error) {
-        logger.error(`Error resolving reference ${ast.path}:`, error);
-        if (
-          error instanceof PathSyntaxError ||
-          error instanceof PropertyAccessError ||
-          error instanceof UnknownReferenceError
-        ) {
-          throw new ExpressionError(`Failed to resolve reference: ${ast.path}`, error);
-        }
-        throw error;
-      }
-    }
-
-    if (ast.type === 'object') {
-      logger.debug('Evaluating object:', ast.properties);
-      if (!ast.properties) {
-        logger.error('Internal error: Object node missing properties');
-        throw new ExpressionError('Internal error: Object node missing properties');
-      }
-      const result: Record<string, any> = {};
-      for (const { key, value, spread } of ast.properties) {
-        if (spread) {
-          const spreadValue = this.evaluateAst(value, context, startTime);
-          if (spreadValue && typeof spreadValue === 'object') {
-            Object.assign(result, spreadValue);
-          } else {
-            logger.error('Invalid spread operator usage: can only spread objects');
-            throw new ExpressionError('Invalid spread operator usage: can only spread objects');
-          }
-        } else {
-          result[key] = this.evaluateAst(value, context, startTime);
-        }
-      }
-      return result;
-    }
-
-    if (ast.type === 'array') {
-      logger.debug('Evaluating array:', ast.elements);
-      if (!ast.elements) {
-        logger.error('Internal error: Array node missing elements');
-        throw new ExpressionError('Internal error: Array node missing elements');
-      }
-
-      const result: unknown[] = [];
-      for (const element of ast.elements) {
-        const value = element.value;
-        if (element.spread) {
-          const spreadValue = this.evaluateAst(value, context, startTime);
-          if (Array.isArray(spreadValue)) {
-            result.push(...spreadValue);
-          } else if (spreadValue && typeof spreadValue === 'object') {
-            result.push(...Object.values(spreadValue));
-          } else {
-            logger.error('Invalid spread operator usage:', spreadValue);
-            throw new ExpressionError(
-              'Invalid spread operator usage: can only spread arrays and objects',
-            );
-          }
-        } else {
-          result.push(this.evaluateAst(value, context, startTime));
-        }
-      }
-      return result;
-    }
-
-    if (ast.type === 'operation') {
-      logger.debug('Evaluating operation:', ast.operator);
-      if (!ast.operator || !ast.left || !ast.right) {
-        logger.error('Internal error: Operation node missing operator or operands');
-        throw new ExpressionError('Internal error: Operation node missing operator or operands');
-      }
-
-      const operator = SafeExpressionEvaluator.OPERATORS[ast.operator];
-      if (!operator) {
-        logger.error(`Unknown operator: ${ast.operator}`);
-        throw new ExpressionError(`Unknown operator: ${ast.operator}`);
-      }
-
-      const left = this.evaluateAst(ast.left, context, startTime);
-      const right = this.evaluateAst(ast.right, context, startTime);
-
-      try {
-        logger.debug(`Evaluating operation ${ast.operator}:`, { left, right });
-        const result = operator(left, right);
-        logger.debug(`Operation result:`, result);
-        return result;
-      } catch (error) {
-        logger.error(`Failed to evaluate operation ${ast.operator} with operands:`, {
-          left,
-          right,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-        throw new ExpressionError(
-          `Failed to evaluate operation ${ast.operator}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        );
-      }
-    }
-
-    throw new ExpressionError(`Unknown AST node type: ${ast.type}`);
   }
 
   /**
@@ -925,106 +755,53 @@ export class SafeExpressionEvaluator {
    * @returns An array of reference paths found in the expression
    */
   public extractReferences(expression: string): string[] {
-    try {
-      const refs = new Set<string>();
+    const refs = new Set<string>();
 
-      // Handle spread operator syntax directly
-      const spreadMatches = expression.match(/\.\.\.\${([^}]+)}/g);
-      if (spreadMatches) {
-        spreadMatches.forEach((match) => {
-          const ref = match.slice(5, -1); // Remove ...${} wrapper
-          const baseRef = ref.split('.')[0]; // Get the base reference
-          if (!this.isSpecialVariable(baseRef)) {
+    const extractRefs = (expr: string): void => {
+      let pos = 0;
+      while (pos < expr.length) {
+        const startIdx = expr.indexOf('${', pos);
+        if (startIdx === -1) break;
+        let braceCount = 1;
+        let i = startIdx + 2;
+        while (i < expr.length && braceCount > 0) {
+          if (expr.startsWith('${', i)) {
+            braceCount++;
+            i += 2;
+          } else if (expr[i] === '}') {
+            braceCount--;
+            i++;
+          } else {
+            i++;
+          }
+        }
+        if (braceCount === 0) {
+          const inner = expr.substring(startIdx + 2, i - 1);
+          const baseRef = inner.split(/[[.\s]+/)[0];
+          if (baseRef && !this.isSpecialVariable(baseRef)) {
             refs.add(baseRef);
           }
-        });
+          extractRefs(inner);
+          pos = i;
+        } else {
+          break;
+        }
       }
+    };
 
-      // Handle regular references through AST
-      const tokens = tokenize(expression, this.logger);
-      const ast = this.parse(tokens);
-      this.collectReferencesFromAst(ast, refs);
-      return Array.from(refs).sort(); // Sort references for consistent order
+    try {
+      extractRefs(expression);
     } catch (error) {
-      // Return empty array for invalid expressions
       return [];
     }
-  }
 
-  private collectReferencesFromAst(node: AstNode, refs: Set<string>): void {
-    switch (node.type) {
-      case 'reference':
-        if (node.path) {
-          // Extract base reference and any nested references in array indices
-          const baseRef = node.path.split('.')[0];
-          if (!this.isSpecialVariable(baseRef)) {
-            refs.add(baseRef);
-          }
-
-          // Extract references from array indices
-          const arrayIndexMatches = node.path.match(/\${([^}]+)}/g);
-          if (arrayIndexMatches) {
-            arrayIndexMatches.forEach((match) => {
-              const innerRef = match.slice(2, -1).split('.')[0];
-              if (!this.isSpecialVariable(innerRef)) {
-                refs.add(innerRef);
-              }
-            });
-          }
-        }
-        break;
-
-      case 'operation':
-        if (node.left) this.collectReferencesFromAst(node.left, refs);
-        if (node.right) this.collectReferencesFromAst(node.right, refs);
-        break;
-
-      case 'object':
-        if (node.properties) {
-          node.properties.forEach((prop) => {
-            // Handle spread operator in object properties
-            if (prop.spread) {
-              if (prop.value.type === 'reference') {
-                const baseRef = prop.value.path?.split('.')[0];
-                if (baseRef && !this.isSpecialVariable(baseRef)) {
-                  refs.add(baseRef);
-                }
-              }
-              // Also collect any nested references in the spread value
-              this.collectReferencesFromAst(prop.value, refs);
-            } else {
-              this.collectReferencesFromAst(prop.value, refs);
-            }
-          });
-        }
-        break;
-
-      case 'array':
-        if (node.elements) {
-          node.elements.forEach((element) => {
-            // Handle spread operator in array elements
-            if (element.spread) {
-              if (element.value.type === 'reference') {
-                const baseRef = element.value.path?.split('.')[0];
-                if (baseRef && !this.isSpecialVariable(baseRef)) {
-                  refs.add(baseRef);
-                }
-              }
-              // Also collect any nested references in the spread value
-              this.collectReferencesFromAst(element.value, refs);
-            } else {
-              this.collectReferencesFromAst(element.value, refs);
-            }
-          });
-        }
-        break;
-    }
+    return Array.from(refs).sort();
   }
 
   /**
    * Check if a variable name is a special variable that should be ignored
    */
   private isSpecialVariable(name: string): boolean {
-    return ['context', 'metadata', 'item', 'acc', 'a', 'b'].includes(name);
+    return ['item', 'context', 'acc'].includes(name);
   }
 }

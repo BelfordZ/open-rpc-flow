@@ -1,3 +1,12 @@
+## [1.3.3](https://github.com/BelfordZ/open-rpc-flow/compare/v1.3.2...v1.3.3) (2025-02-17)
+
+
+### Bug Fixes
+
+* adjust coverage numbers ([3fd9835](https://github.com/BelfordZ/open-rpc-flow/commit/3fd9835e399afb49171b2224ead5f5b59c5c9bd0))
+* linting and formatting ([b939898](https://github.com/BelfordZ/open-rpc-flow/commit/b93989827a7be480540e6c9502b585316833c1cb))
+* tokenizer fix to properly handle period juice ([0340fd2](https://github.com/BelfordZ/open-rpc-flow/commit/0340fd21bcd8d7078055bdf948f95203c9c1371a))
+
 ## [1.3.2](https://github.com/BelfordZ/open-rpc-flow/compare/v1.3.1...v1.3.2) (2025-02-08)
 
 

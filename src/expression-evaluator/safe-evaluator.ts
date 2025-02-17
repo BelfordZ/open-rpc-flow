@@ -2,7 +2,6 @@ import { Logger } from '../util/logger';
 import { ExpressionError } from '../expression-evaluator/errors';
 import { ReferenceResolver } from '../reference-resolver';
 import { PathSyntaxError, PropertyAccessError } from '../path-accessor';
-import { UnknownReferenceError } from '../reference-resolver';
 import { tokenize, Token } from './tokenizer';
 import { TokenizerError } from './tokenizer';
 
@@ -18,6 +17,13 @@ interface AstNode {
   right?: AstNode;
   properties?: { key: string; value: AstNode; spread?: boolean }[];
   elements?: { value: AstNode; spread?: boolean }[];
+}
+
+export class _UnknownReferenceError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UnknownReferenceError';
+  }
 }
 
 export class SafeExpressionEvaluator {
@@ -133,24 +139,28 @@ export class SafeExpressionEvaluator {
 
       // Handle template literals
       if (expression.startsWith('`') && expression.endsWith('`')) {
-        return tokens.map(token => {
-          if (token.type === 'string') {
-            return token.value;
-          }
-          if (token.type === 'reference') {
-            const path = this.buildReferencePath(token.value);
-            try {
-              const value = this.referenceResolver.resolvePath(path, context);
-              return String(value);
-            } catch (error) {
-              if (error instanceof PropertyAccessError) {
-                throw new ExpressionError(error.message);
-              }
-              throw error;
+        return tokens
+          .map((token) => {
+            if (token.type === 'string') {
+              return token.value;
             }
-          }
-          throw new ExpressionError(`Unexpected token in template literal: ${JSON.stringify(token)}`);
-        }).join('');
+            if (token.type === 'reference') {
+              const path = this.buildReferencePath(token.value);
+              try {
+                const value = this.referenceResolver.resolvePath(path, context);
+                return String(value);
+              } catch (error) {
+                if (error instanceof PropertyAccessError) {
+                  throw new ExpressionError(error.message);
+                }
+                throw error;
+              }
+            }
+            throw new ExpressionError(
+              `Unexpected token in template literal: ${JSON.stringify(token)}`,
+            );
+          })
+          .join('');
       }
 
       // Handle single references
@@ -171,11 +181,15 @@ export class SafeExpressionEvaluator {
       this.logger.debug('AST:', ast);
       return this.evaluateAst(ast, context, startTime);
     } catch (error) {
-      if (error instanceof TokenizerError ||
-          error instanceof PathSyntaxError ||
-          error instanceof PropertyAccessError ||
-          error instanceof ExpressionError) {
-        throw new ExpressionError(`Failed to evaluate expression: ${expression}. Got error: ${error.message}`);
+      if (
+        error instanceof TokenizerError ||
+        error instanceof PathSyntaxError ||
+        error instanceof PropertyAccessError ||
+        error instanceof ExpressionError
+      ) {
+        throw new ExpressionError(
+          `Failed to evaluate expression: ${expression}. Got error: ${error.message}`,
+        );
       }
       throw error;
     }
@@ -255,49 +269,49 @@ export class SafeExpressionEvaluator {
 
   private parse(tokens: Token[]): AstNode {
     if (tokens.length === 0) {
-        throw new ExpressionError('Empty expression');
+      throw new ExpressionError('Empty expression');
     }
 
     // Handle literals
     if (tokens.length === 1) {
-        const token = tokens[0];
-        if (token.type === 'number') {
-            return { type: 'literal', value: Number(token.value) };
-        }
-        if (token.type === 'string') {
-            return { type: 'literal', value: token.value };
-        }
-        if (token.type === 'identifier') {
-            if (token.value === 'true') return { type: 'literal', value: true };
-            if (token.value === 'false') return { type: 'literal', value: false };
-            if (token.value === 'null') return { type: 'literal', value: null };
-            if (token.value === 'undefined') return { type: 'literal', value: undefined };
-            return { type: 'literal', value: token.value };
-        }
-        if (token.type === 'reference') {
-            return { type: 'reference', path: this.buildReferencePath(token.value) };
-        }
-        // New: handle object and array literal tokens
-        if (token.type === 'object_literal') {
-            const properties = this.parseObjectProperties(token.value);
-            return { type: 'object', properties };
-        }
-        if (token.type === 'array_literal') {
-            const elements = this.parseArrayElements(token.value);
-            return { type: 'array', elements };
-        }
+      const token = tokens[0];
+      if (token.type === 'number') {
+        return { type: 'literal', value: Number(token.value) };
+      }
+      if (token.type === 'string') {
+        return { type: 'literal', value: token.value };
+      }
+      if (token.type === 'identifier') {
+        if (token.value === 'true') return { type: 'literal', value: true };
+        if (token.value === 'false') return { type: 'literal', value: false };
+        if (token.value === 'null') return { type: 'literal', value: null };
+        if (token.value === 'undefined') return { type: 'literal', value: undefined };
+        return { type: 'literal', value: token.value };
+      }
+      if (token.type === 'reference') {
+        return { type: 'reference', path: this.buildReferencePath(token.value) };
+      }
+      // New: handle object and array literal tokens
+      if (token.type === 'object_literal') {
+        const properties = this.parseObjectProperties(token.value);
+        return { type: 'object', properties };
+      }
+      if (token.type === 'array_literal') {
+        const elements = this.parseArrayElements(token.value);
+        return { type: 'array', elements };
+      }
     }
 
     // Handle array literals
     if (tokens[0]?.value === '[' && tokens[tokens.length - 1]?.value === ']') {
-        const elements = this.parseArrayElements(tokens.slice(1, -1));
-        return { type: 'array', elements };
+      const elements = this.parseArrayElements(tokens.slice(1, -1));
+      return { type: 'array', elements };
     }
 
     // Handle object literals
     if (tokens[0]?.value === '{' && tokens[tokens.length - 1]?.value === '}') {
-        const properties = this.parseObjectProperties(tokens.slice(1, -1));
-        return { type: 'object', properties };
+      const properties = this.parseObjectProperties(tokens.slice(1, -1));
+      return { type: 'object', properties };
     }
 
     // Handle operators with precedence
@@ -359,7 +373,11 @@ export class SafeExpressionEvaluator {
         expectOperator = true;
       } else if (token.type === 'identifier') {
         // If the identifier is actually an operator symbol (e.g., '*', '/', '+', '-', etc.), treat it as an operator
-        if (['*', '/', '%', '+', '-', '==', '===', '!=', '!==', '>', '>=', '<', '<='].includes(token.value)) {
+        if (
+          ['*', '/', '%', '+', '-', '==', '===', '!=', '!==', '>', '>=', '<', '<='].includes(
+            token.value,
+          )
+        ) {
           if (!expectOperator) {
             throw new ExpressionError('Unexpected operator');
           }
@@ -397,7 +415,10 @@ export class SafeExpressionEvaluator {
         }
         outputQueue.push({ type: 'reference', path: this.buildReferencePath(token.value) });
         expectOperator = true;
-      } else if (token.type === 'operator' || ['&&', '||', '??', '==', '===', '!=', '!==', '>', '>=', '<', '<='].includes(token.value)) {
+      } else if (
+        token.type === 'operator' ||
+        ['&&', '||', '??', '==', '===', '!=', '!==', '>', '>=', '<', '<='].includes(token.value)
+      ) {
         if (!expectOperator) {
           throw new ExpressionError('Unexpected operator');
         }
@@ -440,31 +461,31 @@ export class SafeExpressionEvaluator {
 
   private getPrecedence(operator: Operator): number {
     switch (operator) {
-        case '||':
-            return 1;
-        case '&&':
-            return 2;
-        case '==':
-        case '===':
-        case '!=':
-        case '!==':
-            return 3;
-        case '<':
-        case '<=':
-        case '>':
-        case '>=':
-            return 4;
-        case '+':
-        case '-':
-            return 5;
-        case '*':
-        case '/':
-        case '%':
-            return 6;
-        case '??':
-            return 7;
-        default:
-            return 0;
+      case '||':
+        return 1;
+      case '&&':
+        return 2;
+      case '==':
+      case '===':
+      case '!=':
+      case '!==':
+        return 3;
+      case '<':
+      case '<=':
+      case '>':
+      case '>=':
+        return 4;
+      case '+':
+      case '-':
+        return 5;
+      case '*':
+      case '/':
+      case '%':
+        return 6;
+      case '??':
+        return 7;
+      default:
+        return 0;
     }
   }
 
@@ -477,45 +498,47 @@ export class SafeExpressionEvaluator {
     let isSpread = false;
 
     for (let i = 0; i < tokens.length; i++) {
-        const token = tokens[i];
+      const token = tokens[i];
 
-        if (token.value === ',' && depth === 0) {
-            if (currentTokens.length > 0) {
-                elements.push({
-                    value: this.parse(currentTokens),
-                    spread: isSpread
-                });
-                currentTokens = [];
-                isSpread = false;
-            }
-            continue;
+      if (token.value === ',' && depth === 0) {
+        if (currentTokens.length > 0) {
+          elements.push({
+            value: this.parse(currentTokens),
+            spread: isSpread,
+          });
+          currentTokens = [];
+          isSpread = false;
         }
+        continue;
+      }
 
-        if (token.value === '...' && depth === 0) {
-            isSpread = true;
-            continue;
-        }
+      if (token.value === '...' && depth === 0) {
+        isSpread = true;
+        continue;
+      }
 
-        if (token.value === '[' || token.value === '{' || token.value === '(') {
-            depth++;
-        } else if (token.value === ']' || token.value === '}' || token.value === ')') {
-            depth--;
-        }
+      if (token.value === '[' || token.value === '{' || token.value === '(') {
+        depth++;
+      } else if (token.value === ']' || token.value === '}' || token.value === ')') {
+        depth--;
+      }
 
-        currentTokens.push(token);
+      currentTokens.push(token);
     }
 
     if (currentTokens.length > 0) {
-        elements.push({
-            value: this.parse(currentTokens),
-            spread: isSpread
-        });
+      elements.push({
+        value: this.parse(currentTokens),
+        spread: isSpread,
+      });
     }
 
     return elements;
   }
 
-  private parseObjectProperties(tokens: Token[]): { key: string; value: AstNode; spread?: boolean }[] {
+  private parseObjectProperties(
+    tokens: Token[],
+  ): { key: string; value: AstNode; spread?: boolean }[] {
     if (tokens.length === 0) return [];
 
     const properties: { key: string; value: AstNode; spread?: boolean }[] = [];
@@ -525,74 +548,76 @@ export class SafeExpressionEvaluator {
     let key: string | null = null;
 
     for (let i = 0; i < tokens.length; i++) {
-        const token = tokens[i];
+      const token = tokens[i];
 
-        if (token.value === ',' && depth === 0) {
-            if (currentTokens.length > 0) {
-                if (key === null && !isSpread) {
-                    throw new ExpressionError('Invalid object literal: missing key');
-                }
-                properties.push({
-                    key: key || '',
-                    value: this.parse(currentTokens),
-                    spread: isSpread
-                });
-                currentTokens = [];
-                key = null;
-                isSpread = false;
-            }
-            continue;
+      if (token.value === ',' && depth === 0) {
+        if (currentTokens.length > 0) {
+          if (key === null && !isSpread) {
+            throw new ExpressionError('Invalid object literal: missing key');
+          }
+          properties.push({
+            key: key || '',
+            value: this.parse(currentTokens),
+            spread: isSpread,
+          });
+          currentTokens = [];
+          key = null;
+          isSpread = false;
         }
+        continue;
+      }
 
-        if (token.value === ':' && depth === 0 && !isSpread) {
-            if (currentTokens.length !== 1) {
-                throw new ExpressionError('Invalid object literal: invalid key');
-            }
-            key = currentTokens[0].value;
-            currentTokens = [];
-            continue;
+      if (token.value === ':' && depth === 0 && !isSpread) {
+        if (currentTokens.length !== 1) {
+          throw new ExpressionError('Invalid object literal: invalid key');
         }
+        key = currentTokens[0].value;
+        currentTokens = [];
+        continue;
+      }
 
-        if (token.value === '...' && depth === 0) {
-            isSpread = true;
-            continue;
-        }
+      if (token.value === '...' && depth === 0) {
+        isSpread = true;
+        continue;
+      }
 
-        if (token.value === '[' || token.value === '{' || token.value === '(') {
-            depth++;
-        } else if (token.value === ']' || token.value === '}' || token.value === ')') {
-            depth--;
-        }
+      if (token.value === '[' || token.value === '{' || token.value === '(') {
+        depth++;
+      } else if (token.value === ']' || token.value === '}' || token.value === ')') {
+        depth--;
+      }
 
-        currentTokens.push(token);
+      currentTokens.push(token);
     }
 
     if (currentTokens.length > 0) {
-        if (key === null && !isSpread) {
-            throw new ExpressionError('Invalid object literal: missing key');
-        }
-        properties.push({
-            key: key || '',
-            value: this.parse(currentTokens),
-            spread: isSpread
-        });
+      if (key === null && !isSpread) {
+        throw new ExpressionError('Invalid object literal: missing key');
+      }
+      properties.push({
+        key: key || '',
+        value: this.parse(currentTokens),
+        spread: isSpread,
+      });
     }
 
     return properties;
   }
 
   private buildReferencePath(tokens: Token[]): string {
-    return tokens.map(token => {
+    return tokens
+      .map((token) => {
         if (token.type === 'operator' && token.value === '.') {
-            return '.';
+          return '.';
         }
         if (token.type === 'punctuation') {
-            if (token.value === '[') return '[';
-            if (token.value === ']') return ']';
-            return '';
+          if (token.value === '[') return '[';
+          if (token.value === ']') return ']';
+          return '';
         }
         return token.raw;
-    }).join('');
+      })
+      .join('');
   }
 
   private parseValue(token: string): AstNode {
@@ -661,90 +686,99 @@ export class SafeExpressionEvaluator {
     this.checkTimeout(startTime);
 
     switch (ast.type) {
-        case 'literal':
-            return ast.value;
+      case 'literal':
+        return ast.value;
 
-        case 'reference':
-            if (!ast.path) {
-                throw new ExpressionError('Reference node missing path');
-            }
-            try {
-                return this.referenceResolver.resolvePath(ast.path, context);
-            } catch (error) {
-                if (error instanceof PropertyAccessError) {
-                    throw new ExpressionError(error.message);
-                }
-                throw error;
-            }
+      case 'reference':
+        if (!ast.path) {
+          throw new ExpressionError('Reference node missing path');
+        }
+        try {
+          return this.referenceResolver.resolvePath(ast.path, context);
+        } catch (error) {
+          if (error instanceof PropertyAccessError) {
+            throw new ExpressionError(error.message);
+          }
+          throw error;
+        }
 
-        case 'operation':
-            if (!ast.operator || !ast.left || !ast.right) {
-                throw new ExpressionError('Invalid operation node');
+      case 'operation': {
+        if (!ast.operator || !ast.left || !ast.right) {
+          throw new ExpressionError('Invalid operation node');
+        }
+        const operator = SafeExpressionEvaluator.OPERATORS[ast.operator];
+        if (!operator) {
+          throw new ExpressionError(
+            `Failed to evaluate expression: unknown operator '${ast.operator}'`,
+          );
+        }
+        const left = this.evaluateAst(ast.left, context, startTime);
+        const right = this.evaluateAst(ast.right, context, startTime);
+        try {
+          return operator(left, right);
+        } catch (error: unknown) {
+          if (error instanceof ExpressionError) {
+            throw error;
+          }
+          if (error instanceof Error) {
+            if (
+              error.message.toLowerCase().includes('division') &&
+              error.message.toLowerCase().includes('zero')
+            ) {
+              throw new ExpressionError('Division/modulo by zero');
             }
-            const operator = SafeExpressionEvaluator.OPERATORS[ast.operator];
-            if (!operator) {
-                throw new ExpressionError(`Failed to evaluate expression: unknown operator '${ast.operator}'`);
-            }
-            const left = this.evaluateAst(ast.left, context, startTime);
-            const right = this.evaluateAst(ast.right, context, startTime);
-            try {
-                return operator(left, right);
-            } catch (error: unknown) {
-                if (error instanceof ExpressionError) {
-                    throw error;
-                }
-                if (error instanceof Error) {
-                    if (error.message.toLowerCase().includes('division') && error.message.toLowerCase().includes('zero')) {
-                        throw new ExpressionError('Division/modulo by zero');
-                    }
-                    throw new ExpressionError(`Failed to evaluate operation: ${error.message}`);
-                }
-                throw new ExpressionError('Failed to evaluate operation: Unknown error');
-            }
+            throw new ExpressionError(`Failed to evaluate operation: ${error.message}`);
+          }
+          throw new ExpressionError('Failed to evaluate operation: Unknown error');
+        }
+      }
 
-        case 'object':
-            if (!ast.properties) {
-                throw new ExpressionError('Internal error: Object node missing properties');
+      case 'object': {
+        if (!ast.properties) {
+          throw new ExpressionError('Internal error: Object node missing properties');
+        }
+        const obj: Record<string, unknown> = {};
+        for (const prop of ast.properties) {
+          if (prop.spread) {
+            const spreadValue = this.evaluateAst(prop.value, context, startTime);
+            if (typeof spreadValue === 'object' && spreadValue !== null) {
+              Object.assign(obj, spreadValue);
+            } else {
+              throw new ExpressionError('Invalid spread operator usage: can only spread objects');
             }
-            const obj: Record<string, unknown> = {};
-            for (const prop of ast.properties) {
-                if (prop.spread) {
-                    const spreadValue = this.evaluateAst(prop.value, context, startTime);
-                    if (typeof spreadValue === 'object' && spreadValue !== null) {
-                        Object.assign(obj, spreadValue);
-                    } else {
-                        throw new ExpressionError('Invalid spread operator usage: can only spread objects');
-                    }
-                } else {
-                    obj[prop.key] = this.evaluateAst(prop.value, context, startTime);
-                }
-            }
-            return obj;
+          } else {
+            obj[prop.key] = this.evaluateAst(prop.value, context, startTime);
+          }
+        }
+        return obj;
+      }
 
-        case 'array':
-            if (!ast.elements) {
-                throw new ExpressionError('Internal error: Array node missing elements');
+      case 'array': {
+        if (!ast.elements) {
+          throw new ExpressionError('Internal error: Array node missing elements');
+        }
+        const result: unknown[] = [];
+        for (const elem of ast.elements) {
+          if (elem.spread) {
+            const spreadValue = this.evaluateAst(elem.value, context, startTime);
+            if (Array.isArray(spreadValue)) {
+              result.push(...spreadValue);
+            } else if (spreadValue !== null && typeof spreadValue === 'object') {
+              result.push(...Object.values(spreadValue));
+            } else {
+              throw new ExpressionError(
+                'Invalid spread operator usage: can only spread arrays or objects',
+              );
             }
-            const result: unknown[] = [];
-            for (const elem of ast.elements) {
-                if (elem.spread) {
-                    const spreadValue = this.evaluateAst(elem.value, context, startTime);
-                    if (Array.isArray(spreadValue)) {
-                        result.push(...spreadValue);
-                    } else if (spreadValue !== null && typeof spreadValue === 'object') {
-                        result.push(...Object.values(spreadValue));
-                    } else {
-                        const valueType = spreadValue === null ? 'null' : typeof spreadValue;
-                        throw new ExpressionError(`Invalid spread operator usage: cannot spread ${valueType} literal`);
-                    }
-                } else {
-                    result.push(this.evaluateAst(elem.value, context, startTime));
-                }
-            }
-            return result;
+          } else {
+            result.push(this.evaluateAst(elem.value, context, startTime));
+          }
+        }
+        return result;
+      }
 
-        default:
-            throw new ExpressionError(`Unknown AST node type: ${(ast as AstNode).type}`);
+      default:
+        throw new ExpressionError(`Unknown AST node type: ${(ast as AstNode).type}`);
     }
   }
 

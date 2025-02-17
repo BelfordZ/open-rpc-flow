@@ -1,12 +1,5 @@
-import { tokenize, TokenizerError } from '../../expression-evaluator/tokenizer';
+import { tokenize } from '../../expression-evaluator/tokenizer';
 import { TestLogger } from '../../util/logger';
-
-// Define the new token types for clarity in tests
-type Token = {
-  type: 'string' | 'number' | 'operator' | 'object_literal' | 'array_literal' | 'reference' | 'punctuation' | 'identifier';
-  value: string | number | Token[];
-  raw: string;
-};
 
 describe('tokenize', () => {
   let logger: TestLogger;
@@ -51,10 +44,10 @@ describe('tokenize', () => {
 
     it('tokenizes nullish coalescing with references', () => {
       expect(tokenize('${value} ?? "default"', logger)).toEqual([
-        { 
+        {
           type: 'reference',
           value: [{ type: 'identifier', value: 'value', raw: 'value' }],
-          raw: '${value}'
+          raw: '${value}',
         },
         { type: 'operator', value: '??', raw: '??' },
         { type: 'string', value: 'default', raw: '"default"' },
@@ -63,16 +56,16 @@ describe('tokenize', () => {
 
     it('tokenizes chained nullish coalescing', () => {
       expect(tokenize('${a} ?? ${b} ?? "default"', logger)).toEqual([
-        { 
+        {
           type: 'reference',
           value: [{ type: 'identifier', value: 'a', raw: 'a' }],
-          raw: '${a}'
+          raw: '${a}',
         },
         { type: 'operator', value: '??', raw: '??' },
-        { 
+        {
           type: 'reference',
           value: [{ type: 'identifier', value: 'b', raw: 'b' }],
-          raw: '${b}'
+          raw: '${b}',
         },
         { type: 'operator', value: '??', raw: '??' },
         { type: 'string', value: 'default', raw: '"default"' },
@@ -83,11 +76,11 @@ describe('tokenize', () => {
   describe('references', () => {
     it('tokenizes references with nested expressions', () => {
       expect(tokenize('${foo}', logger)).toEqual([
-        { 
+        {
           type: 'reference',
           value: [{ type: 'identifier', value: 'foo', raw: 'foo' }],
-          raw: '${foo}'
-        }
+          raw: '${foo}',
+        },
       ]);
 
       expect(tokenize('${foo.bar}', logger)).toEqual([
@@ -96,10 +89,10 @@ describe('tokenize', () => {
           value: [
             { type: 'identifier', value: 'foo', raw: 'foo' },
             { type: 'operator', value: '.', raw: '.' },
-            { type: 'identifier', value: 'bar', raw: 'bar' }
+            { type: 'identifier', value: 'bar', raw: 'bar' },
           ],
-          raw: '${foo.bar}'
-        }
+          raw: '${foo.bar}',
+        },
       ]);
 
       expect(tokenize('${foo[${bar}]}', logger)).toEqual([
@@ -108,15 +101,15 @@ describe('tokenize', () => {
           value: [
             { type: 'identifier', value: 'foo', raw: 'foo' },
             { type: 'punctuation', value: '[', raw: '[' },
-            { 
+            {
               type: 'reference',
               value: [{ type: 'identifier', value: 'bar', raw: 'bar' }],
-              raw: '${bar}'
+              raw: '${bar}',
             },
-            { type: 'punctuation', value: ']', raw: ']' }
+            { type: 'punctuation', value: ']', raw: ']' },
           ],
-          raw: '${foo[${bar}]}'
-        }
+          raw: '${foo[${bar}]}',
+        },
       ]);
     });
   });
@@ -129,14 +122,14 @@ describe('tokenize', () => {
           value: [
             { type: 'string', value: 'key', raw: 'key' },
             { type: 'punctuation', value: ':', raw: ':' },
-            { 
+            {
               type: 'reference',
               value: [{ type: 'identifier', value: 'value', raw: 'value' }],
-              raw: '${value}'
-            }
+              raw: '${value}',
+            },
           ],
-          raw: '{ key: ${value} }'
-        }
+          raw: '{ key: ${value} }',
+        },
       ]);
 
       expect(tokenize('{ key1: "value1", key2: "value2" }', logger)).toEqual([
@@ -149,10 +142,10 @@ describe('tokenize', () => {
             { type: 'punctuation', value: ',', raw: ',' },
             { type: 'string', value: 'key2', raw: 'key2' },
             { type: 'punctuation', value: ':', raw: ':' },
-            { type: 'string', value: 'value2', raw: '"value2"' }
+            { type: 'string', value: 'value2', raw: '"value2"' },
           ],
-          raw: '{ key1: "value1", key2: "value2" }'
-        }
+          raw: '{ key1: "value1", key2: "value2" }',
+        },
       ]);
     });
 
@@ -164,39 +157,39 @@ describe('tokenize', () => {
             { type: 'number', value: 1, raw: '1' },
             { type: 'punctuation', value: ',', raw: ',' },
             { type: 'operator', value: '...', raw: '...' },
-            { 
+            {
               type: 'reference',
               value: [{ type: 'identifier', value: 'foo', raw: 'foo' }],
-              raw: '${foo}'
-            }
+              raw: '${foo}',
+            },
           ],
-          raw: '[1, ...${foo}]'
-        }
+          raw: '[1, ...${foo}]',
+        },
       ]);
     });
 
     it('tokenizes template literals', () => {
       expect(tokenize('`Value is ${foo}`', logger)).toEqual([
         { type: 'string', value: 'Value is ', raw: 'Value is ' },
-        { 
+        {
           type: 'reference',
           value: [{ type: 'identifier', value: 'foo', raw: 'foo' }],
-          raw: '${foo}'
-        }
+          raw: '${foo}',
+        },
       ]);
 
       expect(tokenize('`${foo} and ${bar}`', logger)).toEqual([
-        { 
+        {
           type: 'reference',
           value: [{ type: 'identifier', value: 'foo', raw: 'foo' }],
-          raw: '${foo}'
+          raw: '${foo}',
         },
         { type: 'string', value: ' and ', raw: ' and ' },
-        { 
+        {
           type: 'reference',
           value: [{ type: 'identifier', value: 'bar', raw: 'bar' }],
-          raw: '${bar}'
-        }
+          raw: '${bar}',
+        },
       ]);
     });
 
@@ -212,10 +205,10 @@ describe('tokenize', () => {
               value: [
                 { type: 'number', value: 1, raw: '1' },
                 { type: 'punctuation', value: ',', raw: ',' },
-                { 
+                {
                   type: 'reference',
                   value: [{ type: 'identifier', value: 'foo', raw: 'foo' }],
-                  raw: '${foo}'
+                  raw: '${foo}',
                 },
                 { type: 'punctuation', value: ',', raw: ',' },
                 {
@@ -223,20 +216,20 @@ describe('tokenize', () => {
                   value: [
                     { type: 'string', value: 'nested', raw: 'nested' },
                     { type: 'punctuation', value: ':', raw: ':' },
-                    { 
+                    {
                       type: 'reference',
                       value: [{ type: 'identifier', value: 'bar', raw: 'bar' }],
-                      raw: '${bar}'
-                    }
+                      raw: '${bar}',
+                    },
                   ],
-                  raw: '{ nested: ${bar} }'
-                }
+                  raw: '{ nested: ${bar} }',
+                },
               ],
-              raw: '[1, ${foo}, { nested: ${bar} }]'
-            }
+              raw: '[1, ${foo}, { nested: ${bar} }]',
+            },
           ],
-          raw: '{ arr: [1, ${foo}, { nested: ${bar} }] }'
-        }
+          raw: '{ arr: [1, ${foo}, { nested: ${bar} }] }',
+        },
       ]);
     });
   });
@@ -248,14 +241,14 @@ describe('tokenize', () => {
           type: 'object_literal',
           value: [
             { type: 'operator', value: '...', raw: '...' },
-            { 
+            {
               type: 'reference',
               value: [{ type: 'identifier', value: 'foo', raw: 'foo' }],
-              raw: '${foo}'
-            }
+              raw: '${foo}',
+            },
           ],
-          raw: '{ ...${foo} }'
-        }
+          raw: '{ ...${foo} }',
+        },
       ]);
 
       expect(tokenize('{ ...${foo}, bar: "baz" }', logger)).toEqual([
@@ -263,18 +256,18 @@ describe('tokenize', () => {
           type: 'object_literal',
           value: [
             { type: 'operator', value: '...', raw: '...' },
-            { 
+            {
               type: 'reference',
               value: [{ type: 'identifier', value: 'foo', raw: 'foo' }],
-              raw: '${foo}'
+              raw: '${foo}',
             },
             { type: 'punctuation', value: ',', raw: ',' },
             { type: 'string', value: 'bar', raw: 'bar' },
             { type: 'punctuation', value: ':', raw: ':' },
-            { type: 'string', value: 'baz', raw: '"baz"' }
+            { type: 'string', value: 'baz', raw: '"baz"' },
           ],
-          raw: '{ ...${foo}, bar: "baz" }'
-        }
+          raw: '{ ...${foo}, bar: "baz" }',
+        },
       ]);
     });
 
@@ -284,14 +277,14 @@ describe('tokenize', () => {
           type: 'array_literal',
           value: [
             { type: 'operator', value: '...', raw: '...' },
-            { 
+            {
               type: 'reference',
               value: [{ type: 'identifier', value: 'foo', raw: 'foo' }],
-              raw: '${foo}'
-            }
+              raw: '${foo}',
+            },
           ],
-          raw: '[...${foo}]'
-        }
+          raw: '[...${foo}]',
+        },
       ]);
 
       expect(tokenize('[...${foo}, 1, 2]', logger)).toEqual([
@@ -299,18 +292,18 @@ describe('tokenize', () => {
           type: 'array_literal',
           value: [
             { type: 'operator', value: '...', raw: '...' },
-            { 
+            {
               type: 'reference',
               value: [{ type: 'identifier', value: 'foo', raw: 'foo' }],
-              raw: '${foo}'
+              raw: '${foo}',
             },
             { type: 'punctuation', value: ',', raw: ',' },
             { type: 'number', value: 1, raw: '1' },
             { type: 'punctuation', value: ',', raw: ',' },
-            { type: 'number', value: 2, raw: '2' }
+            { type: 'number', value: 2, raw: '2' },
           ],
-          raw: '[...${foo}, 1, 2]'
-        }
+          raw: '[...${foo}, 1, 2]',
+        },
       ]);
     });
 
@@ -321,25 +314,23 @@ describe('tokenize', () => {
           raw: '{ ...${foo}, ...${bar} }',
           value: [
             { type: 'operator', value: '...', raw: '...' },
-            { 
+            {
               type: 'reference',
               value: [{ type: 'identifier', value: 'foo', raw: 'foo' }],
-              raw: '${foo}'
+              raw: '${foo}',
             },
             { type: 'punctuation', value: ',', raw: ',' },
             { type: 'operator', value: '...', raw: '...' },
             {
               type: 'reference',
               value: [{ type: 'identifier', value: 'bar', raw: 'bar' }],
-              raw: '${bar}'
-            }
-          ]
-        }
+              raw: '${bar}',
+            },
+          ],
+        },
       ]);
     });
   });
-
- 
 
   describe('spread operator validation', () => {
     it('allows spreading references and expressions', () => {
@@ -354,7 +345,6 @@ describe('tokenize', () => {
   });
 
   describe('operator sequences', () => {
-
     it('handles operator sequences with braces', () => {
       // Test operator sequences inside braces
       expect(tokenize('{ some text + more text }', logger)).toEqual([
@@ -369,67 +359,77 @@ describe('tokenize', () => {
 
   describe('reference tokenization', () => {
     it('should tokenize simple references with correct raw values', () => {
-      expect(tokenize('${foo}', logger)).toEqual([{
-        type: 'reference',
-        value: [{
-          type: 'identifier',
-          value: 'foo',
-          raw: 'foo'
-        }],
-        raw: '${foo}'
-      }]);
+      expect(tokenize('${foo}', logger)).toEqual([
+        {
+          type: 'reference',
+          value: [
+            {
+              type: 'identifier',
+              value: 'foo',
+              raw: 'foo',
+            },
+          ],
+          raw: '${foo}',
+        },
+      ]);
     });
 
     it('should tokenize nested references with correct raw values', () => {
-      expect(tokenize('${foo.${bar}}', logger)).toEqual([{
-        type: 'reference',
-        value: [
-          {
-            type: 'identifier',
-            value: 'foo',
-            raw: 'foo'
-          },
-          {
-            type: 'operator',
-            value: '.',
-            raw: '.'
-          },
-          {
-            type: 'reference',
-            value: [{
+      expect(tokenize('${foo.${bar}}', logger)).toEqual([
+        {
+          type: 'reference',
+          value: [
+            {
               type: 'identifier',
-              value: 'bar',
-              raw: 'bar'
-            }],
-            raw: '${bar}'
-          }
-        ],
-        raw: '${foo.${bar}}'
-      }]);
+              value: 'foo',
+              raw: 'foo',
+            },
+            {
+              type: 'operator',
+              value: '.',
+              raw: '.',
+            },
+            {
+              type: 'reference',
+              value: [
+                {
+                  type: 'identifier',
+                  value: 'bar',
+                  raw: 'bar',
+                },
+              ],
+              raw: '${bar}',
+            },
+          ],
+          raw: '${foo.${bar}}',
+        },
+      ]);
     });
 
     it('should tokenize property access in references', () => {
-      expect(tokenize('${foo.bar}', logger)).toEqual([{
-        type: 'reference',
-        value: [
-          {
-            type: 'identifier',
-            value: 'foo',
-            raw: 'foo'
-          },
-          {
-            type: 'operator',
-            value: '.',
-            raw: '.'
-          },
-          {
-            type: 'identifier',
-            value: 'bar',
-            raw: 'bar'
-          }
-        ],
-        raw: '${foo.bar}'
-      }]);
+      expect(tokenize('${foo.bar}', logger)).toEqual([
+        {
+          type: 'reference',
+          value: [
+            {
+              type: 'identifier',
+              value: 'foo',
+              raw: 'foo',
+            },
+            {
+              type: 'operator',
+              value: '.',
+              raw: '.',
+            },
+            {
+              type: 'identifier',
+              value: 'bar',
+              raw: 'bar',
+            },
+          ],
+          raw: '${foo.bar}',
+        },
+      ]);
     });
   });
 
@@ -442,20 +442,22 @@ describe('tokenize', () => {
             {
               type: 'operator',
               value: '...',
-              raw: '...'
+              raw: '...',
             },
             {
               type: 'reference',
-              value: [{
-                type: 'identifier',
-                value: 'foo',
-                raw: 'foo'
-              }],
-              raw: '${foo}'
-            }
+              value: [
+                {
+                  type: 'identifier',
+                  value: 'foo',
+                  raw: 'foo',
+                },
+              ],
+              raw: '${foo}',
+            },
           ],
-          raw: '{ ...${foo} }'
-        }
+          raw: '{ ...${foo} }',
+        },
       ]);
     });
 
@@ -467,7 +469,7 @@ describe('tokenize', () => {
             {
               type: 'operator',
               value: '...',
-              raw: '...'
+              raw: '...',
             },
             {
               type: 'reference',
@@ -475,28 +477,30 @@ describe('tokenize', () => {
                 {
                   type: 'identifier',
                   value: 'foo',
-                  raw: 'foo'
+                  raw: 'foo',
                 },
                 {
                   type: 'operator',
                   value: '.',
-                  raw: '.'
+                  raw: '.',
                 },
                 {
                   type: 'reference',
-                  value: [{
-                    type: 'identifier',
-                    value: 'bar',
-                    raw: 'bar'
-                  }],
-                  raw: '${bar}'
-                }
+                  value: [
+                    {
+                      type: 'identifier',
+                      value: 'bar',
+                      raw: 'bar',
+                    },
+                  ],
+                  raw: '${bar}',
+                },
               ],
-              raw: '${foo.${bar}}'
-            }
+              raw: '${foo.${bar}}',
+            },
           ],
-          raw: '{ ...${foo.${bar}} }'
-        }
+          raw: '{ ...${foo.${bar}} }',
+        },
       ]);
     });
   });
@@ -510,25 +514,27 @@ describe('tokenize', () => {
             {
               type: 'string',
               value: 'key',
-              raw: 'key'
+              raw: 'key',
             },
             {
               type: 'punctuation',
               value: ':',
-              raw: ':'
+              raw: ':',
             },
             {
               type: 'reference',
-              value: [{
-                type: 'identifier',
-                value: 'value',
-                raw: 'value'
-              }],
-              raw: '${value}'
-            }
+              value: [
+                {
+                  type: 'identifier',
+                  value: 'value',
+                  raw: 'value',
+                },
+              ],
+              raw: '${value}',
+            },
           ],
-          raw: '{ key: ${value} }'
-        }
+          raw: '{ key: ${value} }',
+        },
       ]);
     });
 
@@ -540,59 +546,53 @@ describe('tokenize', () => {
             {
               type: 'reference',
               value: [{ type: 'identifier', value: 'key', raw: 'key' }],
-              raw: '${key}'
+              raw: '${key}',
             },
             { type: 'punctuation', value: ':', raw: ':' },
-            { type: 'identifier', value: 'value', raw: 'value' }
+            { type: 'identifier', value: 'value', raw: 'value' },
           ],
-          raw: '{ ${key}: value }'
-        }
+          raw: '{ ${key}: value }',
+        },
       ]);
     });
   });
 
   describe('whitespace handling', () => {
     it('handles various whitespace patterns consistently', () => {
-      const expressions = [
-        '2 + 2',
-        '2+2',
-        '2   +   2',
-        '\t2\t+\t2\t',
-        '\n2\n+\n2\n'
-      ];
+      const expressions = ['2 + 2', '2+2', '2   +   2', '\t2\t+\t2\t', '\n2\n+\n2\n'];
 
       const expected = [
         { type: 'number', value: 2, raw: '2' },
         { type: 'operator', value: '+', raw: '+' },
-        { type: 'number', value: 2, raw: '2' }
+        { type: 'number', value: 2, raw: '2' },
       ];
 
-      expressions.forEach(expr => {
+      expressions.forEach((expr) => {
         expect(tokenize(expr, logger)).toEqual(expected);
       });
     });
 
     it('preserves whitespace in string literals', () => {
       expect(tokenize('" hello  world "', logger)).toEqual([
-        { type: 'string', value: ' hello  world ', raw: '" hello  world "' }
+        { type: 'string', value: ' hello  world ', raw: '" hello  world "' },
       ]);
     });
 
     it('preserves whitespace in template literals', () => {
       expect(tokenize('`  ${foo}  ${bar}  `', logger)).toEqual([
         { type: 'string', value: '  ', raw: '  ' },
-        { 
+        {
           type: 'reference',
           value: [{ type: 'identifier', value: 'foo', raw: 'foo' }],
-          raw: '${foo}'
+          raw: '${foo}',
         },
         { type: 'string', value: '  ', raw: '  ' },
-        { 
+        {
           type: 'reference',
           value: [{ type: 'identifier', value: 'bar', raw: 'bar' }],
-          raw: '${bar}'
+          raw: '${bar}',
         },
-        { type: 'string', value: '  ', raw: '  ' }
+        { type: 'string', value: '  ', raw: '  ' },
       ]);
     });
   });
@@ -603,17 +603,19 @@ describe('tokenize', () => {
         {
           type: 'string',
           value: 'Hello ',
-          raw: 'Hello '
+          raw: 'Hello ',
         },
         {
           type: 'reference',
-          value: [{
-            type: 'identifier',
-            value: 'name',
-            raw: 'name'
-          }],
-          raw: '${name}'
-        }
+          value: [
+            {
+              type: 'identifier',
+              value: 'name',
+              raw: 'name',
+            },
+          ],
+          raw: '${name}',
+        },
       ]);
     });
 
@@ -622,22 +624,24 @@ describe('tokenize', () => {
         {
           type: 'string',
           value: 'Hello there. My name is ',
-          raw: 'Hello there. My name is '
+          raw: 'Hello there. My name is ',
         },
-        { 
+        {
           type: 'reference',
-          value: [{
-            type: 'identifier',
-            value: 'name',
-            raw: 'name'
-          }],
-          raw: '${name}'
+          value: [
+            {
+              type: 'identifier',
+              value: 'name',
+              raw: 'name',
+            },
+          ],
+          raw: '${name}',
         },
         {
           type: 'string',
           value: '!',
-          raw: '!'
-        }
+          raw: '!',
+        },
       ]);
 
       // Also test with regular string literals
@@ -645,8 +649,8 @@ describe('tokenize', () => {
         {
           type: 'string',
           value: 'Hello there. This is a test.',
-          raw: '"Hello there. This is a test."'
-        }
+          raw: '"Hello there. This is a test."',
+        },
       ]);
     });
 
@@ -655,7 +659,7 @@ describe('tokenize', () => {
         {
           type: 'string',
           value: 'Count: ',
-          raw: 'Count: '
+          raw: 'Count: ',
         },
         {
           type: 'reference',
@@ -663,21 +667,21 @@ describe('tokenize', () => {
             {
               type: 'number',
               value: 1,
-              raw: '1'
+              raw: '1',
             },
             {
               type: 'operator',
               value: '+',
-              raw: '+'
+              raw: '+',
             },
             {
               type: 'number',
               value: 2,
-              raw: '2'
-            }
+              raw: '2',
+            },
           ],
-          raw: '${1 + 2}'
-        }
+          raw: '${1 + 2}',
+        },
       ]);
     });
 
@@ -689,25 +693,27 @@ describe('tokenize', () => {
             {
               type: 'identifier',
               value: 'user',
-              raw: 'user'
+              raw: 'user',
             },
             {
               type: 'operator',
               value: '.',
-              raw: '.'
+              raw: '.',
             },
             {
               type: 'reference',
-              value: [{
-                type: 'identifier',
-                value: 'field',
-                raw: 'field'
-              }],
-              raw: '${field}'
-            }
+              value: [
+                {
+                  type: 'identifier',
+                  value: 'field',
+                  raw: 'field',
+                },
+              ],
+              raw: '${field}',
+            },
           ],
-          raw: '${user.${field}}'
-        }
+          raw: '${user.${field}}',
+        },
       ]);
     });
 
@@ -716,8 +722,8 @@ describe('tokenize', () => {
         {
           type: 'string',
           value: 'Hello ${name}',
-          raw: 'Hello \\${name}'
-        }
+          raw: 'Hello \\${name}',
+        },
       ]);
     });
   });
@@ -731,12 +737,12 @@ describe('tokenize', () => {
             {
               type: 'string',
               value: 'foo',
-              raw: 'foo'
+              raw: 'foo',
             },
             {
               type: 'punctuation',
               value: ':',
-              raw: ':'
+              raw: ':',
             },
             {
               type: 'object_literal',
@@ -744,12 +750,12 @@ describe('tokenize', () => {
                 {
                   type: 'string',
                   value: 'bar',
-                  raw: 'bar'
+                  raw: 'bar',
                 },
                 {
                   type: 'punctuation',
                   value: ':',
-                  raw: ':'
+                  raw: ':',
                 },
                 {
                   type: 'reference',
@@ -757,31 +763,33 @@ describe('tokenize', () => {
                     {
                       type: 'identifier',
                       value: 'baz',
-                      raw: 'baz'
+                      raw: 'baz',
                     },
                     {
                       type: 'operator',
                       value: '.',
-                      raw: '.'
+                      raw: '.',
                     },
                     {
                       type: 'reference',
-                      value: [{
-                        type: 'identifier',
-                        value: 'qux',
-                        raw: 'qux'
-                      }],
-                      raw: '${qux}'
-                    }
+                      value: [
+                        {
+                          type: 'identifier',
+                          value: 'qux',
+                          raw: 'qux',
+                        },
+                      ],
+                      raw: '${qux}',
+                    },
                   ],
-                  raw: '${baz.${qux}}'
-                }
+                  raw: '${baz.${qux}}',
+                },
               ],
-              raw: '{ bar: ${baz.${qux}} }'
-            }
+              raw: '{ bar: ${baz.${qux}} }',
+            },
           ],
-          raw: '{ foo: { bar: ${baz.${qux}} } }'
-        }
+          raw: '{ foo: { bar: ${baz.${qux}} } }',
+        },
       ]);
     });
 
@@ -793,31 +801,33 @@ describe('tokenize', () => {
             {
               type: 'number',
               value: 1,
-              raw: '1'
+              raw: '1',
             },
             {
               type: 'punctuation',
               value: ',',
-              raw: ','
+              raw: ',',
             },
             {
               type: 'operator',
               value: '...',
-              raw: '...'
+              raw: '...',
             },
             {
               type: 'reference',
-              value: [{
-                type: 'identifier',
-                value: 'arr',
-                raw: 'arr'
-              }],
-              raw: '${arr}'
+              value: [
+                {
+                  type: 'identifier',
+                  value: 'arr',
+                  raw: 'arr',
+                },
+              ],
+              raw: '${arr}',
             },
             {
               type: 'punctuation',
               value: ',',
-              raw: ','
+              raw: ',',
             },
             {
               type: 'reference',
@@ -825,24 +835,24 @@ describe('tokenize', () => {
                 {
                   type: 'identifier',
                   value: 'x',
-                  raw: 'x'
+                  raw: 'x',
                 },
                 {
                   type: 'operator',
                   value: '+',
-                  raw: '+'
+                  raw: '+',
                 },
                 {
                   type: 'number',
                   value: 2,
-                  raw: '2'
-                }
+                  raw: '2',
+                },
               ],
-              raw: '${x + 2}'
-            }
+              raw: '${x + 2}',
+            },
           ],
-          raw: '[1, ...${arr}, ${x + 2}]'
-        }
+          raw: '[1, ...${arr}, ${x + 2}]',
+        },
       ]);
     });
   });
@@ -852,15 +862,15 @@ describe('tokenize', () => {
       expect(tokenize('a === b', logger)).toEqual([
         { type: 'identifier', value: 'a', raw: 'a' },
         { type: 'operator', value: '===', raw: '===' },
-        { type: 'identifier', value: 'b', raw: 'b' }
+        { type: 'identifier', value: 'b', raw: 'b' },
       ]);
     });
-    
+
     it('tokenizes strict inequality operator (!==) as one token', () => {
       expect(tokenize('a !== b', logger)).toEqual([
         { type: 'identifier', value: 'a', raw: 'a' },
         { type: 'operator', value: '!==', raw: '!==' },
-        { type: 'identifier', value: 'b', raw: 'b' }
+        { type: 'identifier', value: 'b', raw: 'b' },
       ]);
     });
   });
@@ -872,16 +882,16 @@ describe('tokenize', () => {
           type: 'array_literal',
           value: [
             { type: 'operator', value: '...', raw: '...' },
-            { 
+            {
               type: 'reference',
               value: [{ type: 'identifier', value: 'arr', raw: 'arr' }],
-              raw: '${arr}'
+              raw: '${arr}',
             },
             { type: 'punctuation', value: ',', raw: ',' },
-            { type: 'string', value: 'foo', raw: '"foo"' }
+            { type: 'string', value: 'foo', raw: '"foo"' },
           ],
-          raw: '[ ...${arr}, "foo" ]'
-        }
+          raw: '[ ...${arr}, "foo" ]',
+        },
       ]);
     });
 
@@ -891,25 +901,25 @@ describe('tokenize', () => {
           type: 'array_literal',
           value: [
             { type: 'operator', value: '...', raw: '...' },
-            { 
+            {
               type: 'reference',
               value: [{ type: 'identifier', value: 'a', raw: 'a' }],
-              raw: '${a}'
+              raw: '${a}',
             },
             { type: 'punctuation', value: ',', raw: ',' },
             { type: 'number', value: 1, raw: '1' },
             { type: 'punctuation', value: ',', raw: ',' },
             { type: 'operator', value: '...', raw: '...' },
-            { 
+            {
               type: 'reference',
               value: [{ type: 'identifier', value: 'b', raw: 'b' }],
-              raw: '${b}'
+              raw: '${b}',
             },
             { type: 'punctuation', value: ',', raw: ',' },
-            { type: 'string', value: 'foo', raw: '"foo"' }
+            { type: 'string', value: 'foo', raw: '"foo"' },
           ],
-          raw: '[ ...${a}, 1, ...${b}, "foo" ]'
-        }
+          raw: '[ ...${a}, 1, ...${b}, "foo" ]',
+        },
       ]);
     });
   });

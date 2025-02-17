@@ -305,34 +305,34 @@ describe('SafeExpressionEvaluator', () => {
       stepResults.set('primitive', 42);
       const expression = '[1, 2, ...${primitive}]';
       expect(() => evaluator.evaluate(expression, {})).toThrow(
-        `${errorPrefix} cannot spread number literal`,
+        `${errorPrefix} can only spread arrays or objects`,
       );
 
       // Test spreading string literals
       stepResults.set('primitive', 'foo');
       const expression2 = '[1, 2, ...${primitive}]';
       expect(() => evaluator.evaluate(expression2, {})).toThrow(
-        `${errorPrefix} cannot spread string literal`,
+        `${errorPrefix} can only spread arrays or objects`,
       );
 
       // Test spreading boolean literals
       stepResults.set('primitive', true);
       const expression3 = '[1, 2, ...${primitive}]';
       expect(() => evaluator.evaluate(expression3, {})).toThrow(
-        `${errorPrefix} cannot spread boolean literal`,
+        `${errorPrefix} can only spread arrays or objects`,
       );
 
       // Test spreading null/undefined
       stepResults.set('primitive', null);
       const expression4 = '[1, 2, ...${primitive}]';
       expect(() => evaluator.evaluate(expression4, {})).toThrow(
-        `${errorPrefix} cannot spread null`,
+        `${errorPrefix} can only spread arrays or objects`,
       );
 
       stepResults.set('primitive', undefined);
       const expression5 = '[1, 2, ...${primitive}]';
       expect(() => evaluator.evaluate(expression5, {})).toThrow(
-        `${errorPrefix} cannot spread undefined`,
+        `${errorPrefix} can only spread arrays or objects`,
       );
     });
   });

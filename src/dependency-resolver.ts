@@ -129,6 +129,21 @@ export class DependencyResolver {
           this.loopVars.delete(loopVar);
         }
       }
+
+      // Process the loop's steps if present
+      if (step.loop.steps) {
+        // Add the loop variable to loopVars temporarily
+        const loopVar = step.loop.as;
+        this.loopVars.add(loopVar);
+
+        // Find dependencies in each step
+        for (const subStep of step.loop.steps) {
+          this.findStepDependencies(subStep).forEach((dep) => deps.add(dep));
+        }
+
+        // Remove the loop variable from loopVars
+        this.loopVars.delete(loopVar);
+      }
     }
 
     // Extract references from condition steps

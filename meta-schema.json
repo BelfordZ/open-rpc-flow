@@ -130,7 +130,7 @@
       "properties": {
         "loop": {
           "type": "object",
-          "required": ["over", "as", "step"],
+          "required": ["over", "as"],
           "properties": {
             "over": {
               "type": "string",
@@ -152,6 +152,13 @@
             "step": {
               "$ref": "#/definitions/Step",
               "description": "The step to execute for each item in the iteration. Can be any primitive step type."
+            },
+            "steps": {
+              "type": "array",
+              "description": "An array of steps to execute for each item in the iteration.",
+              "items": {
+                "$ref": "#/definitions/Step"
+              }
             }
           }
         }

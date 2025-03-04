@@ -541,4 +541,61 @@ describe('DependencyResolver', () => {
     expect(deps).toContain('step2');
     expect(deps).toContain('step3');
   });
+
+  it('correctly identifies dependencies in loop steps with multiple steps', () => {
+    const flow: Flow = {
+      name: 'Test Flow',
+      description: 'Test flow for loop step dependencies with multiple steps',
+      steps: [
+        {
+          name: 'getUser',
+          request: {
+            method: 'user.get',
+            params: { id: 1 },
+          },
+        },
+        {
+          name: 'getFriends',
+          request: {
+            method: 'user.getFriends',
+            params: { userId: '${getUser.id}' },
+          },
+        },
+        {
+          name: 'notifyFriends',
+          loop: {
+            over: '${getFriends}',
+            as: 'friend',
+            steps: [
+              {
+                name: 'validateFriend',
+                request: {
+                  method: 'friend.validate',
+                  params: { id: '${friend.id}' },
+                },
+              },
+              {
+                name: 'sendNotification',
+                request: {
+                  method: 'notification.send',
+                  params: {
+                    userId: '${friend.id}',
+                    message: 'Hello from ${getUser.name}!',
+                  },
+                },
+              },
+            ],
+          },
+        },
+      ],
+    };
+
+    const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
+    expect(resolver.getDependencies('notifyFriends')).toEqual(['getFriends', 'getUser']);
+    expect(resolver.getExecutionOrder().map((s) => s.name)).toEqual([
+      'getUser',
+      'getFriends',
+      'notifyFriends',
+    ]);
+  });
 });

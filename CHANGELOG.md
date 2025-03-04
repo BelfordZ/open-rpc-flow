@@ -1,3 +1,10 @@
+## [1.3.4](https://github.com/BelfordZ/open-rpc-flow/compare/v1.3.3...v1.3.4) (2025-03-04)
+
+
+### Bug Fixes
+
+* add support for loop steps in meta schema ([2e500be](https://github.com/BelfordZ/open-rpc-flow/commit/2e500be968822d08a195932ebd12456d971a30dc))
+
 ## [1.3.3](https://github.com/BelfordZ/open-rpc-flow/compare/v1.3.2...v1.3.3) (2025-02-17)
 
 

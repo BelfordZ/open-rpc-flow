@@ -3,7 +3,6 @@
   "title": "JSON-RPC Flow Schema",
   "description": "A schema for defining JSON-RPC workflows as a series of composable, nestable operations. Each flow consists of a sequence of steps that can be executed based on their data dependencies and control flow structures.",
   "type": "object",
-  "required": ["name", "description", "steps"],
   "properties": {
     "name": {
       "type": "string",

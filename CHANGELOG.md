@@ -1,3 +1,10 @@
+## [1.3.5](https://github.com/BelfordZ/open-rpc-flow/compare/v1.3.4...v1.3.5) (2025-03-10)
+
+
+### Bug Fixes
+
+* loosen metaschema for Flow required props ([#40](https://github.com/BelfordZ/open-rpc-flow/issues/40)) ([fec06e2](https://github.com/BelfordZ/open-rpc-flow/commit/fec06e219c86fc389306b45457e089a75612b50d))
+
 ## [1.3.4](https://github.com/BelfordZ/open-rpc-flow/compare/v1.3.3...v1.3.4) (2025-03-04)
 
 

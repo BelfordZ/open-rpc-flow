@@ -6,8 +6,7 @@
   "properties": {
     "name": {
       "type": "string",
-      "description": "A unique identifier for the flow. Should be descriptive and follow kebab-case naming convention.",
-      "pattern": "^[a-z][a-z0-9-]*$"
+      "description": "A unique identifier for the flow. Should be descriptive and follow kebab-case naming convention."
     },
     "description": {
       "type": "string",

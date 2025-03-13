@@ -1,3 +1,10 @@
+## [1.3.6](https://github.com/BelfordZ/open-rpc-flow/compare/v1.3.5...v1.3.6) (2025-03-13)
+
+
+### Bug Fixes
+
+* remove pattern requirements for name ([#41](https://github.com/BelfordZ/open-rpc-flow/issues/41)) ([a27ce76](https://github.com/BelfordZ/open-rpc-flow/commit/a27ce768da444bdde403278fa1eeeb08d80d406d))
+
 ## [1.3.5](https://github.com/BelfordZ/open-rpc-flow/compare/v1.3.4...v1.3.5) (2025-03-10)
 
 

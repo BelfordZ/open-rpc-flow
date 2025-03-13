@@ -2,6 +2,7 @@ import { Step, StepExecutionContext, JsonRpcRequest } from '../types';
 import { StepExecutor, StepExecutionResult, JsonRpcRequestError, StepType } from './types';
 import { Logger } from '../util/logger';
 import { RequestStep } from './types';
+import { RequestError } from '../errors';
 
 export class RequestStepExecutor implements StepExecutor {
   private requestId: number = 0;
@@ -32,7 +33,10 @@ export class RequestStepExecutor implements StepExecutor {
     extraContext: Record<string, any> = {},
   ): Promise<StepExecutionResult> {
     if (!this.canExecute(step)) {
-      throw new Error('Invalid step type for RequestStepExecutor');
+      throw new RequestError('Invalid step type for RequestStepExecutor', {
+        stepName: step.name,
+        stepType: Object.keys(step).filter(key => key !== 'name').join(', ')
+      });
     }
 
     const requestStep = step as RequestStep;
@@ -47,12 +51,18 @@ export class RequestStepExecutor implements StepExecutor {
     try {
       // Validate method name
       if (typeof requestStep.request.method !== 'string' || !requestStep.request.method.trim()) {
-        throw new Error('Invalid method name: must be a non-empty string');
+        throw new RequestError('Invalid method name: must be a non-empty string', {
+          stepName: step.name,
+          method: requestStep.request.method
+        });
       }
 
       // Validate params
       if (requestStep.request.params !== null && typeof requestStep.request.params !== 'object') {
-        throw new Error('Invalid params: must be an object, array, or null');
+        throw new RequestError('Invalid params: must be an object, array, or null', {
+          stepName: step.name,
+          paramsType: typeof requestStep.request.params
+        });
       }
 
       // Resolve references in params
@@ -105,7 +115,12 @@ export class RequestStepExecutor implements StepExecutor {
       if (error instanceof JsonRpcRequestError) {
         throw error;
       }
-      throw new Error(errorMessage);
+      throw new RequestError(errorMessage, {
+        stepName: step.name,
+        requestId,
+        originalError: error?.message || 'Unknown error',
+        method: requestStep.request.method
+      });
     }
   }
 }

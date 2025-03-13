@@ -15,6 +15,7 @@ export interface Flow {
 export interface Step {
   name: string;
   description?: string;
+  dependencies?: string[];
   request?: {
     method: string;
     params: Record<string, any> | any[];

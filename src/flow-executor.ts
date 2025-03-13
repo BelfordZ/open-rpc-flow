@@ -13,6 +13,9 @@ import {
   StepType,
 } from './step-executors';
 import { Logger, defaultLogger } from './util/logger';
+import { ValidationError } from './errors';
+import { FlowError } from './errors';
+import { StepExecutionError } from './errors';
 
 /**
  * Main executor for JSON-RPC flows
@@ -34,6 +37,10 @@ export class FlowExecutor {
     logger?: Logger,
   ) {
     this.logger = logger || defaultLogger;
+    
+    // Validate flow structure
+    this.validateFlow(flow);
+    
     this.context = flow.context || {};
     this.stepResults = new Map();
 
@@ -67,6 +74,46 @@ export class FlowExecutor {
       ),
       new StopStepExecutor(this.logger),
     ];
+  }
+
+  /**
+   * Validates the flow structure and throws ValidationError if requirements are not met
+   */
+  private validateFlow(flow: Flow): void {
+    // Check if name is present
+    if (!flow.name) {
+      throw new ValidationError('Missing required field: name', { field: 'name' });
+    }
+
+    // Check if steps is present and is an array
+    if (!flow.steps) {
+      throw new ValidationError('Missing required field: steps', { field: 'steps' });
+    }
+
+    if (!Array.isArray(flow.steps)) {
+      throw new ValidationError('Steps must be an array', { field: 'steps', type: typeof flow.steps });
+    }
+
+    // Check if steps array is not empty
+    if (flow.steps.length === 0) {
+      throw new ValidationError('Flow must have at least one step', { field: 'steps' });
+    }
+
+    // Check if description is present
+    if (!flow.description) {
+      throw new ValidationError('Missing required field: description', { field: 'description' });
+    }
+
+    // Validate each step has a name
+    for (let i = 0; i < flow.steps.length; i++) {
+      const step = flow.steps[i];
+      if (!step.name) {
+        throw new ValidationError(`Step at index ${i} is missing required field: name`, { 
+          stepIndex: i,
+          field: 'name'
+        });
+      }
+    }
   }
 
   /**
@@ -112,7 +159,11 @@ export class FlowExecutor {
 
       const executor = this.findExecutor(step);
       if (!executor) {
-        throw new Error(`No executor found for step ${step.name}`);
+        throw new ValidationError(`No executor found for step ${step.name}`, {
+          stepName: step.name,
+          stepType: Object.keys(step).find((k) => k !== 'name'),
+          availableExecutors: this.stepExecutors.map((e) => e.constructor.name)
+        });
       }
 
       this.logger.debug('Selected executor:', {
@@ -125,7 +176,17 @@ export class FlowExecutor {
     } catch (error: any) {
       const errorMessage = error.message || String(error);
       this.logger.error(`Step execution failed: ${step.name}`, { error: errorMessage });
-      throw new Error(`Failed to execute step ${step.name}: ${errorMessage}`);
+      
+      // If it's already one of our FlowError types, just rethrow it
+      if (error instanceof FlowError) {
+        throw error;
+      }
+      
+      // Otherwise, wrap it in a StepExecutionError with the step context
+      throw new StepExecutionError(`Failed to execute step ${step.name}: ${errorMessage}`, {
+        stepName: step.name,
+        originalError: errorMessage
+      });
     }
   }
 

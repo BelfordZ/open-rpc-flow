@@ -139,7 +139,10 @@ export const isTransformStep = (step: Step): step is TransformStep =>
  * Type guard for loop results
  */
 export const isLoopResult = <T>(result: StepExecutionResult<any>): result is LoopStepResult<T> =>
-  result.type === StepType.Loop && 'value' in result.result && 'iterationCount' in result.result;
+  result.type === StepType.Loop && 
+  result.result !== undefined && 
+  'value' in result.result && 
+  'iterationCount' in result.result;
 
 /**
  * Base type for loop results

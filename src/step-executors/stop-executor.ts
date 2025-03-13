@@ -1,6 +1,7 @@
 import { Step } from '../types';
 import { StepExecutor, StepExecutionResult, StepType } from './types';
 import { Logger } from '../util/logger';
+import { ValidationError } from '../errors';
 
 export interface StopStep extends Step {
   stop: {
@@ -21,7 +22,10 @@ export class StopStepExecutor implements StepExecutor {
 
   async execute(step: Step): Promise<StepExecutionResult> {
     if (!this.canExecute(step)) {
-      throw new Error('Invalid step type for StopStepExecutor');
+      throw new ValidationError('Invalid step type for StopStepExecutor', {
+        stepName: step.name,
+        stepType: Object.keys(step).filter(key => key !== 'name').join(', ')
+      });
     }
 
     const stopStep = step as StopStep;

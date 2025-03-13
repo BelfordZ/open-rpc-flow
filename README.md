@@ -430,19 +430,87 @@ The engine supports dynamic expressions using the `${...}` syntax:
 
 ## Error Handling
 
-The engine provides detailed error information and recovery options:
+The Flow Execution Engine throws specific error classes, all extending `FlowError`. Use `instanceof` to catch and handle them.
+
+### Error Classes
+
+- `ValidationError`: Pre-execution flow structure issues (e.g., missing fields).
+- `DependencyError`: Unresolved step dependencies.
+- `ExpressionError`: Expression evaluation failures.
+- `RequestError`: JSON-RPC request failures.
+- `StepExecutionError`: Step execution issues.
+  - `LoopError`: Loop-specific errors (e.g., missing configuration, invalid inputs).
+  - `TransformError`: Transform-specific errors (e.g., invalid operations).
+  - `ConditionError`: Condition-specific errors (e.g., non-boolean conditions).
+
+### Example
 
 ```typescript
+import { 
+  FlowExecutor, 
+  FlowError,
+  ValidationError, 
+  DependencyError,
+  ExpressionError,
+  RequestError,
+  StepExecutionError,
+  LoopError,
+  TransformError,
+  ConditionError
+} from '@open-rpc/flow';
+
 try {
+  const executor = new FlowExecutor(flow, jsonRpcHandler);
   await executor.execute();
 } catch (error) {
-  if (error instanceof JsonRpcRequestError) {
-    // Handle JSON-RPC specific errors
-    console.error('RPC Error:', error.error);
+  if (error instanceof ValidationError) {
+    console.error(`Invalid flow: ${error.message}`, error.details);
+  } else if (error instanceof DependencyError) {
+    console.error(`Dependency issue: ${error.message}`, error.details);
+  } else if (error instanceof ExpressionError) {
+    console.error(`Expression error: ${error.message}`, error.details);
+  } else if (error instanceof RequestError) {
+    console.error(`Request failed: ${error.message}`, error.details);
+  } else if (error instanceof LoopError) {
+    console.error(`Loop issue: ${error.message}`, error.details);
+  } else if (error instanceof TransformError) {
+    console.error(`Transform issue: ${error.message}`, error.details);
+  } else if (error instanceof ConditionError) {
+    console.error(`Condition issue: ${error.message}`, error.details);
+  } else if (error instanceof StepExecutionError) {
+    console.error(`Step execution failed: ${error.message}`, error.details);
+  } else if (error instanceof FlowError) {
+    console.error(`Flow error: ${error.message}`, error.details);
   } else {
-    // Handle other execution errors
-    console.error('Execution Error:', error.message);
+    console.error(`Unexpected error: ${error.message}`);
   }
+}
+```
+
+### Error Details
+
+All error classes include a `details` property with contextual information about the error:
+
+```typescript
+// ValidationError details
+{
+  field: 'steps',  // The field that failed validation
+  stepIndex: 2     // Optional: index of the step that failed validation
+}
+
+// DependencyError details
+{
+  stepName: 'processData',           // The step with the dependency issue
+  missingDependency: 'fetchData',    // The missing dependency
+  availableSteps: ['step1', 'step2'] // Available steps in the flow
+}
+
+// RequestError details
+{
+  stepName: 'makeRequest',    // The step that failed
+  method: 'data.fetch',       // The JSON-RPC method
+  requestId: 123,             // The request ID
+  originalError: 'Network error' // The original error message
 }
 ```
 

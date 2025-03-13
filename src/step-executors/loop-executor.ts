@@ -1,203 +1,133 @@
-import { Step, StepExecutionContext } from '../types';
-import { StepExecutor, StepExecutionResult, StepType, LoopStep } from './types';
+import { StepExecutionContext, Step } from '../types';
+import {
+  StepExecutor,
+  LoopStep,
+  isLoopStep,
+  StepExecutionResult,
+  StepType,
+  LoopResult,
+} from './types';
 import { Logger } from '../util/logger';
+import { LoopError } from '../errors';
 
-export type ExecuteStep = (
-  step: Step,
-  extraContext?: Record<string, any>,
-) => Promise<StepExecutionResult>;
-
-export class LoopStepExecutor implements StepExecutor {
-  private logger: Logger;
-
+/**
+ * Executes loop steps that iterate over arrays or collections
+ */
+export class LoopStepExecutor implements StepExecutor<LoopStep> {
   constructor(
-    private executeStep: ExecuteStep,
-    logger: Logger,
-  ) {
-    this.logger = logger.createNested('LoopStepExecutor');
-  }
+    private executeStep: (step: Step, extraContext?: Record<string, any>) => Promise<StepExecutionResult>,
+    private logger: Logger
+  ) {}
 
   canExecute(step: Step): step is LoopStep {
-    return 'loop' in step;
+    return isLoopStep(step);
   }
 
   async execute(
-    step: Step,
+    step: LoopStep,
     context: StepExecutionContext,
-    extraContext: Record<string, any> = {},
-  ): Promise<StepExecutionResult> {
-    if (!this.canExecute(step)) {
-      throw new Error('Invalid step type for LoopStepExecutor');
+    extraContext: Record<string, any> = {}
+  ): Promise<StepExecutionResult<LoopResult<any>>> {
+    this.logger.debug('Loop executor starting', { stepName: step.name });
+
+    // Validate required loop properties
+    if (!step.loop.step && !step.loop.steps) {
+      throw new LoopError('Loop must have either step or steps defined', {
+        stepName: step.name,
+        loopConfig: step.loop
+      });
     }
 
-    const loopStep = step as LoopStep;
-
-    if (!loopStep.loop.step && !loopStep.loop.steps) {
-      throw new Error('Loop must have either step or steps defined');
+    // Get the array to loop over
+    const loopArray = context.expressionEvaluator.evaluate(step.loop.over, extraContext);
+    
+    if (!Array.isArray(loopArray)) {
+      throw new LoopError(`Expected array for loop iteration, but got ${typeof loopArray}`, {
+        stepName: step.name,
+        overValue: loopArray,
+        valueType: typeof loopArray
+      });
     }
 
-    this.logger.debug('Starting loop execution', {
+    const iterationVariable = step.loop.as || 'item';
+    const maxIterations = step.loop.maxIterations || loopArray.length;
+    const conditionExpr = step.loop.condition;
+
+    this.logger.debug('Loop details', {
       stepName: step.name,
-      iterationVariable: loopStep.loop.as,
-      maxIterations: loopStep.loop.maxIterations,
+      arrayLength: loopArray.length,
+      iterationVariable,
+      maxIterations,
+      hasCondition: Boolean(conditionExpr),
     });
 
-    try {
-      // Resolve the collection to iterate over using expressionEvaluator
-      const collection = context.expressionEvaluator.evaluate(loopStep.loop.over, extraContext);
+    // Results for each loop iteration
+    const results: any[] = [];
+    let iterationCount = 0;
+    let skippedCount = 0;
 
-      if (!Array.isArray(collection)) {
-        throw new Error(
-          `Loop "over" value must resolve to an array. ${JSON.stringify(
-            {
-              over: loopStep.loop.over,
-              resolvedValue: collection,
-              contextKeys: Object.keys(extraContext),
-            },
-            null,
-            2,
-          )}`,
-        );
-      }
-
-      this.logger.debug('Resolved loop collection', {
-        stepName: step.name,
-        collectionLength: collection.length,
-      });
-
-      const results: StepExecutionResult[] = [];
-      let iterationCount = 0;
-      let executedCount = 0;
-      let skippedCount = 0;
-      const maxIterations = loopStep.loop.maxIterations || collection.length;
-
-      // Add this line to maintain iteration history
-      const iterationHistory: any[] = [];
-
-      for (const item of collection) {
-        // Check if we've reached maxIterations
-        if (iterationCount >= maxIterations) {
-          this.logger.debug('Reached maximum iterations', {
-            stepName: step.name,
-            maxIterations,
-          });
-          break;
-        }
-
-        // Increment iteration count before any processing
-        iterationCount++;
-
-        // Create iteration context with array of iterations
-        const currentIteration = {
-          index: iterationCount - 1, // Keep 0-based index for compatibility
-          count: iterationCount,
-          total: collection.length,
-          maxIterations,
-          isFirst: iterationCount === 1,
-          isLast: iterationCount === maxIterations || iterationCount === collection.length,
-          value: item,
-        };
-
-        // Add current iteration to history
-        iterationHistory.push(currentIteration);
-
-        const iterationContext = {
-          ...extraContext,
-          [loopStep.loop.as]: item,
-          metadata: {
-            iteration: [...iterationHistory], // copy of iterationHistory so that it get changed by later iterations
-            current: currentIteration,
-          },
-        };
-
-        this.logger.debug('Creating iteration context', {
-          iterationCount,
-          currentItem: item,
-          iterationHistoryLength: iterationHistory.length,
-          context: iterationContext,
-        });
-
-        // Check condition if present
-        if (loopStep.loop.condition) {
-          const conditionMet = context.expressionEvaluator.evaluate(
-            loopStep.loop.condition,
-            iterationContext,
-          );
-
-          if (!conditionMet) {
-            this.logger.debug('Loop condition not met, skipping iteration', {
-              stepName: step.name,
-              iteration: iterationCount,
-            });
-            skippedCount++;
-            continue;
-          }
-        }
-
-        this.logger.debug('Executing loop iteration', {
-          stepName: step.name,
-          iteration: iterationCount,
-        });
-
-        if (loopStep.loop.step) {
-          const result = await this.executeStep(loopStep.loop.step, iterationContext);
-          results.push(result);
-          executedCount++;
-        } else if (loopStep.loop.steps) {
-          const stepResults = [];
-          for (const stepToExecute of loopStep.loop.steps) {
-            const result = await this.executeStep(stepToExecute, iterationContext);
-            stepResults.push(result);
-          }
-          results.push({
-            type: StepType.Loop,
-            result: {
-              value: stepResults,
-              iterationCount: 1,
-              skippedCount: 0,
-            },
-            metadata: {
-              maxIterations: 1,
-              variable: loopStep.loop.as,
-            },
-          });
-          executedCount++;
-        }
-      }
-
-      // Calculate total skipped count (condition skips + remaining items)
-      const remainingItems = collection.length - iterationCount;
-      const totalSkipped = skippedCount + remainingItems;
-
-      this.logger.debug('Loop execution completed', {
-        stepName: step.name,
-        totalIterations: iterationCount,
-        executedCount,
-        skippedCount: totalSkipped,
-        resultsCount: results.length,
-      });
-
-      return {
-        type: StepType.Loop,
-        result: {
-          value: results,
-          iterationCount,
-          skippedCount: totalSkipped,
-        },
-        metadata: {
-          maxIterations,
-          variable: loopStep.loop.as,
-        },
+    // Execute loop for each item in the array
+    for (let i = 0; i < Math.min(loopArray.length, maxIterations); i++) {
+      const item = loopArray[i];
+      
+      // Create context for this iteration
+      const iterationContext = {
+        ...extraContext,
+        [iterationVariable]: item,
+        index: i,
       };
-    } catch (error: any) {
-      const errorMessage = `Failed to execute loop step "${step.name}": ${error?.message || 'Unknown error'}`;
 
-      this.logger.error('Loop execution failed', {
-        stepName: step.name,
-        error: errorMessage,
-      });
+      // Check condition if specified
+      if (conditionExpr) {
+        const conditionResult = context.expressionEvaluator.evaluate(conditionExpr, iterationContext);
+        if (!conditionResult) {
+          this.logger.debug('Loop condition false, skipping iteration', {
+            stepName: step.name,
+            index: i,
+            condition: conditionExpr,
+          });
+          skippedCount++;
+          continue;
+        }
+      }
 
-      throw new Error(errorMessage);
+      // Execute either the single step or multiple steps
+      if (step.loop.step) {
+        // Execute single step for this iteration
+        const stepResult = await this.executeStep(step.loop.step, iterationContext);
+        results.push(stepResult.result);
+      } else if (step.loop.steps) {
+        // Execute multiple steps for this iteration
+        const iterationResults = [];
+        
+        for (const nestedStep of step.loop.steps) {
+          const stepResult = await this.executeStep(nestedStep, iterationContext);
+          iterationResults.push(stepResult.result);
+        }
+        
+        results.push(iterationResults);
+      }
+
+      iterationCount++;
     }
+
+    // Construct loop result
+    const result: LoopResult<any> = {
+      value: results,
+      iterationCount,
+      skippedCount,
+    };
+
+    this.logger.debug('Loop executor finished', {
+      stepName: step.name,
+      iterationCount,
+      skippedCount,
+      resultLength: results.length,
+    });
+
+    return {
+      type: StepType.Loop,
+      result,
+    };
   }
-}
+} 

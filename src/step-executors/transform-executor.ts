@@ -9,6 +9,7 @@ import {
 import { Logger } from '../util/logger';
 import { SafeExpressionEvaluator } from '../expression-evaluator/safe-evaluator';
 import { ReferenceResolver } from '../reference-resolver';
+import { TransformError } from '../errors';
 
 /**
  * Core transform executor that handles all transformation operations
@@ -93,7 +94,10 @@ export class TransformExecutor {
         case 'join':
           return this.executeJoin(op, data);
         default:
-          throw new Error(`Unknown transform operation type: ${op.type}`);
+          throw new TransformError(`Unknown transform operation type: ${op.type}`, {
+            operationType: op.type,
+            availableOperations: ['map', 'filter', 'reduce', 'flatten', 'sort', 'unique', 'group', 'join']
+          });
       }
     } catch (error) {
       this.logger.error('Operation execution failed', { type: op.type, error });
@@ -271,7 +275,11 @@ export class TransformExecutor {
 
   private validateArray(data: any, operation: string): void {
     if (!Array.isArray(data)) {
-      throw new Error(`${operation} operation requires an array input, got ${typeof data}`);
+      throw new TransformError(`${operation} operation requires an array input, got ${typeof data}`, {
+        operation,
+        inputType: typeof data,
+        input: data
+      });
     }
   }
 }
@@ -308,7 +316,10 @@ export class TransformStepExecutor implements StepExecutor {
     extraContext: Record<string, any> = {},
   ): Promise<StepExecutionResult> {
     if (!this.canExecute(step)) {
-      throw new Error('Invalid step type for TransformStepExecutor');
+      throw new TransformError('Invalid step type for TransformStepExecutor', {
+        stepName: step.name,
+        stepType: Object.keys(step).filter(key => key !== 'name').join(', ')
+      });
     }
 
     const transformStep = step as TransformStep;

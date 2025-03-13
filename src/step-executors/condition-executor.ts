@@ -1,6 +1,7 @@
 import { Step, StepExecutionContext } from '../types';
 import { StepExecutor, StepExecutionResult, StepType, ConditionStep } from './types';
 import { Logger } from '../util/logger';
+import { ConditionError } from '../errors';
 
 export class ConditionStepExecutor implements StepExecutor {
   private logger: Logger;
@@ -25,7 +26,10 @@ export class ConditionStepExecutor implements StepExecutor {
     extraContext: Record<string, any> = {},
   ): Promise<StepExecutionResult> {
     if (!this.canExecute(step)) {
-      throw new Error('Invalid step type for ConditionStepExecutor');
+      throw new ConditionError('Invalid step type for ConditionStepExecutor', {
+        stepName: step.name,
+        stepType: Object.keys(step).filter(key => key !== 'name').join(', ')
+      });
     }
 
     const conditionStep = step as ConditionStep;
@@ -40,6 +44,16 @@ export class ConditionStepExecutor implements StepExecutor {
         conditionStep.condition.if,
         extraContext,
       );
+
+      // Validate that the condition evaluates to a boolean
+      if (typeof conditionValue !== 'boolean') {
+        throw new ConditionError('Condition must evaluate to boolean', {
+          stepName: step.name,
+          condition: conditionStep.condition.if,
+          actualType: typeof conditionValue,
+          value: conditionValue
+        });
+      }
 
       this.logger.debug('Condition evaluated', {
         stepName: step.name,

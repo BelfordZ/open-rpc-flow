@@ -7,6 +7,7 @@ import {
   isTransformStep,
 } from './step-executors/types';
 import { SafeExpressionEvaluator } from './expression-evaluator/safe-evaluator';
+import { DependencyError } from './errors';
 
 export class DependencyResolver {
   private logger: Logger;
@@ -38,7 +39,10 @@ export class DependencyResolver {
     const graph = this.buildDependencyGraph();
     const deps = graph.get(stepName);
     if (!deps) {
-      throw new Error(`Step '${stepName}' not found in dependency graph`);
+      throw new DependencyError(`Step '${stepName}' not found in dependency graph`, {
+        stepName,
+        availableSteps: Array.from(graph.keys())
+      });
     }
     return Array.from(deps);
   }
@@ -77,7 +81,14 @@ export class DependencyResolver {
       const deps = this.findStepDependencies(step);
       for (const dep of deps) {
         if (!graph.has(dep)) {
-          throw new Error(`Step '${step.name}' depends on unknown step '${dep}'`);
+          throw new DependencyError(
+            `Step '${step.name}' depends on unknown step '${dep}'`,
+            {
+              stepName: step.name,
+              missingDependency: dep,
+              availableSteps: Array.from(graph.keys())
+            }
+          );
         }
         graph.get(step.name)?.add(dep);
       }
@@ -223,7 +234,10 @@ export class DependencyResolver {
 
     const visit = (node: string) => {
       if (temp.has(node)) {
-        throw new Error(`Circular dependency detected: ${node}`);
+        throw new DependencyError(`Circular dependency detected: ${node}`, {
+          node,
+          dependencyChain: Array.from(temp)
+        });
       }
       if (visited.has(node)) {
         return;

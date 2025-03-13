@@ -71,9 +71,9 @@ describe('LoopStepExecutor', () => {
 
     expect(isLoopResult<TestResult>(result)).toBe(true);
     expect(result.type).toBe(StepType.Loop);
-    expect(result.result.value).toHaveLength(3);
-    expect(result.result.iterationCount).toBe(3);
-    expect(result.result.skippedCount).toBe(0);
+    expect(result.result!.value).toHaveLength(3);
+    expect(result.result!.iterationCount).toBe(3);
+    expect(result.result!.skippedCount).toBe(0);
     expect(executeStep).toHaveBeenCalledTimes(3);
 
     // Verify expression evaluator calls
@@ -148,13 +148,13 @@ describe('LoopStepExecutor', () => {
     const result = await executor.execute(step, context);
     expect(isLoopResult<TestResult>(result)).toBe(true);
     expect(result.type).toBe(StepType.Loop);
-    expect(result.result.value).toHaveLength(2);
-    expect(result.result.iterationCount).toBe(2);
-    expect(result.result.skippedCount).toBe(0);
+    expect(result.result!.value).toHaveLength(2);
+    expect(result.result!.iterationCount).toBe(2);
+    expect(result.result!.skippedCount).toBe(0);
     expect(executeStep).toHaveBeenCalledTimes(2);
 
     // Each inner loop result should have 2 items due to maxIterations
-    const innerResults = result.result.value;
+    const innerResults = result.result!.value;
     expect(innerResults[0].result).toEqual({
       value: [
         {
@@ -213,9 +213,9 @@ describe('LoopStepExecutor', () => {
     const result = await executor.execute(step, context);
 
     expect(result.type).toBe(StepType.Loop);
-    expect(result.result.value).toHaveLength(0);
-    expect(result.result.iterationCount).toBe(0);
-    expect(result.result.skippedCount).toBe(0);
+    expect(result.result!.value).toHaveLength(0);
+    expect(result.result!.iterationCount).toBe(0);
+    expect(result.result!.skippedCount).toBe(0);
     expect(executeStep).not.toHaveBeenCalled();
 
     // Verify expression evaluator calls
@@ -359,9 +359,9 @@ describe('LoopStepExecutor', () => {
     const result = await executor.execute(step, context);
 
     expect(result.type).toBe(StepType.Loop);
-    expect(result.result.value).toHaveLength(2); // Should only process 2 items due to maxIterations
-    expect(result.result.iterationCount).toBe(2); // Should count only processed iterations
-    expect(result.result.skippedCount).toBe(2); // Should all skipped items (maxIterations)
+    expect(result.result!.value).toHaveLength(2); // Should only process 2 items due to maxIterations
+    expect(result.result!.iterationCount).toBe(2); // Should count only processed iterations
+    expect(result.result!.skippedCount).toBe(2); // Should all skipped items (maxIterations)
     expect(executeStep).toHaveBeenCalledTimes(2);
 
     const iterationHistory = [
@@ -474,13 +474,13 @@ describe('LoopStepExecutor', () => {
     const result = await executor.execute(step, context);
     expect(isLoopResult<TestResult>(result)).toBe(true);
     expect(result.type).toBe(StepType.Loop);
-    expect(result.result.value).toHaveLength(2);
-    expect(result.result.iterationCount).toBe(2);
-    expect(result.result.skippedCount).toBe(1);
+    expect(result.result!.value).toHaveLength(2);
+    expect(result.result!.iterationCount).toBe(2);
+    expect(result.result!.skippedCount).toBe(1);
     expect(executeStep).toHaveBeenCalledTimes(2);
 
     // Each inner loop result should have 2 items due to maxIterations
-    const innerResults = result.result.value;
+    const innerResults = result.result!.value;
     expect(innerResults[0].result).toEqual({
       value: [
         {
@@ -548,9 +548,9 @@ describe('LoopStepExecutor', () => {
     const result = await executor.execute(step, context);
 
     expect(result.type).toBe('loop');
-    expect(result.result.value).toHaveLength(2); // Should process 2 valid items within maxIterations
-    expect(result.result.iterationCount).toBe(3); // Should count all iterations within maxIterations
-    expect(result.result.skippedCount).toBe(2); // Should all skipped items (condiiton not met + skipped due to maxIterations)
+    expect(result.result!.value).toHaveLength(2); // Should process 2 valid items within maxIterations
+    expect(result.result!.iterationCount).toBe(3); // Should count all iterations within maxIterations
+    expect(result.result!.skippedCount).toBe(2); // Should all skipped items (condiiton not met + skipped due to maxIterations)
     expect(executeStep).toHaveBeenCalledTimes(2);
   });
 
@@ -637,13 +637,13 @@ describe('LoopStepExecutor', () => {
     const result = await executor.execute(step, context);
 
     expect(result.type).toBe(StepType.Loop);
-    expect(result.result.value).toHaveLength(2); // Two iterations
-    expect(result.result.iterationCount).toBe(2);
-    expect(result.result.skippedCount).toBe(0);
+    expect(result.result!.value).toHaveLength(2); // Two iterations
+    expect(result.result!.iterationCount).toBe(2);
+    expect(result.result!.skippedCount).toBe(0);
 
     // Each iteration should have executed both steps
-    expect(result.result.value[0].result.value).toEqual([mockValidateResult, mockProcessResult]);
-    expect(result.result.value[1].result.value).toEqual([mockValidateResult, mockProcessResult]);
+    expect(result.result!.value[0].result.value).toEqual([mockValidateResult, mockProcessResult]);
+    expect(result.result!.value[1].result.value).toEqual([mockValidateResult, mockProcessResult]);
 
     // Should have been called 4 times total (2 steps × 2 iterations)
     expect(executeStep).toHaveBeenCalledTimes(4);

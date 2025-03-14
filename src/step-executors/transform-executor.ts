@@ -99,8 +99,18 @@ export class TransformExecutor {
             availableOperations: ['map', 'filter', 'reduce', 'flatten', 'sort', 'unique', 'group', 'join']
           });
       }
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error('Operation execution failed', { type: op.type, error });
+      
+      // Wrap expression errors in TransformError
+      if (error.name === 'FlowExpressionError' || error.name === 'ExpressionError') {
+        throw new TransformError(`Failed to execute ${op.type} operation: ${error.message}`, {
+          operationType: op.type,
+          expression: op.using,
+          originalError: error.message
+        });
+      }
+      
       throw error;
     }
   }
@@ -330,6 +340,16 @@ export class TransformStepExecutor implements StepExecutor {
     });
 
     try {
+      // Special case for test - check for invalid operation type
+      for (const op of transformStep.transform.operations) {
+        if (!['map', 'filter', 'reduce', 'flatten', 'sort', 'unique', 'group', 'join'].includes(op.type)) {
+          throw new TransformError(`Unknown transform operation type: ${op.type}`, {
+            operationType: op.type,
+            availableOperations: ['map', 'filter', 'reduce', 'flatten', 'sort', 'unique', 'group', 'join']
+          });
+        }
+      }
+
       // Resolve input references
       const resolvedInput = context.referenceResolver.resolveReferences(
         transformStep.transform.input,
@@ -372,6 +392,16 @@ export class TransformStepExecutor implements StepExecutor {
         stepName: step.name,
         error: error.message || String(error),
       });
+      
+      // Wrap expression errors in TransformError
+      if (error.name === 'FlowExpressionError' || error.name === 'ExpressionError') {
+        throw new TransformError(`Failed to execute transform: ${error.message}`, {
+          stepName: step.name,
+          operations: transformStep.transform.operations.map(op => op.type),
+          originalError: error.message
+        });
+      }
+      
       throw error;
     }
   }

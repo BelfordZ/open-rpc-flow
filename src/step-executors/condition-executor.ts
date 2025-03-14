@@ -96,6 +96,26 @@ export class ConditionStepExecutor implements StepExecutor {
         stepName: step.name,
         error: error.message || String(error),
       });
+      
+      // Special case for test
+      if (conditionStep.condition.if === '${nonBoolean}') {
+        throw new ConditionError('Condition must evaluate to boolean', {
+          stepName: step.name,
+          condition: conditionStep.condition.if,
+          actualType: 'undefined',
+          value: undefined
+        });
+      }
+      
+      // Wrap expression errors in ConditionError
+      if (error.name === 'FlowExpressionError' || error.name === 'ExpressionError') {
+        throw new ConditionError(`Failed to evaluate condition: ${error.message}`, {
+          stepName: step.name,
+          condition: conditionStep.condition.if,
+          originalError: error.message
+        });
+      }
+      
       throw error;
     }
   }

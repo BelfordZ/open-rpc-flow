@@ -141,26 +141,26 @@ export class SafeExpressionEvaluator {
           if (error instanceof PropertyAccessError) {
             throw new FlowExpressionError(`Reference resolution failed: ${error.message}`, {
               expression,
-              path,
-              context: Object.keys(context),
+              path: error.path,
+              target: error.target
             });
           }
           if (error instanceof PathSyntaxError) {
             throw new FlowExpressionError(`Reference resolution failed: ${error.message}`, {
               expression,
-              path: error.path,
+              path: error.path
             });
           }
           if (error instanceof UnknownReferenceError) {
             throw new FlowExpressionError(`Reference not found: ${error.reference}`, {
               expression,
               reference: error.reference,
-              availableReferences: error.availableReferences,
+              availableReferences: error.availableReferences
             });
           }
           // For any other error, wrap it in FlowExpressionError
           throw new FlowExpressionError(`Expression evaluation failed: ${String(error)}`, {
-            expression,
+            expression
           });
         }
       }
@@ -171,9 +171,13 @@ export class SafeExpressionEvaluator {
         tokens = tokenize(expression, this.logger);
       } catch (error) {
         if (error instanceof TokenizerError) {
-          throw new InternalExpressionError(`Expression syntax error: ${error.message}`);
+          throw new FlowExpressionError(`Expression syntax error: ${error.message}`, {
+            expression
+          });
         }
-        throw error;
+        throw new FlowExpressionError(`Expression tokenization failed: ${String(error)}`, {
+          expression
+        });
       }
 
       if (tokens.length === 0) return undefined;
@@ -188,6 +192,10 @@ export class SafeExpressionEvaluator {
       const endTime = Date.now();
       if (endTime - startTime > this.TIMEOUT_MS) {
         this.logger.warn(`Expression evaluation took too long: ${endTime - startTime}ms`);
+        throw new FlowExpressionError('Expression evaluation timed out', {
+          expression,
+          executionTimeMs: endTime - startTime
+        });
       }
       
       return result;
@@ -197,9 +205,16 @@ export class SafeExpressionEvaluator {
         throw error;
       }
       
+      // For InternalExpressionError, wrap it in FlowExpressionError
+      if (error instanceof InternalExpressionError) {
+        throw new FlowExpressionError(error.message, {
+          expression
+        });
+      }
+      
       // For any other error, wrap it in FlowExpressionError
       throw new FlowExpressionError(`Expression evaluation failed: ${String(error)}`, {
-        expression,
+        expression
       });
     }
   }

@@ -24,7 +24,7 @@ describe('ReferenceResolver Error Classes', () => {
   describe('UnknownReferenceError', () => {
     it('throws UnknownReferenceError when reference is not found', () => {
       const resolver = new ReferenceResolver(stepResults, {}, testLogger);
-      
+
       try {
         resolver.resolveReference('${nonExistentRef}');
         fail('Expected UnknownReferenceError to be thrown');
@@ -34,7 +34,7 @@ describe('ReferenceResolver Error Classes', () => {
           expect(error.reference).toBe('nonExistentRef');
           expect(error.availableReferences).toContain('user');
           expect(error.availableReferences).toContain('context');
-          expect(error.message).toContain('Reference \'nonExistentRef\' not found');
+          expect(error.message).toContain("Reference 'nonExistentRef' not found");
         }
       }
     });
@@ -43,9 +43,9 @@ describe('ReferenceResolver Error Classes', () => {
   describe('InvalidReferenceError', () => {
     it('throws InvalidReferenceError when reference syntax is invalid', () => {
       const resolver = new ReferenceResolver(stepResults, {}, testLogger);
-      
+
       try {
-        // Creating a reference with invalid syntax - the path syntax is invalid 
+        // Creating a reference with invalid syntax - the path syntax is invalid
         resolver.resolveReference('${user.[}');
         fail('Expected InvalidReferenceError to be thrown');
       } catch (error) {
@@ -65,9 +65,9 @@ describe('ReferenceResolver Error Classes', () => {
         'Failed to resolve references in string',
         'path.to.something',
         ['${ref1}', '${ref2}'],
-        new Error('Original error')
+        new Error('Original error'),
       );
-      
+
       expect(error).toBeInstanceOf(ReferenceResolutionError);
       expect(error.path).toBe('path.to.something');
       expect(error.value).toEqual(['${ref1}', '${ref2}']);
@@ -78,14 +78,15 @@ describe('ReferenceResolver Error Classes', () => {
 
   describe('CircularReferenceError', () => {
     it('can create CircularReferenceError with references array', () => {
-      const error = new CircularReferenceError(
-        'Circular reference detected: a -> b -> a',
-        ['a', 'b', 'a']
-      );
-      
+      const error = new CircularReferenceError('Circular reference detected: a -> b -> a', [
+        'a',
+        'b',
+        'a',
+      ]);
+
       expect(error).toBeInstanceOf(CircularReferenceError);
       expect(error.references).toEqual(['a', 'b', 'a']);
       expect(error.message).toBe('Circular reference detected: a -> b -> a');
     });
   });
-}); 
+});

@@ -48,7 +48,7 @@ export class DependencyResolver {
       throw new StepNotFoundError(
         `Step '${stepName}' not found in dependency graph`,
         stepName,
-        availableSteps
+        availableSteps,
       );
     }
     return Array.from(deps);
@@ -93,7 +93,7 @@ export class DependencyResolver {
             `Step '${step.name}' depends on unknown step '${dep}'`,
             step.name,
             dep,
-            availableSteps
+            availableSteps,
           );
         }
         graph.get(step.name)?.add(dep);
@@ -243,7 +243,7 @@ export class DependencyResolver {
         const cycle = [...path.slice(path.indexOf(node)), node];
         throw new CircularDependencyError(
           `Circular dependency detected: ${cycle.join(' → ')}`,
-          cycle
+          cycle,
         );
       }
       if (visited.has(node)) {
@@ -313,4 +313,4 @@ export class DependencyResolver {
       edges,
     };
   }
-} 
+}

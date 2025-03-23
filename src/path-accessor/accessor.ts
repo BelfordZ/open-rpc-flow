@@ -3,7 +3,7 @@ import {
   PathSyntaxError,
   PropertyAccessError,
   InvalidPathError,
-  UnknownReferenceError
+  UnknownReferenceError,
 } from './errors';
 
 /**
@@ -303,4 +303,4 @@ export class PathAccessor {
       })
       .join('');
   }
-} 
+}

@@ -53,4 +53,4 @@ export class InvalidPathError extends PathAccessorError {
   ) {
     super(message);
   }
-} 
+}

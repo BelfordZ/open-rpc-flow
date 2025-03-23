@@ -52,7 +52,7 @@ describe('DependencyResolver Error Classes', () => {
       };
 
       const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
-      
+
       try {
         resolver.getDependencies('nonExistentStep');
         fail('Expected StepNotFoundError to be thrown');
@@ -71,7 +71,7 @@ describe('DependencyResolver Error Classes', () => {
     it('throws UnknownDependencyError when step depends on unknown step', () => {
       // Mock the extractReferences function to return a non-existent step
       expressionEvaluator.extractReferences = jest.fn().mockReturnValue(['nonExistentStep']);
-      
+
       const flow: Flow = {
         name: 'Test Flow',
         description: 'Test flow with unknown dependency',
@@ -80,8 +80,8 @@ describe('DependencyResolver Error Classes', () => {
             name: 'getUser',
             request: {
               method: 'user.get',
-              params: { 
-                id: '${nonExistentStep.result}' 
+              params: {
+                id: '${nonExistentStep.result}',
               },
             },
           },
@@ -89,7 +89,7 @@ describe('DependencyResolver Error Classes', () => {
       };
 
       const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
-      
+
       try {
         resolver.getExecutionOrder();
         fail('Expected UnknownDependencyError to be thrown');
@@ -109,13 +109,12 @@ describe('DependencyResolver Error Classes', () => {
     it('throws CircularDependencyError when circular dependency is detected', () => {
       // Create a flow with circular dependency
       // step1 depends on step2, and step2 depends on step1
-      expressionEvaluator.extractReferences = jest.fn()
-        .mockImplementation((expr: string) => {
-          if (expr.includes('step1')) return ['step1'];
-          if (expr.includes('step2')) return ['step2'];
-          return [];
-        });
-      
+      expressionEvaluator.extractReferences = jest.fn().mockImplementation((expr: string) => {
+        if (expr.includes('step1')) return ['step1'];
+        if (expr.includes('step2')) return ['step2'];
+        return [];
+      });
+
       const flow: Flow = {
         name: 'Test Flow',
         description: 'Test flow with circular dependency',
@@ -124,8 +123,8 @@ describe('DependencyResolver Error Classes', () => {
             name: 'step1',
             request: {
               method: 'test',
-              params: { 
-                data: '${step2.result}' 
+              params: {
+                data: '${step2.result}',
               },
             },
           },
@@ -133,8 +132,8 @@ describe('DependencyResolver Error Classes', () => {
             name: 'step2',
             request: {
               method: 'test',
-              params: { 
-                data: '${step1.result}' 
+              params: {
+                data: '${step1.result}',
               },
             },
           },
@@ -142,7 +141,7 @@ describe('DependencyResolver Error Classes', () => {
       };
 
       const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
-      
+
       try {
         resolver.getExecutionOrder();
         fail('Expected CircularDependencyError to be thrown');
@@ -156,4 +155,4 @@ describe('DependencyResolver Error Classes', () => {
       }
     });
   });
-}); 
+});

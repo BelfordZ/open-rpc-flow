@@ -61,4 +61,4 @@ export class CircularReferenceError extends ReferenceResolverError {
   ) {
     super(message);
   }
-} 
+}

@@ -45,38 +45,26 @@ export class ReferenceResolver {
         PathAccessor.parsePath(path);
       } catch (parseError) {
         if (parseError instanceof PathSyntaxError) {
-          throw new InvalidReferenceError(
-            parseError.message,
-            path
-          );
+          throw new InvalidReferenceError(parseError.message, path);
         }
         throw parseError;
       }
-      
+
       const result = this.resolvePath(path, extraContext);
       this.logger.debug('Successfully resolved reference:', { ref, result });
       return result;
     } catch (error) {
       this.logger.error('Failed to resolve reference:', ref, error);
       // Re-throw our custom errors and PropertyAccessError as is
-      if (
-        error instanceof ReferenceResolverError ||
-        error instanceof PropertyAccessError
-      ) {
+      if (error instanceof ReferenceResolverError || error instanceof PropertyAccessError) {
         throw error;
       }
       // Wrap PathSyntaxError in InvalidReferenceError
       if (error instanceof PathSyntaxError) {
-        throw new InvalidReferenceError(
-          error.message,
-          path
-        );
+        throw new InvalidReferenceError(error.message, path);
       }
       // Wrap other errors in InvalidReferenceError
-      throw new InvalidReferenceError(
-        error instanceof Error ? error.message : String(error),
-        path
-      );
+      throw new InvalidReferenceError(error instanceof Error ? error.message : String(error), path);
     }
   }
 
@@ -111,7 +99,7 @@ export class ReferenceResolver {
             `Failed to resolve references in string: ${obj}`,
             obj,
             references,
-            error instanceof Error ? error : undefined
+            error instanceof Error ? error : undefined,
           );
         }
       } else {
@@ -127,7 +115,7 @@ export class ReferenceResolver {
           `Failed to resolve references in array`,
           'array',
           obj,
-          error instanceof Error ? error : undefined
+          error instanceof Error ? error : undefined,
         );
       }
     }
@@ -144,7 +132,7 @@ export class ReferenceResolver {
           `Failed to resolve references in object`,
           'object',
           obj,
-          error instanceof Error ? error : undefined
+          error instanceof Error ? error : undefined,
         );
       }
     }
@@ -207,7 +195,7 @@ export class ReferenceResolver {
             // Wrap other errors in InvalidReferenceError
             throw new InvalidReferenceError(
               error instanceof Error ? error.message : String(error),
-              expr
+              expr,
             );
           }
         });
@@ -223,7 +211,7 @@ export class ReferenceResolver {
             // Wrap other errors in InvalidReferenceError
             throw new InvalidReferenceError(
               error instanceof Error ? error.message : String(error),
-              expr
+              expr,
             );
           }
         });
@@ -237,14 +225,11 @@ export class ReferenceResolver {
         throw error;
       }
       // Wrap other errors in InvalidReferenceError
-      throw new InvalidReferenceError(
-        error instanceof Error ? error.message : String(error),
-        path
-      );
+      throw new InvalidReferenceError(error instanceof Error ? error.message : String(error), path);
     }
   }
 
   getStepResults(): Map<string, any> {
     return this.stepResults;
   }
-} 
+}

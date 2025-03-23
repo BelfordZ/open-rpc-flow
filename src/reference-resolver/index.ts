@@ -5,4 +5,4 @@ export {
   InvalidReferenceError,
   ReferenceResolutionError,
   CircularReferenceError,
-} from './errors'; 
+} from './errors';

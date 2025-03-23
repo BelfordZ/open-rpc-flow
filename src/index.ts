@@ -1,7 +1,7 @@
 export { Flow, Step, JsonRpcRequest } from './types';
 export { FlowExecutor } from './flow-executor';
 export { SafeExpressionEvaluator } from './expression-evaluator/safe-evaluator';
-export { 
+export {
   ReferenceResolver,
   ReferenceResolverError,
   UnknownReferenceError,
@@ -16,12 +16,12 @@ export {
   PropertyAccessError,
   InvalidPathError,
 } from './path-accessor';
-export { 
+export {
   DependencyResolver,
   DependencyResolverError,
   StepNotFoundError,
   UnknownDependencyError,
-  CircularDependencyError
+  CircularDependencyError,
 } from './dependency-resolver';
 import metaSchemaContent from '../meta-schema.json';
 export const metaSchema = metaSchemaContent;

@@ -49,4 +49,4 @@ export class CircularDependencyError extends DependencyResolverError {
   ) {
     super(message);
   }
-} 
+}

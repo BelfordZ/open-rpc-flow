@@ -5,5 +5,5 @@ export {
   PathSyntaxError,
   PropertyAccessError,
   InvalidPathError,
-  UnknownReferenceError
-} from './errors'; 
+  UnknownReferenceError,
+} from './errors';

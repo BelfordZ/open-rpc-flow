@@ -5,4 +5,4 @@ export interface PathSegment {
   type: 'property' | 'index' | 'expression';
   value: string;
   raw: string;
-} 
+}

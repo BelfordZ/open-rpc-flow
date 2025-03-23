@@ -3,6 +3,11 @@ import { Flow } from '../types';
 import { TestLogger } from '../util/logger';
 import { SafeExpressionEvaluator } from '../expression-evaluator/safe-evaluator';
 import { ReferenceResolver } from '../reference-resolver';
+import {
+  StepNotFoundError,
+  UnknownDependencyError,
+  CircularDependencyError,
+} from '../dependency-resolver/errors';
 
 describe('DependencyResolver', () => {
   let testLogger: TestLogger;
@@ -152,7 +157,7 @@ describe('DependencyResolver', () => {
     };
 
     const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
-    expect(() => resolver.getExecutionOrder()).toThrow('Circular dependency detected');
+    expect(() => resolver.getExecutionOrder()).toThrow(CircularDependencyError);
   });
 
   it('handles complex dependency chains', () => {
@@ -248,22 +253,20 @@ describe('DependencyResolver', () => {
   it('throws error when step depends on unknown step', () => {
     const flow: Flow = {
       name: 'Test Flow',
-      description: 'Test flow for unknown dependency',
+      description: 'Test flow for unknown step dependency',
       steps: [
         {
-          name: 'getFriends',
+          name: 'getUser',
           request: {
-            method: 'user.getFriends',
-            params: { userId: '${nonExistentStep.id}' },
+            method: 'user.get',
+            params: { id: '${nonExistentStep.id}' },
           },
         },
       ],
     };
 
     const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
-    expect(() => resolver.getExecutionOrder()).toThrow(
-      "Step 'getFriends' depends on unknown step 'nonExistentStep'",
-    );
+    expect(() => resolver.getExecutionOrder()).toThrow(UnknownDependencyError);
   });
 
   it('throws error when getting dependencies for non-existent step', () => {
@@ -282,9 +285,7 @@ describe('DependencyResolver', () => {
     };
 
     const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
-    expect(() => resolver.getDependencies('nonExistentStep')).toThrow(
-      "Step 'nonExistentStep' not found in dependency graph",
-    );
+    expect(() => resolver.getDependencies('nonExistentStep')).toThrow(StepNotFoundError);
   });
 
   it('handles missing nodes gracefully in topological sort', () => {

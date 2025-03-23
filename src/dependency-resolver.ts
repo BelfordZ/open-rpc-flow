@@ -7,6 +7,12 @@ import {
   isTransformStep,
 } from './step-executors/types';
 import { SafeExpressionEvaluator } from './expression-evaluator/safe-evaluator';
+import {
+  DependencyResolverError,
+  StepNotFoundError,
+  UnknownDependencyError,
+  CircularDependencyError,
+} from './dependency-resolver/errors';
 
 export class DependencyResolver {
   private logger: Logger;
@@ -38,7 +44,12 @@ export class DependencyResolver {
     const graph = this.buildDependencyGraph();
     const deps = graph.get(stepName);
     if (!deps) {
-      throw new Error(`Step '${stepName}' not found in dependency graph`);
+      const availableSteps = Array.from(graph.keys());
+      throw new StepNotFoundError(
+        `Step '${stepName}' not found in dependency graph`,
+        stepName,
+        availableSteps
+      );
     }
     return Array.from(deps);
   }
@@ -77,7 +88,13 @@ export class DependencyResolver {
       const deps = this.findStepDependencies(step);
       for (const dep of deps) {
         if (!graph.has(dep)) {
-          throw new Error(`Step '${step.name}' depends on unknown step '${dep}'`);
+          const availableSteps = Array.from(graph.keys());
+          throw new UnknownDependencyError(
+            `Step '${step.name}' depends on unknown step '${dep}'`,
+            step.name,
+            dep,
+            availableSteps
+          );
         }
         graph.get(step.name)?.add(dep);
       }
@@ -221,17 +238,22 @@ export class DependencyResolver {
     const temp = new Set<string>();
     const order: string[] = [];
 
-    const visit = (node: string) => {
+    const visit = (node: string, path: string[] = []) => {
       if (temp.has(node)) {
-        throw new Error(`Circular dependency detected: ${node}`);
+        const cycle = [...path.slice(path.indexOf(node)), node];
+        throw new CircularDependencyError(
+          `Circular dependency detected: ${cycle.join(' → ')}`,
+          cycle
+        );
       }
       if (visited.has(node)) {
         return;
       }
       temp.add(node);
+      path.push(node);
       const deps = graph.get(node) || new Set();
       for (const dep of deps) {
-        visit(dep);
+        visit(dep, [...path]);
       }
       temp.delete(node);
       visited.add(node);

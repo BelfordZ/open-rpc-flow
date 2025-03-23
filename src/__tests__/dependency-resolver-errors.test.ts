@@ -6,45 +6,14 @@ import {
   CircularDependencyError,
 } from '../dependency-resolver/errors';
 import { SafeExpressionEvaluator } from '../expression-evaluator/safe-evaluator';
-import { Logger } from '../util/logger';
-
-// Mock logger
-class TestLogger implements Logger {
-  logs: Array<{ level: string; message: string; meta?: any }> = [];
-
-  constructor() {}
-
-  log(level: string, message: string, meta?: any): void {
-    this.logs.push({ level, message, meta });
-  }
-  
-  debug(message: string, meta?: any): void {
-    this.log('debug', message, meta);
-  }
-  
-  info(message: string, meta?: any): void {
-    this.log('info', message, meta);
-  }
-  
-  warn(message: string, meta?: any): void {
-    this.log('warn', message, meta);
-  }
-  
-  error(message: string, meta?: any): void {
-    this.log('error', message, meta);
-  }
-
-  createNested(): TestLogger {
-    return this;
-  }
-}
+import { TestLogger } from '../util/logger';
 
 describe('DependencyResolver Error Classes', () => {
   let testLogger: TestLogger;
   let expressionEvaluator: SafeExpressionEvaluator;
 
   beforeEach(() => {
-    testLogger = new TestLogger();
+    testLogger = new TestLogger('DependencyResolverTest');
     expressionEvaluator = {
       extractReferences: jest.fn().mockImplementation((expr: string) => {
         // Simple implementation to extract references from ${...} syntax
@@ -60,6 +29,10 @@ describe('DependencyResolver Error Classes', () => {
       }),
       evaluate: jest.fn(),
     } as unknown as SafeExpressionEvaluator;
+  });
+
+  afterEach(() => {
+    testLogger.clear();
   });
 
   describe('StepNotFoundError', () => {

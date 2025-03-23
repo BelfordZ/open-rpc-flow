@@ -1,4 +1,3 @@
-import { Logger } from '../util/logger';
 import { ReferenceResolver } from '../reference-resolver';
 import {
   UnknownReferenceError,
@@ -6,46 +5,20 @@ import {
   ReferenceResolutionError,
   CircularReferenceError,
 } from '../reference-resolver/errors';
-
-// Mock logger
-class TestLogger implements Logger {
-  logs: Array<{ level: string; message: string; meta?: any }> = [];
-
-  constructor() {}
-
-  log(level: string, message: string, meta?: any): void {
-    this.logs.push({ level, message, meta });
-  }
-  
-  debug(message: string, meta?: any): void {
-    this.log('debug', message, meta);
-  }
-  
-  info(message: string, meta?: any): void {
-    this.log('info', message, meta);
-  }
-  
-  warn(message: string, meta?: any): void {
-    this.log('warn', message, meta);
-  }
-  
-  error(message: string, meta?: any): void {
-    this.log('error', message, meta);
-  }
-
-  createNested(): TestLogger {
-    return this;
-  }
-}
+import { TestLogger } from '../util/logger';
 
 describe('ReferenceResolver Error Classes', () => {
   let testLogger: TestLogger;
   let stepResults: Map<string, any>;
 
   beforeEach(() => {
-    testLogger = new TestLogger();
+    testLogger = new TestLogger('ReferenceResolverTest');
     stepResults = new Map();
     stepResults.set('user', { id: 1, name: 'John Doe' });
+  });
+
+  afterEach(() => {
+    testLogger.clear();
   });
 
   describe('UnknownReferenceError', () => {

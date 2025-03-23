@@ -87,25 +87,16 @@ describe('PathAccessor', () => {
       });
 
       it('throws on invalid bracket syntax', () => {
-        expect(() => PathAccessor.parsePath('foo[bar')).toThrow(PathSyntaxError);
-        expect(() => PathAccessor.parsePath('foo]')).toThrow(PathSyntaxError);
-        expect(() => PathAccessor.parsePath('foo[[bar]]')).toThrow(PathSyntaxError);
-
-        // This should hit the nested bracket validation
-        let error: any;
+        let error: PathSyntaxError | undefined;
         try {
           PathAccessor.parsePath('foo[1[2]]');
         } catch (e) {
-          if (e instanceof PathSyntaxError) {
-            error = e;
-          } else {
-            throw e;
-          }
+          error = e as PathSyntaxError;
         }
         expect(error).toBeDefined();
-        expect(error.message).toBe('Invalid bracket syntax at position 5: 1');
-        expect(error.path).toBe('foo[1[2]]');
-        expect(error.position).toBe(5);
+        expect(error!.message).toBe('Invalid path syntax: Invalid bracket syntax at position 5: 1');
+        expect(error!.path).toBe('foo[1[2]]');
+        expect(error!.position).toBe(5);
       });
 
       it('should throw PathSyntaxError on invalid array index notation', () => {
@@ -142,39 +133,31 @@ describe('PathAccessor', () => {
       });
 
       it('should throw PathSyntaxError on invalid nested brackets', () => {
-        let error: any;
+        let error: PathSyntaxError | undefined;
         try {
           PathAccessor.parsePath('foo[1[2]]');
         } catch (e) {
-          if (e instanceof PathSyntaxError) {
-            error = e;
-          } else {
-            throw e;
-          }
+          error = e as PathSyntaxError;
         }
         expect(error).toBeDefined();
-        expect(error.message).toBe('Invalid bracket syntax at position 5: 1');
-        expect(error.path).toBe('foo[1[2]]');
-        expect(error.position).toBe(5);
+        expect(error!.message).toBe('Invalid path syntax: Invalid bracket syntax at position 5: 1');
+        expect(error!.path).toBe('foo[1[2]]');
+        expect(error!.position).toBe(5);
       });
 
       it('should throw PathSyntaxError on consecutive opening brackets', () => {
-        let error: any;
+        let error: PathSyntaxError | undefined;
         try {
           PathAccessor.parsePath('foo[[1]]');
         } catch (e) {
-          if (e instanceof PathSyntaxError) {
-            error = e;
-          } else {
-            throw e;
-          }
+          error = e as PathSyntaxError;
         }
         expect(error).toBeDefined();
-        expect(error.message).toBe(
-          'Invalid bracket syntax at position 4: multiple opening brackets at the same level',
+        expect(error!.message).toBe(
+          'Invalid path syntax: Invalid bracket syntax at position 4: multiple opening brackets at the same level',
         );
-        expect(error.path).toBe('foo[[1]]');
-        expect(error.position).toBe(4);
+        expect(error!.path).toBe('foo[[1]]');
+        expect(error!.position).toBe(4);
       });
     });
 

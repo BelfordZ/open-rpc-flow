@@ -1,20 +1,12 @@
-import { PathAccessor, PathSyntaxError, PropertyAccessError } from './path-accessor';
-import { Logger } from './util/logger';
-
-/**
- * Error thrown when a reference cannot be found in the resolver
- */
-export class UnknownReferenceError extends Error {
-  constructor(
-    message: string,
-    public readonly reference: string,
-    public readonly availableReferences: string[],
-  ) {
-    super(message);
-    this.name = this.constructor.name;
-    Object.setPrototypeOf(this, new.target.prototype);
-  }
-}
+import { PathAccessor, PathSyntaxError, PropertyAccessError } from '../path-accessor';
+import { Logger } from '../util/logger';
+import {
+  ReferenceResolverError,
+  UnknownReferenceError,
+  InvalidReferenceError,
+  ReferenceResolutionError,
+  CircularReferenceError,
+} from './errors';
 
 export class ReferenceResolver {
   private logger: Logger;
@@ -49,25 +41,41 @@ export class ReferenceResolver {
     const path = ref.slice(2, -1);
 
     try {
-      PathAccessor.parsePath(path);
+      try {
+        PathAccessor.parsePath(path);
+      } catch (parseError) {
+        if (parseError instanceof PathSyntaxError) {
+          throw new InvalidReferenceError(
+            parseError.message,
+            path
+          );
+        }
+        throw parseError;
+      }
+      
       const result = this.resolvePath(path, extraContext);
       this.logger.debug('Successfully resolved reference:', { ref, result });
       return result;
     } catch (error) {
       this.logger.error('Failed to resolve reference:', ref, error);
-      // Re-throw UnknownReferenceError, PathSyntaxError, and PropertyAccessError as is
+      // Re-throw our custom errors and PropertyAccessError as is
       if (
-        error instanceof UnknownReferenceError ||
-        error instanceof PathSyntaxError ||
+        error instanceof ReferenceResolverError ||
         error instanceof PropertyAccessError
       ) {
         throw error;
       }
-      // Wrap other errors in PathSyntaxError
-      throw new PathSyntaxError(
+      // Wrap PathSyntaxError in InvalidReferenceError
+      if (error instanceof PathSyntaxError) {
+        throw new InvalidReferenceError(
+          error.message,
+          path
+        );
+      }
+      // Wrap other errors in InvalidReferenceError
+      throw new InvalidReferenceError(
         error instanceof Error ? error.message : String(error),
-        ref,
-        undefined,
+        path
       );
     }
   }
@@ -87,31 +95,58 @@ export class ReferenceResolver {
         }
 
         this.logger.debug('handling string containing references:', references);
-        references.forEach((ref) => {
-          let resolvedValue = this.resolveReference(ref, extraContext);
-          // check if resolvedValue is an object and if so, convert it to a string
-          if (typeof resolvedValue === 'object') {
-            resolvedValue = JSON.stringify(resolvedValue);
-          }
-          obj = obj.replace(ref, resolvedValue);
-          this.logger.debug(`replaced ${ref} with ${resolvedValue} in ${obj}`);
-        });
-        return obj;
+        try {
+          references.forEach((ref) => {
+            let resolvedValue = this.resolveReference(ref, extraContext);
+            // check if resolvedValue is an object and if so, convert it to a string
+            if (typeof resolvedValue === 'object') {
+              resolvedValue = JSON.stringify(resolvedValue);
+            }
+            obj = obj.replace(ref, resolvedValue);
+            this.logger.debug(`replaced ${ref} with ${resolvedValue} in ${obj}`);
+          });
+          return obj;
+        } catch (error) {
+          throw new ReferenceResolutionError(
+            `Failed to resolve references in string: ${obj}`,
+            obj,
+            references,
+            error instanceof Error ? error : undefined
+          );
+        }
       } else {
         return obj;
       }
     }
     if (Array.isArray(obj)) {
       this.logger.debug('Resolving array of length:', obj.length);
-      return obj.map((item) => this.resolveReferences(item, extraContext));
+      try {
+        return obj.map((item) => this.resolveReferences(item, extraContext));
+      } catch (error) {
+        throw new ReferenceResolutionError(
+          `Failed to resolve references in array`,
+          'array',
+          obj,
+          error instanceof Error ? error : undefined
+        );
+      }
     }
     if (obj && typeof obj === 'object') {
       this.logger.debug('Resolving object with keys:', Object.keys(obj));
-      const result: Record<string, any> = {};
-      for (const [key, value] of Object.entries(obj)) {
-        result[key] = this.resolveReferences(value, extraContext);
+      try {
+        const result: Record<string, any> = {};
+        for (const [key, value] of Object.entries(obj)) {
+          result[key] = this.resolveReferences(value, extraContext);
+        }
+        return result;
+      } catch (error) {
+        throw new ReferenceResolutionError(
+          `Failed to resolve references in object`,
+          'object',
+          obj,
+          error instanceof Error ? error : undefined
+        );
       }
-      return result;
     }
     return obj;
   }
@@ -165,15 +200,14 @@ export class ReferenceResolver {
           try {
             return this.resolvePath(expr, extraContext);
           } catch (error) {
-            // Re-throw UnknownReferenceError as is
-            if (error instanceof UnknownReferenceError) {
+            // Re-throw our ReferenceResolverError errors as is
+            if (error instanceof ReferenceResolverError) {
               throw error;
             }
-            // Wrap other errors in PathSyntaxError
-            throw new PathSyntaxError(
+            // Wrap other errors in InvalidReferenceError
+            throw new InvalidReferenceError(
               error instanceof Error ? error.message : String(error),
-              path,
-              undefined,
+              expr
             );
           }
         });
@@ -182,15 +216,14 @@ export class ReferenceResolver {
           try {
             return this.resolvePath(expr, extraContext);
           } catch (error) {
-            // Re-throw UnknownReferenceError as is
-            if (error instanceof UnknownReferenceError) {
+            // Re-throw our ReferenceResolverError errors as is
+            if (error instanceof ReferenceResolverError) {
               throw error;
             }
-            // Wrap other errors in PathSyntaxError
-            throw new PathSyntaxError(
+            // Wrap other errors in InvalidReferenceError
+            throw new InvalidReferenceError(
               error instanceof Error ? error.message : String(error),
-              path,
-              undefined,
+              expr
             );
           }
         });
@@ -199,15 +232,14 @@ export class ReferenceResolver {
       return result;
     } catch (error) {
       this.logger.error('Failed to resolve path:', path, error);
-      // Re-throw UnknownReferenceError and PathSyntaxError as is
-      if (error instanceof UnknownReferenceError || error instanceof PathSyntaxError) {
+      // Re-throw ReferenceResolverError and PathSyntaxError as is
+      if (error instanceof ReferenceResolverError || error instanceof PathSyntaxError) {
         throw error;
       }
-      // Wrap other errors in PathSyntaxError
-      throw new PathSyntaxError(
+      // Wrap other errors in InvalidReferenceError
+      throw new InvalidReferenceError(
         error instanceof Error ? error.message : String(error),
-        path,
-        undefined,
+        path
       );
     }
   }
@@ -215,4 +247,4 @@ export class ReferenceResolver {
   getStepResults(): Map<string, any> {
     return this.stepResults;
   }
-}
+} 

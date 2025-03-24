@@ -1,15 +1,10 @@
 export { NoLogger, noLogger } from './no-logger';
 
-/**
- * Represents a value that can be logged
- */
-export type LogValue = string | number | boolean | null | undefined | object | Error | LogValue[];
-
 export interface Logger {
-  log(message: string, ...args: LogValue[]): void;
-  error(message: string, ...args: LogValue[]): void;
-  warn(message: string, ...args: LogValue[]): void;
-  debug(message: string, ...args: LogValue[]): void;
+  log(message: string, ...args: any[]): void;
+  error(message: string, ...args: any[]): void;
+  warn(message: string, ...args: any[]): void;
+  debug(message: string, ...args: any[]): void;
   createNested(prefix: string): Logger;
 }
 
@@ -20,19 +15,19 @@ export class ConsoleLogger implements Logger {
     return this.prefix ? `[${this.prefix}] ${message}` : message;
   }
 
-  log(message: string, ...args: LogValue[]): void {
+  log(message: string, ...args: any[]): void {
     console.log(this.formatMessage(message), ...args);
   }
 
-  error(message: string, ...args: LogValue[]): void {
+  error(message: string, ...args: any[]): void {
     console.error(this.formatMessage(message), ...args);
   }
 
-  warn(message: string, ...args: LogValue[]): void {
+  warn(message: string, ...args: any[]): void {
     console.warn(this.formatMessage(message), ...args);
   }
 
-  debug(message: string, ...args: LogValue[]): void {
+  debug(message: string, ...args: any[]): void {
     console.debug(this.formatMessage(message), ...args);
   }
 
@@ -47,23 +42,23 @@ export class TestLogger implements Logger {
 
   private logs: string[] = [];
 
-  log(message: string, ...args: LogValue[]): void {
+  log(message: string, ...args: any[]): void {
     this.logs.push(this.formatLogEntry('LOG', message, args));
   }
 
-  error(message: string, ...args: LogValue[]): void {
+  error(message: string, ...args: any[]): void {
     this.logs.push(this.formatLogEntry('ERROR', message, args));
   }
 
-  warn(message: string, ...args: LogValue[]): void {
+  warn(message: string, ...args: any[]): void {
     this.logs.push(this.formatLogEntry('WARN', message, args));
   }
 
-  debug(message: string, ...args: LogValue[]): void {
+  debug(message: string, ...args: any[]): void {
     this.logs.push(this.formatLogEntry('DEBUG', message, args));
   }
 
-  private formatLogEntry(level: string, message: string, args: LogValue[]): string {
+  private formatLogEntry(level: string, message: string, args: any[]): string {
     const prefixPart = this.prefix ? `[${this.prefix}] ` : '';
     const argsStr =
       args.length === 1 ? JSON.stringify(args[0]) : args.length > 1 ? JSON.stringify(args) : '';

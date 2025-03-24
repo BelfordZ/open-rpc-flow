@@ -16,7 +16,16 @@ describe('ReferenceResolver', () => {
   beforeEach(() => {
     testLogger = new TestLogger('ReferenceResolverTest');
     stepResults = new Map();
-    resolver = new ReferenceResolver(stepResults, {}, testLogger);
+    resolver = new ReferenceResolver(
+      stepResults,
+      {
+        config: {
+          enabled: true,
+          threshold: 100,
+        },
+      },
+      testLogger,
+    );
   });
 
   afterEach(() => {

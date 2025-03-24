@@ -1,4 +1,4 @@
-import { Logger, LogValue } from './logger';
+import { Logger } from './logger';
 
 /**
  * A logger implementation that silently discards all logs.
@@ -19,10 +19,10 @@ export class NoLogger implements Logger {
     return NoLogger.instance;
   }
 
-  log(_message: string, ..._args: LogValue[]): void {}
-  error(_message: string, ..._args: LogValue[]): void {}
-  warn(_message: string, ..._args: LogValue[]): void {}
-  debug(_message: string, ..._args: LogValue[]): void {}
+  log(_message: string, ..._args: any[]): void {}
+  error(_message: string, ..._args: any[]): void {}
+  warn(_message: string, ..._args: any[]): void {}
+  debug(_message: string, ..._args: any[]): void {}
 
   createNested(_prefix: string): Logger {
     return NoLogger.instance;

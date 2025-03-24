@@ -3,6 +3,7 @@ import {
   UnknownReferenceError,
   InvalidReferenceError,
   ReferenceResolutionError,
+  CircularReferenceError,
 } from '../reference-resolver/errors';
 import { TestLogger } from '../util/logger';
 import { PathSyntaxError, PropertyAccessError } from '../path-accessor';
@@ -444,6 +445,30 @@ describe('ReferenceResolver', () => {
   describe('getStepResults', () => {
     it('returns the step results', () => {
       expect(resolver.getStepResults()).toEqual(stepResults);
+    });
+  });
+
+  describe('Circular Reference Detection', () => {
+    it('detects and throws CircularReferenceError when encountering circular references', () => {
+      // Setting up a circular reference scenario in a more direct way
+      const circularRefResults = new Map();
+      circularRefResults.set('a', '${b}');
+      circularRefResults.set('b', '${a}');
+
+      // We need a fresh resolver for this test to avoid interference
+      const circularResolver = new ReferenceResolver(circularRefResults, {}, noLogger);
+
+      try {
+        // This will trigger a circular reference: a -> b -> a
+        circularResolver.resolveReference('${a}');
+        fail('Expected CircularReferenceError to be thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(CircularReferenceError);
+        if (error instanceof CircularReferenceError) {
+          expect(error.references).toEqual(expect.arrayContaining(['a', 'b']));
+          expect(error.message).toContain('Circular reference detected:');
+        }
+      }
     });
   });
 });

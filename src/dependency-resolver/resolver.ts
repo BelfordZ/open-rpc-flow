@@ -7,12 +7,7 @@ import {
   isTransformStep,
 } from '../step-executors/types';
 import { SafeExpressionEvaluator } from '../expression-evaluator/safe-evaluator';
-import {
-  DependencyResolverError,
-  StepNotFoundError,
-  UnknownDependencyError,
-  CircularDependencyError,
-} from './errors';
+import { StepNotFoundError, UnknownDependencyError, CircularDependencyError } from './errors';
 
 export class DependencyResolver {
   private logger: Logger;

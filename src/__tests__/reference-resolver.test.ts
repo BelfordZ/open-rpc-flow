@@ -6,23 +6,22 @@ import {
   CircularReferenceError,
 } from '../reference-resolver/errors';
 import { TestLogger } from '../util/logger';
-import { PathSyntaxError, PropertyAccessError } from '../path-accessor';
-import { noLogger } from '../util/logger';
+import { PathSyntaxError } from '../path-accessor';
 
 describe('ReferenceResolver', () => {
   let resolver: ReferenceResolver;
   let stepResults: Map<string, any>;
-  let context: Record<string, any>;
+  let testLogger: TestLogger;
 
   beforeEach(() => {
+    testLogger = new TestLogger('ReferenceResolverTest');
     stepResults = new Map();
-    context = {
-      config: {
-        enabled: true,
-        threshold: 100,
-      },
-    };
-    resolver = new ReferenceResolver(stepResults, context, noLogger);
+    resolver = new ReferenceResolver(stepResults, {}, testLogger);
+  });
+
+  afterEach(() => {
+    testLogger.clear();
+    //testLogger.print();
   });
 
   describe('resolveReference', () => {
@@ -171,7 +170,7 @@ describe('ReferenceResolver', () => {
 
     it('should handle basic references', () => {
       const stepResults = new Map([['step1', { value: 'test' }]]);
-      resolver = new ReferenceResolver(stepResults, {}, noLogger);
+      resolver = new ReferenceResolver(stepResults, {}, testLogger);
       expect(resolver.resolveReference('${step1.value}')).toBe('test');
     });
 
@@ -185,7 +184,7 @@ describe('ReferenceResolver', () => {
           },
         ],
       ]);
-      resolver = new ReferenceResolver(stepResults, {}, noLogger);
+      resolver = new ReferenceResolver(stepResults, {}, testLogger);
 
       // Test array access with expressions
       expect(resolver.resolveReference('${arr.result[arr.indices[0]]}')).toBe('a');
@@ -208,7 +207,7 @@ describe('ReferenceResolver', () => {
           },
         ],
       ]);
-      resolver = new ReferenceResolver(stepResults, {}, noLogger);
+      resolver = new ReferenceResolver(stepResults, {}, testLogger);
 
       // Test nested array access with expressions
       expect(
@@ -231,7 +230,7 @@ describe('ReferenceResolver', () => {
           indices: [0, 1, 2],
         });
         stepResults.set('expr', { value: {} });
-        resolver = new ReferenceResolver(stepResults, {}, noLogger);
+        resolver = new ReferenceResolver(stepResults, {}, testLogger);
       });
       it('should throw appropriate errors for invalid expressions', () => {
         // Test invalid array index - should throw UnknownReferenceError
@@ -456,7 +455,7 @@ describe('ReferenceResolver', () => {
       circularRefResults.set('b', '${a}');
 
       // We need a fresh resolver for this test to avoid interference
-      const circularResolver = new ReferenceResolver(circularRefResults, {}, noLogger);
+      const circularResolver = new ReferenceResolver(circularRefResults, {}, testLogger);
 
       try {
         // This will trigger a circular reference: a -> b -> a
@@ -471,58 +470,54 @@ describe('ReferenceResolver', () => {
       }
     });
   });
-});
 
-describe('ReferenceResolver error cases', () => {
-  it('throws when encountering an unknown reference', () => {
-    const refs = new ReferenceResolver(new Map(), {}, noLogger);
-    expect(() => refs.resolveReference('${someRef}', {})).toThrow(UnknownReferenceError);
-  });
-
-  describe('invalid expressions', () => {
-    it('throws for invalid path accessors, empty path', () => {
-      const refs = new ReferenceResolver(new Map(), {}, noLogger);
-      const context = {
-        someRef: {
-          a: 'value-a',
-        },
-      };
-      expect(() => refs.resolveReference('${someRef.}', context)).toThrow(InvalidReferenceError);
+  describe('ReferenceResolver error cases', () => {
+    it('throws when encountering an unknown reference', () => {
+      const refs = new ReferenceResolver(new Map(), {}, testLogger);
+      expect(() => refs.resolveReference('${someRef}', {})).toThrow(UnknownReferenceError);
     });
 
-    it('throws for invalid path accessors, trailing dot', () => {
-      const refs = new ReferenceResolver(new Map(), {}, noLogger);
-      const context = {
-        someRef: {
-          a: 'value-a',
-        },
-      };
-      // The implementation doesn't actually throw for trailing dots - it just ignores them
-      // instead, let's test that trying to access an invalid property will throw
-      const stepsMap = new Map();
-      stepsMap.set('someRef', { a: 'value-a' });
-      const resolver = new ReferenceResolver(stepsMap, {}, noLogger);
-      expect(() => resolver.resolveReference('${someRef.b}', {})).toThrow(InvalidReferenceError);
-    });
+    describe('invalid expressions', () => {
+      it('throws for invalid path accessors, empty path', () => {
+        const refs = new ReferenceResolver(new Map(), {}, testLogger);
+        const context = {
+          someRef: {
+            a: 'value-a',
+          },
+        };
+        expect(() => refs.resolveReference('${someRef.}', context)).toThrow(InvalidReferenceError);
+      });
 
-    it('throws for invalid path accessors, dot followed by operators', () => {
-      const refs = new ReferenceResolver(new Map(), {}, noLogger);
-      const context = {
-        someRef: {
-          a: 'value-a',
-        },
-      };
-      expect(() => refs.resolveReference('${someRef.a.*}', context)).toThrow(InvalidReferenceError);
-    });
+      it('throws for invalid path accessors, trailing dot', () => {
+        // The implementation doesn't actually throw for trailing dots - it just ignores them
+        // instead, let's test that trying to access an invalid property will throw
+        const stepsMap = new Map();
+        stepsMap.set('someRef', { a: 'value-a' });
+        const resolver = new ReferenceResolver(stepsMap, {}, testLogger);
+        expect(() => resolver.resolveReference('${someRef.b}', {})).toThrow(InvalidReferenceError);
+      });
 
-    it('throws for invalid path accessors, leading dot', () => {
-      const refs = new ReferenceResolver(new Map(), {}, noLogger);
-      const context = {
-        someRef: {
-          a: 'value-a',
-        },
-      };
-      expect(() => refs.resolveReference('${.someRef}', context)).toThrow(InvalidReferenceError);
+      it('throws for invalid path accessors, dot followed by operators', () => {
+        const refs = new ReferenceResolver(new Map(), {}, testLogger);
+        const context = {
+          someRef: {
+            a: 'value-a',
+          },
+        };
+        expect(() => refs.resolveReference('${someRef.a.*}', context)).toThrow(
+          InvalidReferenceError,
+        );
+      });
+
+      it('throws for invalid path accessors, leading dot', () => {
+        const refs = new ReferenceResolver(new Map(), {}, testLogger);
+        const context = {
+          someRef: {
+            a: 'value-a',
+          },
+        };
+        expect(() => refs.resolveReference('${.someRef}', context)).toThrow(InvalidReferenceError);
+      });
     });
   });
 });

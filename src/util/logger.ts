@@ -60,8 +60,13 @@ export class TestLogger implements Logger {
 
   private formatLogEntry(level: string, message: string, args: any[]): string {
     const prefixPart = this.prefix ? `[${this.prefix}] ` : '';
-    const argsStr =
-      args.length === 1 ? JSON.stringify(args[0]) : args.length > 1 ? JSON.stringify(args) : '';
+    let argsStr = '';
+    try {
+      argsStr = args.length === 1 ? JSON.stringify(args[0]) : args.length > 1 ? JSON.stringify(args) : '';
+    } catch (error) {
+      // Handle circular references or other JSON.stringify errors
+      argsStr = args.length === 1 ? '[Circular]' : '[Complex Value]';
+    }
     return `[${level}] ${prefixPart}${message}${argsStr ? ' ' + argsStr : ''}`.trim();
   }
 

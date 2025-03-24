@@ -62,7 +62,8 @@ export class TestLogger implements Logger {
     const prefixPart = this.prefix ? `[${this.prefix}] ` : '';
     let argsStr = '';
     try {
-      argsStr = args.length === 1 ? JSON.stringify(args[0]) : args.length > 1 ? JSON.stringify(args) : '';
+      argsStr =
+        args.length === 1 ? JSON.stringify(args[0]) : args.length > 1 ? JSON.stringify(args) : '';
     } catch (error) {
       // Handle circular references or other JSON.stringify errors
       argsStr = args.length === 1 ? '[Circular]' : '[Complex Value]';

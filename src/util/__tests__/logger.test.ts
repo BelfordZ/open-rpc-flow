@@ -171,7 +171,7 @@ describe('TestLogger', () => {
   it('handles multiple complex values in args', () => {
     const obj1 = { a: 1 };
     const obj2: any = { b: 2 };
-    obj2.self = obj2;  // Make one of them circular
+    obj2.self = obj2; // Make one of them circular
     logger.log('test message', obj1, obj2);
     expect(logger.getLogs()[0]).toBe('[LOG] [Test] test message [Complex Value]');
   });
@@ -197,7 +197,7 @@ describe('TestLogger', () => {
 describe('NoLogger', () => {
   beforeEach(() => {
     // Reset the singleton instance before each test
-    // @ts-ignore - accessing private field for testing
+    // @ts-expect-error - accessing private static field for testing
     NoLogger.instance = undefined;
   });
 
@@ -233,29 +233,26 @@ describe('NoLogger', () => {
   });
 
   it('creates new instance when none exists', () => {
-    // @ts-ignore - accessing private field for testing
+    // @ts-expect-error - accessing private static field for testing
     expect(NoLogger.instance).toBeUndefined();
     const logger = NoLogger.getInstance();
-    // @ts-ignore - accessing private field for testing
+    // @ts-expect-error - accessing private static field for testing
     expect(NoLogger.instance).toBe(logger);
   });
 
   it('creates instance with empty prefix', () => {
     const logger = NoLogger.getInstance();
-    // @ts-ignore - accessing private field for testing
     expect(logger['prefix']).toBe('');
   });
 
   it('creates instance with non-empty prefix', () => {
     const logger = NoLogger.getInstance('test');
-    // @ts-ignore - accessing private field for testing
     expect(logger['prefix']).toBe('test');
   });
 
   it('creates instance with default prefix', () => {
-    // @ts-ignore - accessing private constructor for testing
+    // @ts-expect-error - accessing private constructor for testing
     const logger = new NoLogger();
-    // @ts-ignore - accessing private field for testing
     expect(logger['prefix']).toBe('');
   });
 });

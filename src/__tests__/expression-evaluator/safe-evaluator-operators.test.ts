@@ -5,7 +5,7 @@ import { ReferenceResolver } from '../../reference-resolver';
 import { Token } from '../../expression-evaluator/tokenizer';
 
 // Define the type to match the one in safe-evaluator.ts
-type Operator = keyof typeof SafeExpressionEvaluator.OPERATORS;
+type _Operator = keyof typeof SafeExpressionEvaluator.OPERATORS;
 
 /**
  * This is a consolidated test file for operator-related tests in the SafeExpressionEvaluator.
@@ -227,7 +227,7 @@ describe('SafeExpressionEvaluator - Operators', () => {
       // function that returns 0 for unknown operators
 
       // First, let's define the operators that should return specific precedence values
-      const knownOperators = [
+      const _knownOperators = [
         '||',
         '&&',
         '==',

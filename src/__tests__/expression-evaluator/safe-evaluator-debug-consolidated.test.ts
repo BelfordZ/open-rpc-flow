@@ -168,7 +168,7 @@ describe('SafeExpressionEvaluator - Debug Tests (Consolidated)', () => {
       context.a = 10;
       context.b = 20;
       context.nested = { value: 30 };
-      
+
       const evaluatorAny = evaluator as any;
 
       // Skip test if we can't access the parseExpression method
@@ -205,11 +205,11 @@ describe('SafeExpressionEvaluator - Debug Tests (Consolidated)', () => {
           }
 
           if (token.value === ')') {
-            let foundParen = false;
+            let _foundParen = false;
             while (operatorStack.length > 0) {
               const op = operatorStack.pop();
               if (op === '(') {
-                foundParen = true;
+                _foundParen = true;
                 break;
               }
             }
@@ -456,7 +456,7 @@ describe('SafeExpressionEvaluator - Debug Tests (Consolidated)', () => {
 
     it('traces token processing through complex expressions', () => {
       const evaluatorAny = evaluator as any;
-      
+
       if (typeof evaluatorAny.parse !== 'function') {
         logger.warn('Cannot access parse method, skipping trace test');
         return;
@@ -468,7 +468,7 @@ describe('SafeExpressionEvaluator - Debug Tests (Consolidated)', () => {
       // Replace with a tracing version
       evaluatorAny.parse = function (tokens: any[]) {
         logger.log('Tracing parse call with tokens:', JSON.stringify(tokens));
-        
+
         // Track token processing
         for (let i = 0; i < tokens.length; i++) {
           const token = tokens[i];
@@ -488,7 +488,7 @@ describe('SafeExpressionEvaluator - Debug Tests (Consolidated)', () => {
           '(1 + 2) * 3',
           '{key: 1 + 2}',
           '[1, 2, 3]',
-          'null ?? "default"'
+          'null ?? "default"',
         ];
 
         for (const expr of expressions) {
@@ -506,4 +506,4 @@ describe('SafeExpressionEvaluator - Debug Tests (Consolidated)', () => {
       }
     });
   });
-}); 
+});

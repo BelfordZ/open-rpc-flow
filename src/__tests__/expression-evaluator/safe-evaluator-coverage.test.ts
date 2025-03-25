@@ -5,7 +5,10 @@ import {
 import { ExpressionError } from '../../expression-evaluator/errors';
 import { TestLogger } from '../../util/logger';
 import { ReferenceResolver } from '../../reference-resolver';
-import { TokenizerError } from '../../expression-evaluator/tokenizer';
+import {
+  tokenize as _tokenize,
+  TokenizerError as _TokenizerError,
+} from '../../expression-evaluator/tokenizer';
 
 describe('SafeExpressionEvaluator Coverage Improvements', () => {
   let evaluator: SafeExpressionEvaluator;
@@ -408,7 +411,7 @@ describe('SafeExpressionEvaluator Coverage Improvements', () => {
 
       try {
         // First, test with a standard Error object
-        // @ts-ignore - we're monkey patching for testing purposes
+        // @ts-expect-error - we're monkey patching for testing purposes
         SafeExpressionEvaluator['OPERATORS']['+'] = () => {
           const error = new Error('Custom error message');
           throw error;
@@ -421,7 +424,7 @@ describe('SafeExpressionEvaluator Coverage Improvements', () => {
         );
 
         // Now test with a non-Error object (like a string or number)
-        // @ts-ignore - we're monkey patching for testing purposes
+        // @ts-expect-error - we're monkey patching for testing purposes
         SafeExpressionEvaluator['OPERATORS']['+'] = () => {
           throw 'Not an error object';
         };
@@ -433,7 +436,7 @@ describe('SafeExpressionEvaluator Coverage Improvements', () => {
         );
       } finally {
         // Restore the original operators to prevent test pollution
-        // @ts-ignore - restoring the original
+        // @ts-expect-error - restoring the original
         SafeExpressionEvaluator['OPERATORS'] = originalOperators;
       }
     });
@@ -472,7 +475,7 @@ describe('SafeExpressionEvaluator Coverage Improvements', () => {
       // Simulate operation with missing properties by directly calling evaluateAst
       const invalidOp = { type: 'operation' as const };
       try {
-        // @ts-ignore - intentionally passing invalid ast
+        // @ts-expect-error - intentionally passing invalid ast
         evaluator['evaluateAst'](invalidOp, {}, Date.now());
         fail('Should have thrown an error');
       } catch (error) {
@@ -483,7 +486,7 @@ describe('SafeExpressionEvaluator Coverage Improvements', () => {
 
     it('throws proper error for unknown AST node types', () => {
       try {
-        // @ts-ignore - intentionally passing invalid ast
+        // @ts-expect-error - intentionally passing invalid ast
         evaluator['evaluateAst']({ type: 'unknown' }, {}, Date.now());
         fail('Should have thrown an error');
       } catch (error) {
@@ -585,7 +588,7 @@ describe('SafeExpressionEvaluator Coverage Improvements', () => {
       ];
 
       // Call the parse method directly
-      // @ts-ignore - we're accessing a private method for testing
+      // @ts-expect-error - we're accessing a private method for testing
       const ast = evaluator['parse'](mockTokens);
 
       // Verify the AST node type and structure
@@ -599,7 +602,7 @@ describe('SafeExpressionEvaluator Coverage Improvements', () => {
         { type: 'punctuation', value: '}', raw: '}' },
       ];
 
-      // @ts-ignore - we're accessing a private method for testing
+      // @ts-expect-error - we're accessing a private method for testing
       const emptyAst = evaluator['parse'](emptyObjectTokens);
       expect(emptyAst.type).toBe('object');
       expect(emptyAst.properties).toEqual([]);
@@ -636,7 +639,7 @@ describe('SafeExpressionEvaluator Coverage Improvements', () => {
       ];
 
       // Call the parse method directly
-      // @ts-ignore - we're accessing a private method for testing
+      // @ts-expect-error - we're accessing a private method for testing
       const ast = evaluator['parse'](mockTokens);
 
       // Verify the AST node type and structure
@@ -650,7 +653,7 @@ describe('SafeExpressionEvaluator Coverage Improvements', () => {
         { type: 'punctuation', value: ']', raw: ']' },
       ];
 
-      // @ts-ignore - we're accessing a private method for testing
+      // @ts-expect-error - we're accessing a private method for testing
       const emptyAst = evaluator['parse'](emptyArrayTokens);
       expect(emptyAst.type).toBe('array');
       expect(emptyAst.elements).toEqual([]);

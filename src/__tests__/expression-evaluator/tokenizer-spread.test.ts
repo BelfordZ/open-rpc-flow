@@ -1,4 +1,8 @@
-import { tokenize, TokenizerError, Token } from '../../expression-evaluator/tokenizer';
+import {
+  tokenize,
+  TokenizerError as _TokenizerError,
+  Token,
+} from '../../expression-evaluator/tokenizer';
 import { TestLogger } from '../../util/logger';
 
 describe('Tokenizer Spread Tests', () => {
@@ -494,7 +498,9 @@ describe('Tokenizer Spread Tests', () => {
         if (spreadIndex > 0) {
           // Check token before spread
           const beforeToken = tokens[spreadIndex - 1];
-          expect(beforeToken.type === 'identifier' || beforeToken.type === 'punctuation').toBe(true);
+          expect(beforeToken.type === 'identifier' || beforeToken.type === 'punctuation').toBe(
+            true,
+          );
         }
 
         if (spreadIndex < tokens.length - 1) {

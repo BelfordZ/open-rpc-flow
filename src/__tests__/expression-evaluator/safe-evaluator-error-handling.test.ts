@@ -236,7 +236,7 @@ describe('SafeExpressionEvaluator - Error Handling', () => {
       );
 
       // Create a token with an object that would cause the error if we could execute it
-      const objectToken: Token = {
+      const _objectToken: Token = {
         type: 'object_literal',
         value: [],
         raw: '{}',

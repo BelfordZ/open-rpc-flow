@@ -481,7 +481,9 @@ describe('Tokenizer Miscellaneous Tests', () => {
 
     describe('empty expressions', () => {
       it('throws error for empty string', () => {
-        expect(() => tokenize('', logger)).toThrow(new TokenizerError('Expression cannot be empty'));
+        expect(() => tokenize('', logger)).toThrow(
+          new TokenizerError('Expression cannot be empty'),
+        );
       });
 
       it('throws error for whitespace-only string', () => {
@@ -499,7 +501,9 @@ describe('Tokenizer Miscellaneous Tests', () => {
 
       it('tokenizes strings with escaped backslashes', () => {
         const result = tokenize('"Hello\\\\World"', logger);
-        expect(result).toEqual([{ type: 'string', value: 'Hello\\World', raw: '"Hello\\\\World"' }]);
+        expect(result).toEqual([
+          { type: 'string', value: 'Hello\\World', raw: '"Hello\\\\World"' },
+        ]);
       });
 
       it('handles single backslash in string', () => {
@@ -580,7 +584,7 @@ describe('Tokenizer Miscellaneous Tests', () => {
       expect(values.some((v: Token) => v.type === 'number' && v.value === 1)).toBe(true);
       expect(values.some((v: Token) => v.type === 'number' && v.value === 2)).toBe(true);
     });
-    
+
     it('handles empty braces as punctuation', () => {
       const result = tokenize('{}', logger);
       expect(result).toEqual([

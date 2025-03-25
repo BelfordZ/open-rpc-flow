@@ -63,7 +63,7 @@ describe('SafeExpressionEvaluator - Invalid Expression Handling', () => {
         const originalParse = evaluatorAny.parse;
 
         // Create a patched version of parse that will temporarily modify outputQueue
-        evaluatorAny.parse = function (tokens: Token[]): any {
+        evaluatorAny.parse = function (_tokens: Token[]): any {
           // Initialize empty outputQueue for our test
           const outputQueue: any[] = [];
 
@@ -108,7 +108,7 @@ describe('SafeExpressionEvaluator - Invalid Expression Handling', () => {
         // Create a wrapper that will inspect inside the method
         try {
           // Create a modified version of parseExpression that logs output queue
-          const modifiedParseExpression = function (tokens: Token[]) {
+          const modifiedParseExpression = function (_tokens: Token[]) {
             // Create an object that mimics the state inside parseExpression
             const outputQueue: any[] = [];
 

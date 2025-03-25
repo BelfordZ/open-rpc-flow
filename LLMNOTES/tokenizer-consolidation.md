@@ -5,16 +5,19 @@ We're consolidating tokenizer test files to improve maintainability. The consoli
 ## Completed Consolidations
 
 1. **Array-related Tests**: Combined into `tokenizer-array.test.ts`
+
    - ✅ `tokenizer-array-coverage.test.ts` (DELETED)
    - ✅ `tokenizer-array-return-coverage.test.ts` (DELETED)
    - ✅ `tokenizer-array-spread-coverage.test.ts` (DELETED)
 
 2. **Object-related Tests**: Combined into `tokenizer-object.test.ts`
+
    - ✅ `tokenizer-object-coverage.test.ts` (DELETED)
    - ✅ `tokenizer-object-spread-coverage.test.ts` (DELETED)
    - ✅ `tokenizer-object-spread-special.test.ts` (DELETED)
 
 3. **Spread Operator Tests**: Combined into `tokenizer-spread.test.ts`
+
    - ✅ `tokenizer-array-spread-special.test.ts` (DELETED)
    - ✅ `tokenizer-direct-spread-test.test.ts` (DELETED)
    - ✅ `tokenizer-direct-spread.test.ts` (DELETED)
@@ -27,6 +30,7 @@ We're consolidating tokenizer test files to improve maintainability. The consoli
 ## Next Steps for Consolidation
 
 5. **More Spread Operator Tests**: Continue consolidating into `tokenizer-spread.test.ts`
+
    - `tokenizer-special-spreads.test.ts`
    - `tokenizer-spread-array-buffer.test.ts`
    - `tokenizer-spread-coverage.test.ts`
@@ -42,4 +46,4 @@ We're consolidating tokenizer test files to improve maintainability. The consoli
    - `tokenizer-nested-brackets.test.ts`
    - `tokenizer-template-escape.test.ts`
 
-All tests are passing after consolidation and removal of the original files, maintaining the same level of coverage. 
+All tests are passing after consolidation and removal of the original files, maintaining the same level of coverage.

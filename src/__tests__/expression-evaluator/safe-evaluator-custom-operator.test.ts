@@ -2,7 +2,7 @@ import { SafeExpressionEvaluator } from '../../expression-evaluator/safe-evaluat
 import { ExpressionError } from '../../expression-evaluator/errors';
 import { TestLogger } from '../../util/logger';
 import { ReferenceResolver } from '../../reference-resolver';
-import { Token } from '../../expression-evaluator/tokenizer';
+import { Token as _Token } from '../../expression-evaluator/tokenizer';
 
 /**
  * This test focuses on testing the default case in the getPrecedence method

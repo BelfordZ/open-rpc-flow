@@ -1,10 +1,13 @@
-import { SafeExpressionEvaluator, _UnknownReferenceError } from '../../expression-evaluator/safe-evaluator';
+import {
+  SafeExpressionEvaluator,
+  _UnknownReferenceError,
+} from '../../expression-evaluator/safe-evaluator';
 import { ExpressionError } from '../../expression-evaluator/errors';
 import { TestLogger } from '../../util/logger';
 import { ReferenceResolver } from '../../reference-resolver';
-import { Token } from '../../expression-evaluator/tokenizer';
-import { Logger } from '../../util/logger';
-import { tokenize } from '../../expression-evaluator/tokenizer';
+import { Token as _Token } from '../../expression-evaluator/tokenizer';
+import { Logger as _Logger } from '../../util/logger';
+import { tokenize as _tokenize } from '../../expression-evaluator/tokenizer';
 
 describe('SafeExpressionEvaluator - Combined Line Coverage Tests', () => {
   let evaluator: SafeExpressionEvaluator;
@@ -112,7 +115,7 @@ describe('SafeExpressionEvaluator - Combined Line Coverage Tests', () => {
       // Create a function that replicates the specific code path in line 336
       function replicaLineTest() {
         const operatorStack = [')'];
-        
+
         while (operatorStack.length > 0) {
           const operator = operatorStack.pop()!;
           // This is line 336 in the original code
@@ -139,7 +142,7 @@ describe('SafeExpressionEvaluator - Combined Line Coverage Tests', () => {
       // The + operator has lower precedence than *, so 3 * 4 should be evaluated first
       const result = evaluator.evaluate('2 + 3 * 4', {});
       expect(result).toBe(14); // 2 + (3 * 4) = 2 + 12 = 14
-      
+
       // First encounters * (higher precedence) and then + (lower precedence)
       const result2 = evaluator.evaluate('3 * 4 + 2', {});
       expect(result2).toBe(14); // (3 * 4) + 2 = 12 + 2 = 14
@@ -149,11 +152,11 @@ describe('SafeExpressionEvaluator - Combined Line Coverage Tests', () => {
       // The * and / operators have equal precedence and are left-associative
       const result = evaluator.evaluate('12 / 4 * 3', {});
       expect(result).toBe(9); // (12 / 4) * 3 = 3 * 3 = 9
-      
-      // + and - have equal precedence 
+
+      // + and - have equal precedence
       const result2 = evaluator.evaluate('10 + 5 - 3', {});
       expect(result2).toBe(12); // (10 + 5) - 3 = 15 - 3 = 12
-      
+
       // Multiple subtraction operators should be processed left to right
       const result3 = evaluator.evaluate('10 - 5 - 2', {});
       expect(result3).toBe(3); // (10 - 5) - 2 = 5 - 2 = 3
@@ -169,11 +172,11 @@ describe('SafeExpressionEvaluator - Combined Line Coverage Tests', () => {
       // This expression mixes +, *, /, and comparison operators to test full precedence rules
       const result = evaluator.evaluate('2 + 3 * 4 / 2 - 1 > 5 && true', {});
       expect(result).toBe(true);
-      
+
       // A complex expression with multiple operators and parentheses
       const result2 = evaluator.evaluate('(2 + 3) * (4 - 1) / (2 + 1) + 1', {});
       expect(result2).toBe(6);
-      
+
       // This expression specifically creates a situation where we'll hit line 403's condition
       const result3 = evaluator.evaluate('5 * 2 / 2 + 3 * 4', {});
       expect(result3).toBe(17); // ((5 * 2) / 2) + (3 * 4) = 5 + 12 = 17
@@ -183,11 +186,11 @@ describe('SafeExpressionEvaluator - Combined Line Coverage Tests', () => {
       // ?? has high precedence
       const result = evaluator.evaluate('null ?? "default" + " value"', {});
       expect(result).toBe('default value');
-      
+
       // && has higher precedence than ||
       const result2 = evaluator.evaluate('false || true && true', {});
       expect(result2).toBe(true);
-      
+
       // Equality operators have higher precedence than logical operators
       const result3 = evaluator.evaluate('2 == 2 && 3 != 4 || false', {});
       expect(result3).toBe(true);
@@ -211,18 +214,18 @@ describe('SafeExpressionEvaluator - Combined Line Coverage Tests', () => {
         ['*', '+'],
         ['/', '-'],
         ['&&', '||'],
-        
+
         // Equal precedence pairs
         ['+', '-'],
         ['*', '/'],
         ['>', '>='],
-        
+
         // Lower precedence followed by higher precedence
         ['+', '*'],
         ['-', '/'],
-        ['||', '&&']
+        ['||', '&&'],
       ];
-      
+
       for (const [op1, op2] of testPairs) {
         try {
           // Create a simple expression with the two operators
@@ -270,39 +273,47 @@ describe('SafeExpressionEvaluator - Combined Line Coverage Tests', () => {
     it('should correctly handle spread operator in arrays', () => {
       // Setup the context with an array property
       context.arr = [3, 4, 5];
-      
+
       // Test spreading an array at the beginning
       const result1 = evaluator.evaluate('[...${context.arr}, 6, 7]', {});
       expect(result1).toEqual([3, 4, 5, 6, 7]);
-      
+
       // Test spreading an array in the middle
       const result2 = evaluator.evaluate('[1, 2, ...${context.arr}, 6, 7]', {});
       expect(result2).toEqual([1, 2, 3, 4, 5, 6, 7]);
-      
+
       // Test spreading an array at the end
       const result3 = evaluator.evaluate('[1, 2, ...${context.arr}]', {});
       expect(result3).toEqual([1, 2, 3, 4, 5]);
-      
+
       // Test with just the spread operator
       const result4 = evaluator.evaluate('[...${context.arr}]', {});
       expect(result4).toEqual([3, 4, 5]);
     });
-    
+
     it('should handle multiple spread operators in a single array', () => {
       context.arr1 = [1, 2];
       context.arr2 = [4, 5];
-      
+
       const result = evaluator.evaluate('[...${context.arr1}, 3, ...${context.arr2}]', {});
       expect(result).toEqual([1, 2, 3, 4, 5]);
     });
-    
+
+    it('should handle spreading objects in arrays', () => {
+      context.obj = { a: 1, b: 2, c: 3 };
+
+      // When spreading an object in an array, it should spread the object values
+      const result = evaluator.evaluate('[...${context.obj}]', {});
+      expect(result).toEqual([1, 2, 3]);
+    });
+
     it('should handle spreading non-array values', () => {
       context.nonArr = 42;
-      
+
       // Should throw an error when trying to spread non-array, non-object values
       expect(() => {
         evaluator.evaluate('[...${context.nonArr}]', {});
       }).toThrow('Invalid spread operator usage: can only spread arrays or objects');
     });
   });
-}); 
+});

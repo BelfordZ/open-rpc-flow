@@ -1,6 +1,6 @@
 import { DependencyResolver } from '../dependency-resolver';
 import { SafeExpressionEvaluator } from '../expression-evaluator/safe-evaluator';
-import { Flow, Step } from '../types';
+import { Flow, Step as _Step } from '../types';
 import { TestLogger } from '../util/logger';
 import { ReferenceResolver } from '../reference-resolver';
 

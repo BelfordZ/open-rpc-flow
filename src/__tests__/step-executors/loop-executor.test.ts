@@ -584,6 +584,40 @@ describe('LoopStepExecutor', () => {
     );
   });
 
+  it('handles errors without a message property', async () => {
+    const items = [{ id: 1 }];
+    stepResults.set('items', items);
+
+    const step: LoopStep = {
+      name: 'processItems',
+      loop: {
+        over: '${items}',
+        as: 'item',
+        step: {
+          name: 'processItem',
+          request: {
+            method: 'item.process',
+            params: {
+              id: '${item.id}',
+            },
+          },
+        },
+      },
+    };
+
+    // Mock executeStep to throw an error without a message property
+    executeStep.mockImplementation(() => {
+      // Create a custom error-like object without a message property
+      const errorWithoutMessage = { name: 'Error' } as Error;
+      throw errorWithoutMessage;
+    });
+
+    // The loop executor should handle this gracefully and use 'Unknown error'
+    await expect(executor.execute(step, context)).rejects.toThrow(
+      'Failed to execute loop step "processItems": Unknown error'
+    );
+  });
+
   it('executes multiple steps in a loop iteration', async () => {
     const items = [{ id: 1 }, { id: 2 }];
     stepResults.set('items', items);

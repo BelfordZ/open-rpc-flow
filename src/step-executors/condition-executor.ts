@@ -80,7 +80,7 @@ export class ConditionStepExecutor implements StepExecutor {
     } catch (error: any) {
       this.logger.error('Condition execution failed', {
         stepName: step.name,
-        error: error.message || String(error),
+        error: error.toString(),
       });
       throw error;
     }

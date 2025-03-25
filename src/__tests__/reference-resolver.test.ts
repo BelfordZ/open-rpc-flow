@@ -349,6 +349,13 @@ describe('ReferenceResolver', () => {
       expect(resolver.resolveReferences(obj)).toEqual(obj);
     });
 
+    it('throws ReferenceResolutionError when resolving references in array fails', () => {
+      const arrayWithBadRef = ['${step1.result.id}', '${unknown.reference}'];
+      
+      expect(() => resolver.resolveReferences(arrayWithBadRef)).toThrow(ReferenceResolutionError);
+      expect(() => resolver.resolveReferences(arrayWithBadRef)).toThrow('Failed to resolve references in array');
+    });
+
     it('propagates errors from invalid references', () => {
       const obj = {
         name: 'John',
@@ -524,6 +531,74 @@ describe('ReferenceResolver', () => {
         };
         expect(() => refs.resolveReference('${.someRef}', context)).toThrow(InvalidReferenceError);
       });
+    });
+  });
+
+  describe('error handling', () => {
+    it('handles non-Error objects when resolving references in strings', () => {
+      // Setup a mock to force a non-Error error in string resolution
+      const originalResolveReference = resolver.resolveReference;
+      resolver.resolveReference = jest.fn().mockImplementation((ref: string) => {
+        if (ref.includes('${trigger}')) {
+          // Throw a non-Error object
+          throw { message: 'Not an Error instance' };
+        }
+        return 'resolved';
+      });
+
+      try {
+        // This should trigger the catch with a non-Error in string resolution (line 144)
+        expect(() => resolver.resolveReferences('Test ${trigger}', {})).toThrow(ReferenceResolutionError);
+      } finally {
+        // Restore original method
+        resolver.resolveReference = originalResolveReference;
+      }
+    });
+
+    it('handles non-Error objects when resolving references in arrays', () => {
+      // Setup a mock to force a non-Error error in array resolution
+      const originalResolveReferences = resolver.resolveReferences;
+      const mockResolveReferences = jest.fn()
+        .mockImplementation(function(this: any, value: any) {
+          if (value === 'trigger') {
+            // Throw a non-Error object
+            throw { message: 'Not an Error instance' };
+          }
+          return originalResolveReferences.call(this, value);
+        });
+      
+      resolver.resolveReferences = mockResolveReferences;
+
+      try {
+        // This should trigger the catch with a non-Error in array resolution (line 160)
+        expect(() => resolver.resolveReferences(['normal', 'trigger'], {})).toThrow(ReferenceResolutionError);
+      } finally {
+        // Restore original method
+        resolver.resolveReferences = originalResolveReferences;
+      }
+    });
+
+    it('handles non-Error objects when resolving references in objects', () => {
+      // Setup a mock to force a non-Error error in object resolution
+      const originalResolveReferences = resolver.resolveReferences;
+      const mockResolveReferences = jest.fn()
+        .mockImplementation(function(this: any, value: any) {
+          if (value === 'trigger') {
+            // Throw a non-Error object
+            throw { message: 'Not an Error instance' };
+          }
+          return originalResolveReferences.call(this, value);
+        });
+      
+      resolver.resolveReferences = mockResolveReferences;
+
+      try {
+        // This should trigger the catch with a non-Error in object resolution (line 177)
+        expect(() => resolver.resolveReferences({ normal: 'value', bad: 'trigger' }, {})).toThrow(ReferenceResolutionError);
+      } finally {
+        // Restore original method
+        resolver.resolveReferences = originalResolveReferences;
+      }
     });
   });
 });

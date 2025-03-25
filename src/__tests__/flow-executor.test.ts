@@ -39,7 +39,7 @@ describe('FlowExecutor', () => {
     };
 
     jsonRpcHandler.mockResolvedValue({ success: true });
-    executor = new FlowExecutor(flow, jsonRpcHandler, testLogger);
+    executor = new FlowExecutor(flow, jsonRpcHandler);
     await executor.execute();
 
     // expect testLogger to have captured logs

@@ -274,6 +274,19 @@ describe('PathAccessor', () => {
         expect(PathAccessor.get(arrayObj, '[0]["foo"]')).toBe('bar');
       });
     });
+
+    it('should handle unexpected closing brackets properly', () => {
+      // This test specifically covers line 79 in accessor.ts
+      // Test where a closing bracket is outside a quote
+      expect(() => PathAccessor.parsePath('foo]')).toThrow(
+        'Unexpected ] at position 3'
+      );
+      
+      // Test with different position
+      expect(() => PathAccessor.parsePath('foo.bar]')).toThrow(
+        'Unexpected ] at position 7'
+      );
+    });
   });
 
   describe('get', () => {

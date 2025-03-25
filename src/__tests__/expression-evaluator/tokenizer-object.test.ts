@@ -309,4 +309,4 @@ describe('Tokenizer Object Tests', () => {
       expect(spreadIndex).toBeGreaterThanOrEqual(0);
     });
   });
-}); 
+});

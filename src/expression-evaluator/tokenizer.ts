@@ -25,8 +25,7 @@ export class TokenizerError extends Error {
     this.name = 'TokenizerError';
   }
 }
-
-const SPECIAL_CHARS = new Set(['(', ')', '[', ']', '{', '}', ',', ':']);
+const _SPECIAL_CHARS = new Set(['(', ')', '[', ']', '{', '}', ',', ':']);
 const OPERATORS = new Set([
   '+',
   '-',
@@ -206,7 +205,7 @@ function isTemplateExpression(expression: string, index: number): boolean {
 }
 
 function handleReference(state: TokenizerState): Token {
-  const startIndex = state.currentIndex;
+  const _startIndex = state.currentIndex;
   state.currentIndex += 2; // Skip ${
 
   const referenceTokens: Token[] = [];
@@ -233,7 +232,7 @@ function handleReference(state: TokenizerState): Token {
         return {
           type: 'reference',
           value: referenceTokens,
-          raw: state.expression.substring(startIndex, state.currentIndex),
+          raw: state.expression.substring(_startIndex, state.currentIndex),
         };
       }
       /* istanbul ignore next */
@@ -309,7 +308,7 @@ function isSpreadOperator(expression: string, index: number): boolean {
 }
 
 function handleOperator(state: TokenizerState): Token {
-  const startIndex = state.currentIndex;
+  const _startIndex = state.currentIndex;
   const char = state.expression[state.currentIndex];
 
   // Handle spread operator
@@ -356,7 +355,7 @@ function handleOperator(state: TokenizerState): Token {
 }
 
 function handleStringLiteral(state: TokenizerState, quote: string): Token {
-  const startIndex = state.currentIndex;
+  const _startIndex = state.currentIndex;
   let value = '';
 
   state.currentIndex++; // Skip opening quote
@@ -383,7 +382,7 @@ function handleStringLiteral(state: TokenizerState, quote: string): Token {
       return {
         type: 'string',
         value: value,
-        raw: state.expression.substring(startIndex, state.currentIndex),
+        raw: state.expression.substring(_startIndex, state.currentIndex),
       };
     }
 
@@ -487,13 +486,13 @@ function handleTemplateLiteral(state: TokenizerState): Token[] {
 }
 
 function handleObjectLiteral(state: TokenizerState): Token {
-  const startIndex = state.currentIndex;
+  const _startIndex = state.currentIndex;
   state.currentIndex++; // Skip opening brace
 
   const objectTokens: Token[] = [];
   state.textBuffer = '';
   let _expectingValue = true;
-  let expectingKey = true;
+  let _expectingKey = true;
 
   while (state.currentIndex < state.expression.length) {
     const char = state.expression[state.currentIndex];
@@ -519,7 +518,7 @@ function handleObjectLiteral(state: TokenizerState): Token {
       return {
         type: 'object_literal',
         value: objectTokens,
-        raw: state.expression.substring(startIndex, state.currentIndex),
+        raw: state.expression.substring(_startIndex, state.currentIndex),
       };
     }
 
@@ -534,7 +533,7 @@ function handleObjectLiteral(state: TokenizerState): Token {
         state.textBuffer = '';
       }
       objectTokens.push(createPunctuationToken(':'));
-      expectingKey = false;
+      _expectingKey = false;
       _expectingValue = true;
       state.currentIndex++;
       continue;
@@ -544,7 +543,7 @@ function handleObjectLiteral(state: TokenizerState): Token {
       flushBufferToArray(state.textBuffer, objectTokens, false, state.textBuffer);
       state.textBuffer = '';
       objectTokens.push(createPunctuationToken(','));
-      expectingKey = true;
+      _expectingKey = true;
       _expectingValue = true;
       state.currentIndex++;
       continue;
@@ -626,7 +625,7 @@ function handleObjectLiteral(state: TokenizerState): Token {
 }
 
 function handleArrayLiteral(state: TokenizerState): Token {
-  const startIndex = state.currentIndex;
+  const _startIndex = state.currentIndex;
   state.currentIndex++; // Skip opening bracket
 
   const arrayTokens: Token[] = [];
@@ -655,7 +654,7 @@ function handleArrayLiteral(state: TokenizerState): Token {
         return {
           type: 'array_literal',
           value: arrayTokens,
-          raw: state.expression.substring(startIndex, state.currentIndex),
+          raw: state.expression.substring(_startIndex, state.currentIndex),
         };
       }
       /* istanbul ignore next */

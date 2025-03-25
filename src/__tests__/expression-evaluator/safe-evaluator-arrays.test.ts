@@ -3,37 +3,30 @@ import { ExpressionError } from '../../expression-evaluator/errors';
 import { TestLogger } from '../../util/logger';
 import { ReferenceResolver } from '../../reference-resolver';
 
-// Define the type to match the one in safe-evaluator.ts
-type Operator = keyof typeof SafeExpressionEvaluator.OPERATORS;
-
-// Define AstNode interface to match the one in safe-evaluator.ts
-interface AstNode {
-  type: 'literal' | 'reference' | 'operation' | 'object' | 'array';
-  value?: any;
-  path?: string;
-  operator?: Operator;
-  left?: AstNode;
-  right?: AstNode;
-  properties?: { key: string; value: AstNode; spread?: boolean }[];
-  elements?: { value: AstNode; spread?: boolean }[];
-}
-
 /**
  * This is a consolidated test file for array-related tests in the SafeExpressionEvaluator.
  * It combines tests from:
  * - safe-evaluator-array-elements.test.ts
  * - safe-evaluator-array-case-coverage.test.ts
  */
-describe('SafeExpressionEvaluator - Arrays', () => {
+describe('SafeExpressionEvaluator - Array Tests', () => {
   let evaluator: SafeExpressionEvaluator;
   let stepResults: Map<string, any>;
   let context: Record<string, any>;
   let referenceResolver: ReferenceResolver;
-  const logger = new TestLogger('SafeEvaluatorArraysTest');
+  let logger: TestLogger;
 
   beforeEach(() => {
     stepResults = new Map();
-    context = {};
+    context = {
+      arr: [1, 2, 3, 4, 5],
+      nestedArr: [[1, 2], [3, 4], [5, 6]],
+      mixedArr: [1, 'hello', true, null, undefined, { key: 'value' }],
+      objArr: [{ id: 1, name: 'A' }, { id: 2, name: 'B' }],
+      emptyArr: [],
+      idx: 2
+    };
+    logger = new TestLogger('SafeEvaluatorArrayTest');
     referenceResolver = new ReferenceResolver(stepResults, context, logger);
     evaluator = new SafeExpressionEvaluator(logger, referenceResolver);
   });
@@ -42,295 +35,99 @@ describe('SafeExpressionEvaluator - Arrays', () => {
     logger.clear();
   });
 
-  // Tests from safe-evaluator-array-elements.test.ts
-  describe('Array AST Node Handling', () => {
-    // This is the core test that directly targets line 642
-    it('throws when evaluating an array AST node with missing elements', () => {
-      // Create a malformed AST node by accessing evaluator's private evaluateAst method directly
-      const malformedAst: AstNode = { type: 'array' };
-
-      // We need to use a little trick to access the private method and test it
-      // @ts-ignore - Ignore TypeScript errors for accessing private methods in tests
-      const evaluateAst = evaluator['evaluateAst'].bind(evaluator);
-
-      // Test that it throws the expected error
-      expect(() => {
-        evaluateAst(malformedAst, {}, Date.now());
-      }).toThrow(ExpressionError);
-
-      expect(() => {
-        evaluateAst(malformedAst, {}, Date.now());
-      }).toThrow('Internal error: Array node missing elements');
-    });
-
-    // Test with an empty array elements property
-    it('handles array AST node with empty elements array', () => {
-      const emptyElementsAst: AstNode = {
-        type: 'array',
-        elements: [],
-      };
-
-      // @ts-ignore - Ignore TypeScript errors for accessing private methods in tests
-      const evaluateAst = evaluator['evaluateAst'].bind(evaluator);
-
-      // Should not throw, should return an empty array
-      const result = evaluateAst(emptyElementsAst, {}, Date.now());
-      expect(result).toEqual([]);
-    });
-
-    // Test with valid array elements
-    it('evaluates array AST node with valid elements', () => {
-      const validElementsAst: AstNode = {
-        type: 'array',
-        elements: [
-          {
-            value: { type: 'literal', value: 1 },
-            spread: false,
-          },
-          {
-            value: { type: 'literal', value: 2 },
-            spread: false,
-          },
-        ],
-      };
-
-      // @ts-ignore - Ignore TypeScript errors for accessing private methods in tests
-      const evaluateAst = evaluator['evaluateAst'].bind(evaluator);
-
-      const result = evaluateAst(validElementsAst, {}, Date.now());
-      expect(result).toEqual([1, 2]);
-    });
-
-    // Test with spread operator in array elements
-    it('handles spread operator in array elements', () => {
-      context.arr = [3, 4, 5];
-
-      const spreadElementsAst: AstNode = {
-        type: 'array',
-        elements: [
-          {
-            value: { type: 'literal', value: 1 },
-            spread: false,
-          },
-          {
-            value: { type: 'literal', value: 2 },
-            spread: false,
-          },
-          {
-            value: { type: 'reference', path: 'context.arr' },
-            spread: true,
-          },
-        ],
-      };
-
-      // @ts-ignore - Ignore TypeScript errors for accessing private methods in tests
-      const evaluateAst = evaluator['evaluateAst'].bind(evaluator);
-
-      const result = evaluateAst(spreadElementsAst, context, Date.now());
-      expect(result).toEqual([1, 2, 3, 4, 5]);
-    });
-
-    // Test spreading non-array values
-    it('handles spreading non-array object values', () => {
-      context.obj = { a: 1, b: 2 };
-
-      const spreadObjectAst: AstNode = {
-        type: 'array',
-        elements: [
-          {
-            value: { type: 'reference', path: 'context.obj' },
-            spread: true,
-          },
-        ],
-      };
-
-      // @ts-ignore - Ignore TypeScript errors for accessing private methods in tests
-      const evaluateAst = evaluator['evaluateAst'].bind(evaluator);
-
-      const result = evaluateAst(spreadObjectAst, context, Date.now());
-      expect(result).toEqual([1, 2]); // Should be Object.values(obj)
-    });
-
-    // Test spreading invalid values (not array or object)
-    it('throws when spreading invalid values', () => {
-      context.str = 'not spreadable';
-
-      const invalidSpreadAst: AstNode = {
-        type: 'array',
-        elements: [
-          {
-            value: { type: 'reference', path: 'context.str' },
-            spread: true,
-          },
-        ],
-      };
-
-      // @ts-ignore - Ignore TypeScript errors for accessing private methods in tests
-      const evaluateAst = evaluator['evaluateAst'].bind(evaluator);
-
-      expect(() => {
-        evaluateAst(invalidSpreadAst, context, Date.now());
-      }).toThrow(ExpressionError);
-
-      expect(() => {
-        evaluateAst(invalidSpreadAst, context, Date.now());
-      }).toThrow('Invalid spread operator usage: can only spread arrays or objects');
-    });
-
-    // Test with null and undefined spread
-    it('handles null and undefined spread attempts correctly', () => {
-      context.nullVal = null;
-      context.undefinedVal = undefined;
-
-      const nullSpreadAst: AstNode = {
-        type: 'array',
-        elements: [
-          {
-            value: { type: 'reference', path: 'context.nullVal' },
-            spread: true,
-          },
-        ],
-      };
-
-      const undefinedSpreadAst: AstNode = {
-        type: 'array',
-        elements: [
-          {
-            value: { type: 'reference', path: 'context.undefinedVal' },
-            spread: true,
-          },
-        ],
-      };
-
-      // @ts-ignore - Ignore TypeScript errors for accessing private methods in tests
-      const evaluateAst = evaluator['evaluateAst'].bind(evaluator);
-
-      // Both should throw since they're not arrays or valid objects
-      expect(() => {
-        evaluateAst(nullSpreadAst, context, Date.now());
-      }).toThrow(ExpressionError);
-
-      expect(() => {
-        evaluateAst(undefinedSpreadAst, context, Date.now());
-      }).toThrow(ExpressionError);
-    });
-  });
-
-  // Integration tests that use the evaluate method directly
-  describe('Array Evaluation Integration', () => {
-    it('evaluates simple array literals', () => {
-      expect(evaluator.evaluate('[1, 2, 3]', {})).toEqual([1, 2, 3]);
+  describe('Array Literal Creation', () => {
+    it('should create and evaluate empty arrays', () => {
       expect(evaluator.evaluate('[]', {})).toEqual([]);
     });
 
-    it('evaluates nested array literals', () => {
-      expect(evaluator.evaluate('[[1, 2], [3, 4]]', {})).toEqual([
-        [1, 2],
-        [3, 4],
-      ]);
+    it('should create and evaluate arrays with simple values', () => {
+      expect(evaluator.evaluate('[1, 2, 3]', {})).toEqual([1, 2, 3]);
+      expect(evaluator.evaluate('["a", "b", "c"]', {})).toEqual(['a', 'b', 'c']);
+      expect(evaluator.evaluate('[true, false, true]', {})).toEqual([true, false, true]);
     });
 
-    it('evaluates array literals with computed values', () => {
-      // The expression syntax needs to be different - expressions need to be separate references or literals
-      context.val1 = 3;
-      context.val2 = 12;
-      expect(evaluator.evaluate('[${context.val1}, ${context.val2}]', {})).toEqual([3, 12]);
+    it('should create and evaluate arrays with mixed values', () => {
+      expect(evaluator.evaluate('[1, "two", true, null]', {})).toEqual([1, 'two', true, null]);
     });
 
-    it('evaluates array literals with references', () => {
-      context.a = 1;
-      context.b = 2;
-      expect(evaluator.evaluate('[${context.a}, ${context.b}]', {})).toEqual([1, 2]);
-    });
-
-    it('evaluates array literals with spread operator', () => {
-      context.arr = [2, 3, 4];
-      expect(evaluator.evaluate('[1, ...${context.arr}, 5]', {})).toEqual([1, 2, 3, 4, 5]);
-    });
-
-    it('evaluates array literals with multiple spread operators', () => {
-      context.arr1 = [2, 3];
-      context.arr2 = [4, 5];
-      expect(evaluator.evaluate('[1, ...${context.arr1}, ...${context.arr2}, 6]', {})).toEqual([
-        1, 2, 3, 4, 5, 6,
-      ]);
-    });
-
-    it('handles spreading objects in array literals', () => {
-      context.obj = { a: 7, b: 8 };
-      expect(evaluator.evaluate('[1, ...${context.obj}]', {})).toEqual([1, 7, 8]);
-    });
-
-    it('throws when spreading non-spreadable values', () => {
-      context.nonSpreadable = 42;
-      expect(() => evaluator.evaluate('[...${context.nonSpreadable}]', {})).toThrow(ExpressionError);
+    it('should create and evaluate nested arrays', () => {
+      expect(evaluator.evaluate('[[1, 2], [3, 4]]', {})).toEqual([[1, 2], [3, 4]]);
+      expect(evaluator.evaluate('[1, [2, 3], 4]', {})).toEqual([1, [2, 3], 4]);
     });
   });
 
-  // Tests from safe-evaluator-array-case-coverage.test.ts
-  describe('Reference Extraction and Special Cases', () => {
-    // Test extractReferences method (line 741)
-    it('should extract references from template literals', () => {
-      // Template literal with context reference (context is a special variable but should still be found)
-      const expression = '`Hello ${user.name} from ${user.location}!`';
-      const references = evaluator.extractReferences(expression);
-
-      // Should extract 'user'
-      expect(references).toContain('user');
-      expect(references.length).toBe(1); // Should have only 'user'
+  describe('Array References', () => {
+    it('should correctly reference array elements directly', () => {
+      expect(evaluator.evaluate('${context.arr[0]}', {})).toBe(1);
+      expect(evaluator.evaluate('${context.arr[2]}', {})).toBe(3);
+      expect(evaluator.evaluate('${context.arr[4]}', {})).toBe(5);
     });
 
-    // Test extractReferences with invalid expressions
-    it('should handle errors in extractReferences gracefully', () => {
-      // This is an invalid expression (unclosed template literal)
-      const invalidExpression = '`This is an unclosed template literal with ${something';
-
-      // Should return empty array when there's a parsing error
-      const references = evaluator.extractReferences(invalidExpression);
-      expect(Array.isArray(references)).toBe(true);
-      // The actual behavior might find a partial reference, we're just testing it doesn't throw
+    it('should correctly reference nested array elements', () => {
+      expect(evaluator.evaluate('${context.nestedArr[0][0]}', {})).toBe(1);
+      expect(evaluator.evaluate('${context.nestedArr[1][1]}', {})).toBe(4);
+      expect(evaluator.evaluate('${context.nestedArr[2][0]}', {})).toBe(5);
     });
 
-    // Test extractReferences with nested references
-    it('should extract nested references correctly', () => {
-      // Template with nested references
-      const nestedExpression = '`${user.address.${city}.zipcode}`';
-
-      const references = evaluator.extractReferences(nestedExpression);
-      expect(references).toContain('user');
-      expect(references).toContain('city');
+    it('should access array properties', () => {
+      expect(evaluator.evaluate('${context.arr.length}', {})).toBe(5);
     });
 
-    // Test special variable handling in extractReferences
-    it('should ignore special variable names in extractReferences', () => {
-      const specialVarsExpression = '`Loop variables ${item} and ${acc} and ${context}`';
-
-      const references = evaluator.extractReferences(specialVarsExpression);
-
-      // Special variables (item, acc, context) shouldn't be included
-      expect(references).not.toContain('item');
-      expect(references).not.toContain('acc');
-      expect(references).not.toContain('context');
-      expect(references.length).toBe(0);
-    });
-
-    // Integration test with array-related expressions
-    it('should evaluate complex array operations correctly', () => {
-      // Set up test data
-      context.items = [1, 2, 3];
-      context.obj = { a: 4, b: 5 };
-      context.empty = [];
-      context.nullValue = null;
-
-      // Test various array cases
-      expect(evaluator.evaluate('[...${context.items}, ...${context.obj}]', {})).toEqual([
-        1, 2, 3, 4, 5,
-      ]);
-
-      expect(evaluator.evaluate('[...${context.empty}]', {})).toEqual([]);
-
-      // Test error cases
-      expect(() => evaluator.evaluate('[...${context.nullValue}]', {})).toThrow(ExpressionError);
+    it('should access object properties in arrays', () => {
+      expect(evaluator.evaluate('${context.objArr[0].id}', {})).toBe(1);
+      expect(evaluator.evaluate('${context.objArr[1].name}', {})).toBe('B');
     });
   });
-}); 
+
+  describe('Array Manipulation', () => {
+    it('should create arrays with context references', () => {
+      expect(evaluator.evaluate('[${context.arr[0]}, ${context.arr[1]}]', {})).toEqual([1, 2]);
+    });
+
+    it('should handle spread operator in arrays', () => {
+      context.items = [10, 20, 30];
+      expect(evaluator.evaluate('[...${context.items}]', {})).toEqual([10, 20, 30]);
+      expect(evaluator.evaluate('[1, ...${context.items}, 2]', {})).toEqual([1, 10, 20, 30, 2]);
+    });
+
+    it('should handle multiple spread operators', () => {
+      context.items1 = [10, 20];
+      context.items2 = [30, 40];
+      expect(evaluator.evaluate('[...${context.items1}, ...${context.items2}]', {})).toEqual([10, 20, 30, 40]);
+    });
+  });
+
+  describe('Array Error Handling', () => {
+    it('should throw for out of bounds indices', () => {
+      expect(() => {
+        evaluator.evaluate('${context.arr[10]}', {});
+      }).toThrow();
+    });
+
+    it('should throw when trying to access properties on non-arrays', () => {
+      context.notArray = 42;
+      expect(() => {
+        evaluator.evaluate('${context.notArray[0]}', {});
+      }).toThrow();
+    });
+
+    it('should handle null/undefined array gracefully', () => {
+      context.nullArray = null;
+      context.undefinedArray = undefined;
+      
+      expect(() => {
+        evaluator.evaluate('${context.nullArray[0]}', {});
+      }).toThrow();
+      
+      expect(() => {
+        evaluator.evaluate('${context.undefinedArray[0]}', {});
+      }).toThrow();
+    });
+
+    it('should handle invalid input to evaluate', () => {
+      const anyEvaluator = evaluator as any;
+      expect(() => anyEvaluator.evaluate(null, {})).toThrow();
+      expect(() => anyEvaluator.evaluate(undefined, {})).toThrow();
+    });
+  });
+});

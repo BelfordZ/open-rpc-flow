@@ -270,7 +270,9 @@ describe('Tokenizer Reference Tests', () => {
       expect(referenceToken.value.length).toBeGreaterThan(3);
 
       // The important assertion here is that whitespace between tokens is properly handled
-      const identifierCount = referenceToken.value.filter((t: any) => t.type === 'identifier').length;
+      const identifierCount = referenceToken.value.filter(
+        (t: any) => t.type === 'identifier',
+      ).length;
       expect(identifierCount).toBe(3); // foo, bar, baz
     });
 
@@ -330,4 +332,4 @@ describe('Tokenizer Reference Tests', () => {
       }
     });
   });
-}); 
+});

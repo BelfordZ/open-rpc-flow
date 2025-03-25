@@ -402,4 +402,4 @@ describe('Tokenizer Array Tests', () => {
       expect(spreadIndex).toBeGreaterThanOrEqual(0);
     });
   });
-}); 
+});

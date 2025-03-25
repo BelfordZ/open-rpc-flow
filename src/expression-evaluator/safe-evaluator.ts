@@ -580,6 +580,7 @@ export class SafeExpressionEvaluator {
         } catch (error) {
           this.handleReferenceError(error);
         }
+        break;
 
       case 'operation': {
         if (!ast.operator || !ast.left || !ast.right) {

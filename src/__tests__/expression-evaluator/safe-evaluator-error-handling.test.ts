@@ -144,7 +144,9 @@ describe('SafeExpressionEvaluator - Error Handling', () => {
       it('should handle null property access errors in expressions', () => {
         context.nullObj = null;
 
-        expect(() => evaluator.evaluate('${context.nullObj.property}', {})).toThrow(ExpressionError);
+        expect(() => evaluator.evaluate('${context.nullObj.property}', {})).toThrow(
+          ExpressionError,
+        );
 
         expect(() => evaluator.evaluate('${context.nullObj.property}', {})).toThrow(
           "Cannot access property 'property' of null",
@@ -192,50 +194,54 @@ describe('SafeExpressionEvaluator - Error Handling', () => {
     it('should throw an error for unexpected token types in template literals', () => {
       // Cast to any to access private methods
       const evaluatorAny = evaluator as any;
-      
+
       // Try to directly call the evaluate method with a manually created template token
       if (typeof evaluatorAny.evaluate === 'function') {
         // Create a token that mimics a template literal with an unsupported token type
         const unsupportedToken: Token = {
           type: 'number', // not 'string' or 'reference'
           value: 123,
-          raw: '123'
+          raw: '123',
         };
-        
+
         const templateToken: Token = {
           type: 'template_literal',
           value: [unsupportedToken],
-          raw: '`${123}`'
+          raw: '`${123}`',
         };
-        
+
         try {
           // Call evaluate directly with the token
           evaluatorAny.evaluate(templateToken, {});
         } catch (error) {
           // We expect an error here because 'number' is not a supported token type
           // in template literals
-          if (error instanceof ExpressionError && 
-              error.message.includes('Unexpected token in template literal')) {
+          if (
+            error instanceof ExpressionError &&
+            error.message.includes('Unexpected token in template literal')
+          ) {
             // This confirms we hit line 151!
             expect(error.message).toContain('Unexpected token in template literal');
             return; // Test passed
           }
         }
       }
-      
+
       // Alternative approach since direct method access might not be available
       logger.warn('WARNING: Could not test line 151 directly using standard approaches.');
-      
+
       // Document this as a known coverage gap
-      logger.log('RECOMMENDATION: Document line 151 as a known coverage gap due to private method access limitations.');
-      
+      logger.log(
+        'RECOMMENDATION: Document line 151 as a known coverage gap due to private method access limitations.',
+      );
+
       // Create a token with an object that would cause the error if we could execute it
-      const objectToken: Token = { 
-        type: 'object_literal', 
-        value: [], 
-        raw: '{}'
+      const objectToken: Token = {
+        type: 'object_literal',
+        value: [],
+        raw: '{}',
       };
-      
+
       // This is just to keep the test passing while we document the coverage gap
       expect(true).toBe(true);
     });
@@ -246,18 +252,18 @@ describe('SafeExpressionEvaluator - Error Handling', () => {
     it('should re-throw non-standard errors directly', () => {
       // To hit line 183, we need to cause an error that's not one of the standard error types
       // in the error handling block
-      
+
       // Let's monkey patch the tokenize method to throw a custom error
       const evaluatorAny = evaluator as any;
-      
+
       if (typeof evaluatorAny.tokenize === 'function') {
         const originalTokenize = evaluatorAny.tokenize;
-        
+
         // Replace with a function that throws a custom Error
-        evaluatorAny.tokenize = function() {
+        evaluatorAny.tokenize = function () {
           throw new Error('Custom non-standard error');
         };
-        
+
         try {
           // This should now trigger our custom error
           evaluator.evaluate('1 + 1', {});
@@ -279,15 +285,15 @@ describe('SafeExpressionEvaluator - Error Handling', () => {
       } else {
         // If we can't access tokenize, try another method
         logger.warn('Cannot access tokenize method, attempting alternative approach');
-        
+
         // Mock the evaluateAst method instead
         if (typeof evaluatorAny.evaluateAst === 'function') {
           const originalEvaluateAst = evaluatorAny.evaluateAst;
-          
-          evaluatorAny.evaluateAst = function() {
+
+          evaluatorAny.evaluateAst = function () {
             throw new Error('Custom non-standard error');
           };
-          
+
           try {
             evaluator.evaluate('1 + 1', {});
             fail('Expected an error to be thrown');
@@ -311,7 +317,7 @@ describe('SafeExpressionEvaluator - Error Handling', () => {
       }
     });
   });
-  
+
   // Tests from safe-evaluator-unexpected-operator.test.ts
   describe('Unexpected Operator Errors', () => {
     /**
@@ -377,4 +383,4 @@ describe('SafeExpressionEvaluator - Error Handling', () => {
       expect(() => evaluator.evaluate('(true &&)', {})).toThrow(/Unexpected|Invalid/);
     });
   });
-}); 
+});

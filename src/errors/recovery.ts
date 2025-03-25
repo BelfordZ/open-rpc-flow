@@ -46,7 +46,7 @@ export class RetryableOperation<T> {
         return result;
       } catch (error: unknown) {
         lastError = error instanceof Error ? error : new Error(String(error));
-        
+
         // Add detailed debugging
         if (error instanceof FlowError) {
           this.logger.debug('Caught FlowError', {
@@ -137,13 +137,16 @@ export class RetryableOperation<T> {
     };
 
     // Check by constructor name instead of instanceof
-    if (error && typeof error === 'object' && error.constructor && 
-        (error.constructor.name === 'FlowError' || 
-         error.constructor.name === 'ExecutionError' ||
-         error.constructor.name === 'ValidationError' ||
-         error.constructor.name === 'TimeoutError' ||
-         error.constructor.name === 'StateError')) {
-      
+    if (
+      error &&
+      typeof error === 'object' &&
+      error.constructor &&
+      (error.constructor.name === 'FlowError' ||
+        error.constructor.name === 'ExecutionError' ||
+        error.constructor.name === 'ValidationError' ||
+        error.constructor.name === 'TimeoutError' ||
+        error.constructor.name === 'StateError')
+    ) {
       // We know it's a FlowError-like object, so access properties accordingly
       const flowError = error as any;
       const errorCode = flowError.code;
@@ -156,16 +159,16 @@ export class RetryableOperation<T> {
 
       // Convert both sides to strings before comparing
       const errorCodeStr = String(errorCode);
-      
+
       // Compare each retryable error with the error code using string comparison
       const isRetryable = this.policy.retryableErrors.some(
-        retryableError => String(retryableError) === errorCodeStr
+        (retryableError) => String(retryableError) === errorCodeStr,
       );
 
       this.logger.debug('Retryable check result', {
         errorCode,
         errorCodeAsString: errorCodeStr,
-        retryableErrorsAsStrings: this.policy.retryableErrors.map(e => String(e)),
+        retryableErrorsAsStrings: this.policy.retryableErrors.map((e) => String(e)),
         isRetryable,
         errorType: error.constructor.name,
       });

@@ -28,7 +28,7 @@ describe('ContextCollector', () => {
   describe('collect', () => {
     it('should collect system metrics', async () => {
       const context = await collector.collect();
-      
+
       expect(context.system).toBeDefined();
       expect(typeof context.system.memory).toBe('number');
       expect(typeof context.system.cpu).toBe('number');
@@ -38,16 +38,16 @@ describe('ContextCollector', () => {
     it('should handle missing NODE_ENV', async () => {
       const originalEnv = process.env.NODE_ENV;
       delete process.env.NODE_ENV;
-      
+
       const context = await collector.collect();
       expect(context.system.env).toBe('unknown');
-      
+
       process.env.NODE_ENV = originalEnv;
     });
 
     it('should include execution timing', async () => {
       const context = await collector.collect();
-      
+
       expect(context.execution).toBeDefined();
       expect(context.execution.startTime).toBeInstanceOf(Date);
       expect(typeof context.execution.duration).toBe('number');
@@ -56,7 +56,7 @@ describe('ContextCollector', () => {
 
     it('should include step context', async () => {
       const context = await collector.collect();
-      
+
       expect(context.step).toBeDefined();
       expect(context.step.name).toBe('unknown');
       expect(context.step.type).toBe('unknown');
@@ -68,7 +68,7 @@ describe('ContextCollector', () => {
     it('should increment attempts counter', () => {
       collector.recordAttempt();
       expect(collector['attempts']).toBe(1);
-      
+
       collector.recordAttempt();
       expect(collector['attempts']).toBe(2);
     });
@@ -78,7 +78,10 @@ describe('ContextCollector', () => {
     it('should add context entries', () => {
       collector.addContext('testKey', 'testValue');
       expect(collector.getContext()).toEqual({ testKey: 'testValue' });
-      expect(mockLogger.debug).toHaveBeenCalledWith('Added context', { key: 'testKey', value: 'testValue' });
+      expect(mockLogger.debug).toHaveBeenCalledWith('Added context', {
+        key: 'testKey',
+        value: 'testValue',
+      });
     });
 
     it('should get context as a copy', () => {
@@ -100,7 +103,7 @@ describe('ContextCollector', () => {
       collector.addContext('key2', 'value2');
       expect(collector.getContext()).toEqual({
         key1: 'value1',
-        key2: 'value2'
+        key2: 'value2',
       });
     });
   });
@@ -109,7 +112,7 @@ describe('ContextCollector', () => {
     it('should create error with context', () => {
       collector.addContext('testKey', 'testValue');
       const error = collector.createError('test error', ErrorCode.INTERNAL_ERROR);
-      
+
       expect(error.message).toBe('test error');
       expect(error.code).toBe(ErrorCode.INTERNAL_ERROR);
       expect(error.context).toEqual({ testKey: 'testValue' });
@@ -120,4 +123,4 @@ describe('ContextCollector', () => {
       expect(error.context).toEqual({});
     });
   });
-}); 
+});

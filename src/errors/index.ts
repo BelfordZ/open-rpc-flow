@@ -1,5 +1,5 @@
 // Export all error-related functionality
-export * from './base';  // Contains all error class definitions (FlowError, ValidationError, ExecutionError, TimeoutError, StateError)
+export * from './base'; // Contains all error class definitions (FlowError, ValidationError, ExecutionError, TimeoutError, StateError)
 export * from './codes';
 export * from './recovery';
 export * from './circuit-breaker';

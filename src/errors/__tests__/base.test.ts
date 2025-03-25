@@ -27,10 +27,10 @@ describe('FlowError', () => {
   it('should handle missing Error.captureStackTrace', () => {
     const originalCaptureStackTrace = Error.captureStackTrace;
     Error.captureStackTrace = undefined as any;
-    
+
     const error = new FlowError('test message', ErrorCode.INTERNAL_ERROR, {});
     expect(error).toBeInstanceOf(FlowError);
-    
+
     Error.captureStackTrace = originalCaptureStackTrace;
   });
 });
@@ -39,7 +39,7 @@ describe('ValidationError', () => {
   it('should create validation error with correct properties', () => {
     const context = { field: 'test' };
     const error = new ValidationError('invalid input', context);
-    
+
     expect(error.message).toBe('invalid input');
     expect(error.code).toBe(ErrorCode.VALIDATION_ERROR);
     expect(error.context).toBe(context);
@@ -53,7 +53,7 @@ describe('ExecutionError', () => {
   it('should create execution error with default code', () => {
     const context = { operation: 'test' };
     const error = new ExecutionError('execution failed', context);
-    
+
     expect(error.code).toBe(ErrorCode.EXECUTION_ERROR);
     expect(error.context).toBe(context);
     expect(error.name).toBe('ExecutionError');
@@ -62,14 +62,14 @@ describe('ExecutionError', () => {
   it('should create execution error with custom code', () => {
     const context = { operation: 'test', code: ErrorCode.TIMEOUT_ERROR };
     const error = new ExecutionError('execution failed', context);
-    
+
     expect(error.code).toBe(ErrorCode.TIMEOUT_ERROR);
   });
 
   it('should create execution error with cause', () => {
     const cause = new Error('root cause');
     const error = new ExecutionError('execution failed', {}, cause);
-    
+
     expect(error.cause).toBe(cause);
   });
 });
@@ -78,7 +78,7 @@ describe('TimeoutError', () => {
   it('should create timeout error with correct properties', () => {
     const context = { duration: 1000 };
     const error = new TimeoutError('operation timed out', context);
-    
+
     expect(error.message).toBe('operation timed out');
     expect(error.code).toBe(ErrorCode.TIMEOUT_ERROR);
     expect(error.context).toBe(context);
@@ -92,7 +92,7 @@ describe('StateError', () => {
   it('should create state error with correct properties', () => {
     const context = { state: 'invalid' };
     const error = new StateError('invalid state', context);
-    
+
     expect(error.message).toBe('invalid state');
     expect(error.code).toBe(ErrorCode.STATE_ERROR);
     expect(error.context).toBe(context);
@@ -100,4 +100,4 @@ describe('StateError', () => {
     expect(error).toBeInstanceOf(StateError);
     expect(error).toBeInstanceOf(FlowError);
   });
-}); 
+});

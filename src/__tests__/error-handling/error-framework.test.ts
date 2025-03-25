@@ -8,7 +8,6 @@ import {
   CircuitBreaker,
   CircuitBreakerConfig,
   ContextCollector,
-  StateError,
 } from '../../errors';
 import { noLogger, TestLogger } from '../../util/logger';
 
@@ -71,30 +70,31 @@ describe('Error Framework', () => {
 
     it('should retry on retryable error', async () => {
       const logger = testLogger.createNested('debugging');
-      
+
       // Use the approach from recovery.test.ts that works
       const networkError = new FlowError('network error', ErrorCode.NETWORK_ERROR, {});
-      
-      // Verify that the error has the correct code  
+
+      // Verify that the error has the correct code
       logger.debug('Network error details', {
         error: networkError,
         code: networkError.code,
         codeType: typeof networkError.code,
         errorType: networkError.constructor.name,
-        isFlowError: networkError instanceof FlowError
+        isFlowError: networkError instanceof FlowError,
       });
-      
+
       // Use the working implementation from recovery.test.ts
-      const operation = jest.fn()
+      const operation = jest
+        .fn()
         .mockRejectedValueOnce(networkError)
         .mockResolvedValueOnce('success');
-      
+
       const retryable = new RetryableOperation(operation, policy, logger);
-      
+
       const result = await retryable.execute();
-      
+
       logger.debug('Operation result', { result });
-      
+
       expect(result).toBe('success');
       expect(operation).toHaveBeenCalledTimes(2);
     });
@@ -137,8 +137,8 @@ describe('Error Framework', () => {
       const retryableLogger = testLogger.createNested('retryable');
       const retryable = new RetryableOperation(operation, policy, retryableLogger);
 
-      const error = await retryable.execute().catch(e => e) as FlowError;
-      
+      const error = (await retryable.execute().catch((e) => e)) as FlowError;
+
       // Check by constructor name instead of instanceof
       expect(error.constructor.name).toBe('ExecutionError');
       expect(error.message).toBe('Max retry attempts exceeded');
@@ -196,34 +196,34 @@ describe('Error Framework', () => {
         recoveryTime: 200, // Reduce from 1000 to make test faster
       };
       const circuitBreaker = new CircuitBreaker(testConfig, logger);
-      
+
       // Fail enough times to open the circuit
       const operation = jest.fn().mockRejectedValue(
         new ExecutionError('Failed', {
           code: ErrorCode.NETWORK_ERROR,
-        })
+        }),
       );
-      
+
       // First failure
       await expect(circuitBreaker.execute(operation)).rejects.toThrow();
-      
+
       // Second failure - should open the circuit
       await expect(circuitBreaker.execute(operation)).rejects.toThrow();
-      
+
       // This should throw a StateError - check by message instead of constructor
       await expect(circuitBreaker.execute(operation)).rejects.toThrow('Circuit breaker is open');
-      
+
       logger.debug('Waiting for recovery time');
       // Wait for recovery time to pass
       await new Promise((resolve) => setTimeout(resolve, 250));
-      
+
       // After recovery time, circuit should be half-open
       // which means it will allow the operation to run again
       operation.mockResolvedValueOnce('success');
-      
+
       const result = await circuitBreaker.execute(operation);
       expect(result).toBe('success');
-      
+
       // After success, circuit should be closed
       logger.debug('Circuit should be closed now');
       expect(operation).toHaveBeenCalledTimes(3);

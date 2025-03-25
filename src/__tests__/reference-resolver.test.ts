@@ -6,7 +6,7 @@ import {
   CircularReferenceError,
 } from '../reference-resolver/errors';
 import { TestLogger } from '../util/logger';
-import { PathSyntaxError } from '../path-accessor';
+import { PathSyntaxError, PropertyAccessError } from '../path-accessor';
 
 describe('ReferenceResolver', () => {
   let resolver: ReferenceResolver;
@@ -443,10 +443,7 @@ describe('ReferenceResolver', () => {
 
       expect(() => {
         resolver.resolvePath('error.result[error.index]');
-      }).toThrow(PathSyntaxError);
-      expect(() => {
-        resolver.resolvePath('error.result[error.index]');
-      }).toThrow('Not an error object');
+      }).toThrow('Invalid path syntax: Failed to evaluate expression: Not an error object');
     });
   });
 
@@ -503,7 +500,7 @@ describe('ReferenceResolver', () => {
         const stepsMap = new Map();
         stepsMap.set('someRef', { a: 'value-a' });
         const resolver = new ReferenceResolver(stepsMap, {}, testLogger);
-        expect(() => resolver.resolveReference('${someRef.b}', {})).toThrow(InvalidReferenceError);
+        expect(() => resolver.resolveReference('${someRef.b}', {})).toThrow(PropertyAccessError);
       });
 
       it('throws for invalid path accessors, dot followed by operators', () => {

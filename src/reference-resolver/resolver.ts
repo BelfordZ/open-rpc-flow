@@ -21,6 +21,17 @@ export class ReferenceResolver {
     this.logger.debug('Initialized with context keys:', Object.keys(this.context));
   }
 
+  private checkForCircularReference(path: string): void {
+    if (this.resolvingPaths.includes(path)) {
+      const referencePath = [...this.resolvingPaths, path];
+      this.logger.error('Circular reference detected:', referencePath);
+      throw new CircularReferenceError(
+        `Circular reference detected: ${referencePath.join(' -> ')}`,
+        referencePath,
+      );
+    }
+  }
+
   /**
    * Extracts references from a string like "I like ${foo} and ${bar}" and returns ["${foo}", "${bar}"]
    */
@@ -30,62 +41,72 @@ export class ReferenceResolver {
     return matches ?? [];
   }
 
+  private trackResolutionPath<T>(path: string, fn: () => T): T {
+    this.resolvingPaths.push(path);
+    try {
+      return fn();
+    } finally {
+      this.resolvingPaths.pop();
+    }
+  }
+
+  private wrapError(error: unknown, path: string): never {
+    this.logger.error('Resolution error:', error);
+
+    if (error instanceof ReferenceResolverError || error instanceof PropertyAccessError) {
+      throw error;
+    }
+
+    if (error instanceof PathSyntaxError) {
+      throw new InvalidReferenceError(error.message, path);
+    }
+
+    throw new InvalidReferenceError(error instanceof Error ? error.message : String(error), path);
+  }
+
+  private handleSimplePathResolution(
+    value: any,
+    path: string,
+    extraContext: Record<string, any>,
+    isDirectCall: boolean,
+  ): any {
+    if (typeof value === 'string' && value.startsWith('${') && value.endsWith('}')) {
+      const refPath = value.slice(2, -1);
+      this.checkForCircularReference(refPath);
+      value = this.resolveReference(value, extraContext);
+    }
+
+    if (isDirectCall) {
+      this.resolvingPaths.pop();
+    }
+
+    return value;
+  }
+
   /**
    * Resolves a reference string like "${step1.data.value}" to its value
    */
   resolveReference(ref: string, extraContext: Record<string, any> = {}): any {
-    this.logger.debug('Resolving reference:', ref);
+    this.logger.debug('Resolving reference', { ref });
     if (!ref.startsWith('${') || !ref.endsWith('}')) {
       this.logger.debug('Not a reference pattern, returning as is:', ref);
       return ref;
     }
     const path = ref.slice(2, -1);
 
-    // Check for circular references
-    if (this.resolvingPaths.includes(path)) {
-      const referencePath = [...this.resolvingPaths, path];
-      this.logger.error('Circular reference detected:', referencePath);
-      throw new CircularReferenceError(
-        `Circular reference detected: ${referencePath.join(' -> ')}`,
-        referencePath,
-      );
-    }
+    // Check for circular references using new helper method
+    this.checkForCircularReference(path);
 
     try {
-      try {
-        PathAccessor.parsePath(path);
-      } catch (parseError) {
-        if (parseError instanceof PathSyntaxError) {
-          throw new InvalidReferenceError(parseError.message, path);
-        }
-        throw parseError;
-      }
+      PathAccessor.parsePath(path);
 
-      // Add path to the array of resolving paths
-      this.resolvingPaths.push(path);
-
-      const result = this.resolvePath(path, extraContext);
-      this.logger.debug('Successfully resolved reference:', { ref, result });
-
-      // Remove path from the array of resolving paths
-      this.resolvingPaths.pop();
-
-      return result;
+      return this.trackResolutionPath(path, () => {
+        const result = this.resolvePath(path, extraContext);
+        this.logger.debug('Successfully resolved reference:', { ref, result });
+        return result;
+      });
     } catch (error) {
-      // Remove path from the array of resolving paths in case of error
-      this.resolvingPaths.pop();
-
-      this.logger.error('Failed to resolve reference:', ref, error);
-      // Re-throw our custom errors and PropertyAccessError as is
-      if (error instanceof ReferenceResolverError || error instanceof PropertyAccessError) {
-        throw error;
-      }
-      // Wrap PathSyntaxError in InvalidReferenceError
-      if (error instanceof PathSyntaxError) {
-        throw new InvalidReferenceError(error.message, path);
-      }
-      // Wrap other errors in InvalidReferenceError
-      throw new InvalidReferenceError(error instanceof Error ? error.message : String(error), path);
+      this.wrapError(error, path);
     }
   }
 
@@ -166,8 +187,7 @@ export class ReferenceResolver {
   resolvePath(path: string, extraContext: Record<string, any> = {}): any {
     this.logger.debug('Resolving path:', path);
 
-    // For tracking direct calls to resolvePath we need to add the path
-    // Only if this is a direct call (not already in our resolving paths)
+    // For tracking direct calls to resolvePath
     const isDirectCall = !this.resolvingPaths.includes(path);
     if (isDirectCall) {
       this.resolvingPaths.push(path);
@@ -205,116 +225,27 @@ export class ReferenceResolver {
 
       // For simple values that don't need further resolution, we can return directly
       if (path === source) {
-        this.logger.debug('No further path resolution needed');
-
-        // If the value is a string with reference syntax, we need to resolve it
-        // This is where circular references often happen
-        if (typeof value === 'string' && value.startsWith('${') && value.endsWith('}')) {
-          this.logger.debug('Value is a reference string, resolving recursively:', value);
-
-          // Before recursively resolving, we need to check if this is a circular reference
-          const refPath = value.slice(2, -1);
-          if (this.resolvingPaths.includes(refPath)) {
-            const referencePath = [...this.resolvingPaths, refPath];
-            this.logger.error('Circular reference detected in referenced value:', referencePath);
-            throw new CircularReferenceError(
-              `Circular reference detected: ${referencePath.join(' -> ')}`,
-              referencePath,
-            );
-          }
-
-          try {
-            // Adding to resolving path handled by resolveReference
-            value = this.resolveReference(value, extraContext);
-          } catch (error) {
-            // Re-throw CircularReferenceError as is
-            if (error instanceof CircularReferenceError) {
-              throw error;
-            }
-            // For other errors, we should wrap them
-            throw new ReferenceResolutionError(
-              `Failed to resolve reference in value for '${path}'`,
-              path,
-              value,
-              error instanceof Error ? error : undefined,
-            );
-          }
-        }
-
-        // Remove path from resolving paths before returning if this was a direct call
-        if (isDirectCall) {
-          this.resolvingPaths.pop();
-        }
-
-        return value;
+        return this.handleSimplePathResolution(value, path, extraContext, isDirectCall);
       }
 
       const restPath = path.slice(source.length);
       this.logger.debug('Resolving rest of path:', restPath);
 
-      let result;
-      if (restPath.startsWith('.')) {
-        result = PathAccessor.get(value, restPath.slice(1), (expr) => {
-          try {
-            // Check for circular references in expression evaluation
-            if (this.resolvingPaths.includes(expr)) {
-              const referencePath = [...this.resolvingPaths, expr];
-              this.logger.error('Circular reference detected in expression:', referencePath);
-              throw new CircularReferenceError(
-                `Circular reference detected: ${referencePath.join(' -> ')}`,
-                referencePath,
-              );
-            }
+      // Simplified getValueForSubPath without redundant error handling
+      const getValueForSubPath = (expr: string) => {
+        this.checkForCircularReference(expr);
+        return this.resolvePath(expr, extraContext);
+      };
 
-            // The circular reference check for adding to resolvingPaths is handled within resolvePath
-            return this.resolvePath(expr, extraContext);
-          } catch (error) {
-            // Re-throw our ReferenceResolverError errors as is
-            if (error instanceof ReferenceResolverError) {
-              throw error;
-            }
-            // Wrap other errors in InvalidReferenceError
-            throw new InvalidReferenceError(
-              error instanceof Error ? error.message : String(error),
-              expr,
-            );
-          }
-        });
-      } else {
-        result = PathAccessor.get(value, restPath, (expr) => {
-          try {
-            // Check for circular references in expression evaluation
-            if (this.resolvingPaths.includes(expr)) {
-              const referencePath = [...this.resolvingPaths, expr];
-              this.logger.error('Circular reference detected in expression:', referencePath);
-              throw new CircularReferenceError(
-                `Circular reference detected: ${referencePath.join(' -> ')}`,
-                referencePath,
-              );
-            }
-
-            // The circular reference check for adding to resolvingPaths is handled within resolvePath
-            return this.resolvePath(expr, extraContext);
-          } catch (error) {
-            // Re-throw our ReferenceResolverError errors as is
-            if (error instanceof ReferenceResolverError) {
-              throw error;
-            }
-            // Wrap other errors in InvalidReferenceError
-            throw new InvalidReferenceError(
-              error instanceof Error ? error.message : String(error),
-              expr,
-            );
-          }
-        });
-      }
+      // Unify the restPath logic:
+      const actualRestPath = restPath.startsWith('.') ? restPath.slice(1) : restPath;
+      const result = PathAccessor.get(value, actualRestPath, getValueForSubPath);
 
       this.logger.debug('Successfully resolved path:', { path, result });
-      // Remove path from resolving paths before returning if this was a direct call
+
       if (isDirectCall) {
         this.resolvingPaths.pop();
       }
-
       return result;
     } catch (error) {
       // Remove path from resolving paths in case of error if this was a direct call
@@ -322,13 +253,7 @@ export class ReferenceResolver {
         this.resolvingPaths.pop();
       }
 
-      this.logger.error('Failed to resolve path:', path, error);
-      // Re-throw ReferenceResolverError and PathSyntaxError as is
-      if (error instanceof ReferenceResolverError || error instanceof PathSyntaxError) {
-        throw error;
-      }
-      // Wrap other errors in InvalidReferenceError
-      throw new InvalidReferenceError(error instanceof Error ? error.message : String(error), path);
+      this.wrapError(error, path);
     }
   }
 

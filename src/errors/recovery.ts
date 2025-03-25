@@ -109,9 +109,8 @@ export class RetryableOperation<T> {
       }
     }
 
-
     /* istanbul ignore next */
-    throw new Error('unreachable code')
+    throw new Error('unreachable code');
   }
 
   /**

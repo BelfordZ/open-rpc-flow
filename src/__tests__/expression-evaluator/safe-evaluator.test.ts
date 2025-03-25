@@ -368,13 +368,13 @@ describe('SafeExpressionEvaluator', () => {
       // Test invalid operand types
       expect(() => evaluator.evaluate('"hello" * 2', {})).toThrow(ExpressionError);
       expect(() => evaluator.evaluate('"hello" * 2', {})).toThrow(
-        'Cannot perform multiplication on non-numeric values: hello * 2',
+        'Failed to evaluate expression: "hello" * 2. Got error: Cannot perform * on non-numeric values: hello * 2',
       );
 
       // Test undefined operands
       expect(() => evaluator.evaluate('undefined + 1', {})).toThrow(ExpressionError);
       expect(() => evaluator.evaluate('undefined + 1', {})).toThrow(
-        'Cannot perform addition on non-numeric values: undefined + 1',
+        'Failed to evaluate expression: undefined + 1. Got error: Cannot perform + on non-numeric values: undefined + 1',
       );
     });
   });

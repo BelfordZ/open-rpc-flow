@@ -48,6 +48,7 @@ Implement caching mechanism in the `DependencyResolver` class to store and reuse
    ```
 
 2. Verify buildGraphIfNeeded behavior:
+
    ```typescript
    it('builds graph only when needed', () => {
      const resolver = new DependencyResolver(flow, expressionEvaluator, logger);

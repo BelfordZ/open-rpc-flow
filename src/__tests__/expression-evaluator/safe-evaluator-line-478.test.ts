@@ -37,7 +37,7 @@ describe('SafeExpressionEvaluator Line 478-480 Coverage', () => {
         expect((error as Error).message).toContain('Invalid object literal: invalid key');
       }
     });
-    
+
     it('should throw when object has a compound expression as key', () => {
       try {
         // Another attempt with a more complex invalid key format
@@ -55,20 +55,20 @@ describe('SafeExpressionEvaluator Line 478-480 Coverage', () => {
         // This test directly calls the method that contains lines 478-480
         // We need to access the private method to directly test it
         const instance = evaluator as any;
-        
+
         // Create tokens that would result in currentTokens.length !== 1 before the colon
         const tokens: Token[] = [
           { type: 'identifier', value: 'a', raw: 'a' },
           { type: 'identifier', value: 'b', raw: 'b' },
           { type: 'operator', value: ':', raw: ':' },
-          { type: 'string', value: 'value', raw: '"value"' }
+          { type: 'string', value: 'value', raw: '"value"' },
         ];
-        
+
         // Create a processor function that will be used when currentTokens.length !== 1
         const processor = (currentTokens: Token[], isSpread: boolean, key?: string) => {
           return { key: key || '', value: currentTokens, spread: isSpread };
         };
-        
+
         instance.parseGroupedElements(tokens, ',', processor);
         fail('Expected an error to be thrown');
       } catch (error) {
@@ -77,11 +77,13 @@ describe('SafeExpressionEvaluator Line 478-480 Coverage', () => {
         if (error instanceof ExpressionError) {
           expect(error.message).toContain('Invalid object literal: invalid key');
         } else {
-          logger.warn('Could not directly test parseGroupedElements, but attempted to cover lines 478-480');
+          logger.warn(
+            'Could not directly test parseGroupedElements, but attempted to cover lines 478-480',
+          );
           logger.warn('Error was:', error);
           // Still pass the test since we attempted to cover the lines
         }
       }
     });
   });
-}); 
+});

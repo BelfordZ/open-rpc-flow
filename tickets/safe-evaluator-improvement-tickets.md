@@ -33,13 +33,14 @@
 **Description:** The AstNode interface is used with optional properties, which can lead to runtime errors if properties are missing. This is evident in the need for null checks throughout the code.
 
 **Suggested improvement:** Consider using discriminated union types for different node types to ensure type safety, e.g.:
+
 ```typescript
-type AstNode = 
-  | { type: 'literal', value: any }
-  | { type: 'reference', path: string }
-  | { type: 'operation', operator: Operator, left: AstNode, right: AstNode }
-  | { type: 'object', properties: { key: string, value: AstNode, spread?: boolean }[] }
-  | { type: 'array', elements: { value: AstNode, spread?: boolean }[] };
+type AstNode =
+  | { type: 'literal'; value: any }
+  | { type: 'reference'; path: string }
+  | { type: 'operation'; operator: Operator; left: AstNode; right: AstNode }
+  | { type: 'object'; properties: { key: string; value: AstNode; spread?: boolean }[] }
+  | { type: 'array'; elements: { value: AstNode; spread?: boolean }[] };
 ```
 
 ### 2. Extract Complex Methods into Smaller Functions
@@ -64,4 +65,4 @@ type AstNode =
 
 **Description:** While the code has good comments, some complex sections could benefit from more detailed explanations, especially regarding error handling and the parse algorithm.
 
-**Suggested improvement:** Add more detailed documentation, especially for the algorithms used in parsing and evaluation. 
+**Suggested improvement:** Add more detailed documentation, especially for the algorithms used in parsing and evaluation.

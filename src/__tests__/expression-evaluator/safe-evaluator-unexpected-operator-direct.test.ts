@@ -33,7 +33,7 @@ describe('SafeExpressionEvaluator - Direct Test for Unexpected Operator', () => 
   /**
    * These tests specifically target the conditions where we check for unexpected operators
    * at lines ~378 and ~402 in safe-evaluator.ts:
-   * 
+   *
    * if (!expectOperator) {
    *   throw new ExpressionError('Unexpected operator');
    * }
@@ -44,7 +44,7 @@ describe('SafeExpressionEvaluator - Direct Test for Unexpected Operator', () => 
     // First token will be an operator, which should trigger the check
     const tokens: Token[] = [
       { type: 'operator', value: '+', raw: '+' },
-      { type: 'number', value: '1', raw: '1' }
+      { type: 'number', value: '1', raw: '1' },
     ];
 
     try {
@@ -61,12 +61,12 @@ describe('SafeExpressionEvaluator - Direct Test for Unexpected Operator', () => 
   it('throws Unexpected operator after valid token when another operator is found', () => {
     // Create another scenario that triggers the check
     // This time after we've had a literal value (so expectOperator would be true),
-    // then an operator (which will flip expectOperator to false), 
+    // then an operator (which will flip expectOperator to false),
     // then another operator which should trigger the error
     const tokens: Token[] = [
       { type: 'number', value: '1', raw: '1' }, // number - expectOperator becomes true
       { type: 'operator', value: '+', raw: '+' }, // operator - expectOperator becomes false
-      { type: 'operator', value: '*', raw: '*' } // another operator when expectOperator is false - should error
+      { type: 'operator', value: '*', raw: '*' }, // another operator when expectOperator is false - should error
     ];
 
     try {
@@ -82,7 +82,7 @@ describe('SafeExpressionEvaluator - Direct Test for Unexpected Operator', () => 
     const tokens: Token[] = [
       { type: 'reference', value: [{ type: 'identifier', value: 'a', raw: 'a' }], raw: '${a}' },
       // After a reference, expectOperator is true, so another reference should throw
-      { type: 'reference', value: [{ type: 'identifier', value: 'b', raw: 'b' }], raw: '${b}' }
+      { type: 'reference', value: [{ type: 'identifier', value: 'b', raw: 'b' }], raw: '${b}' },
     ];
 
     try {
@@ -102,7 +102,7 @@ describe('SafeExpressionEvaluator - Direct Test for Unexpected Operator', () => 
     // when expectOperator is false
     const tokens: Token[] = [
       { type: 'identifier', value: '+', raw: '+' }, // This should trigger the error at line 378
-      { type: 'number', value: '1', raw: '1' }
+      { type: 'number', value: '1', raw: '1' },
     ];
 
     try {
@@ -119,7 +119,7 @@ describe('SafeExpressionEvaluator - Direct Test for Unexpected Operator', () => 
     // Create a token sequence with an identifier that appears when expectOperator is true
     const tokens: Token[] = [
       { type: 'number', value: '1', raw: '1' }, // number - expectOperator becomes true
-      { type: 'identifier', value: 'foo', raw: 'foo' } // identifier when expectOperator is true - should error
+      { type: 'identifier', value: 'foo', raw: 'foo' }, // identifier when expectOperator is true - should error
     ];
 
     try {
@@ -137,11 +137,11 @@ describe('SafeExpressionEvaluator - Direct Test for Unexpected Operator', () => 
     const validTokens: Token[] = [
       { type: 'number', value: '1', raw: '1' }, // number - expectOperator becomes true
       { type: 'operator', value: '+', raw: '+' }, // operator - expectOperator becomes false
-      { type: 'number', value: '2', raw: '2' } // number - valid after operator
+      { type: 'number', value: '2', raw: '2' }, // number - valid after operator
     ];
 
     // This should not throw
     const result = evaluator.testParseExpression(validTokens);
     expect(result).toBeDefined();
   });
-}); 
+});

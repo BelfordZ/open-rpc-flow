@@ -12,6 +12,7 @@ default:
 **Reason for gap**: This is the default case in the `getPrecedence` method's switch statement, which returns a precedence of 0 for any unrecognized operator.
 
 **Attempted approaches**:
+
 1. Created direct tests accessing the private method using TypeScript's any-casting and passing unknown operators.
 2. Attempted indirect tests using expressions with invalid operators that would trigger the default case.
 
@@ -30,6 +31,7 @@ private static checkDivisionByZero(b: any): void {
 **Reason for gap**: This is a static helper method that is called by the operator implementations. It's difficult to test directly as it's not exposed.
 
 **Attempted approaches**:
+
 1. Created tests that trigger division by zero through the public API.
 2. Attempted to access the static method directly but had difficulties.
 
@@ -63,7 +65,7 @@ These lines are difficult to cover because they involve reference tokens in the 
 2. `safe-evaluator-line-383-391.test.ts`
 3. `safe-evaluator-line-383-391-v2.test.ts`
 
-All of these tests show the correct behavior and throw the expected `Unexpected reference` error when reference tokens appear in positions where an operator is expected. 
+All of these tests show the correct behavior and throw the expected `Unexpected reference` error when reference tokens appear in positions where an operator is expected.
 
 Manual inspection of the code flow confirms that these lines are being executed, as evidenced by:
 
@@ -72,8 +74,9 @@ Manual inspection of the code flow confirms that these lines are being executed,
 - The correct behavior when testing with expressions like `5 ${context.value}` or `${context.value} ${context.value}`
 
 The reason Istanbul doesn't show these lines as covered might be related to:
+
 - Private method instrumentation limitations
 - Our monkey-patching approach that may bypass the instrumentation
 - The specific structure of the switch/if-else block
 
-Despite showing as "uncovered" in the report, we have functional tests that demonstrate these lines are working as expected. 
+Despite showing as "uncovered" in the report, we have functional tests that demonstrate these lines are working as expected.

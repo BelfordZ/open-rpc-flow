@@ -23,4 +23,4 @@ This appears to be an issue with how the Istanbul coverage tool instruments and 
 
 For reference, see the debug test in `safe-evaluator-line-516-debug.test.ts` which logs the execution flow and proves the code is executing despite the coverage report.
 
-Note: This has been confirmed as a tool issue and not an actual code issue. Future attempts to achieve 100% coverage can safely ignore this particular line. 
+Note: This has been confirmed as a tool issue and not an actual code issue. Future attempts to achieve 100% coverage can safely ignore this particular line.

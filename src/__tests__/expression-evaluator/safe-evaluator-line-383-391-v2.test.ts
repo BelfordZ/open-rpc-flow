@@ -1,6 +1,6 @@
 /**
  * This test targets lines 383-391 in src/expression-evaluator/safe-evaluator.ts:
- * 
+ *
  * ```typescript
  * else if (token.type === 'reference') {
  *   if (expectOperator) {
@@ -10,7 +10,7 @@
  *   expectOperator = true;
  * }
  * ```
- * 
+ *
  * These lines handle reference tokens during parsing, including the error case when
  * a reference token is encountered when the parser expects an operator.
  */
@@ -66,20 +66,20 @@ describe('SafeExpressionEvaluator - Reference Token Error (lines 383-391)', () =
 
     try {
       // Create a wrapper that lets us observe the tokens and control the state
-      evaluatorAny.parse = function(tokens: any[]) {
+      evaluatorAny.parse = function (tokens: any[]) {
         logger.log('Parsing tokens:', JSON.stringify(tokens));
-        
-        // Special case - if we're testing with our specific tokens, 
+
+        // Special case - if we're testing with our specific tokens,
         // directly trigger the code path for lines 383-391
         if (tokens.length >= 2) {
           for (let i = 0; i < tokens.length; i++) {
             const token = tokens[i];
-            
+
             // If we find a reference token, force the expectOperator flag to be true
             // This is the condition for lines 383-384
             if (token.type === 'reference') {
-              const expectOperator = true;  // Simulate the expectOperator flag being true
-              
+              const expectOperator = true; // Simulate the expectOperator flag being true
+
               if (expectOperator) {
                 logger.log('DIRECT TEST: Found reference token when expectOperator=true');
                 logger.log('TEST SUCCESS: Hitting code path at lines 383-384');
@@ -88,17 +88,17 @@ describe('SafeExpressionEvaluator - Reference Token Error (lines 383-391)', () =
             }
           }
         }
-        
+
         // Otherwise just call the original function
         return originalParse.apply(this, arguments);
       };
-      
+
       // Try to evaluate an expression with our patched parse method
       try {
         // This should cause our patched parse method to hit the code path
         const tokens = [...createLiteralTokens(), ...createRefTokens()];
         evaluatorAny.parse(tokens);
-        
+
         // If we got here, something went wrong
         fail('Expected an error from parse');
       } catch (error) {
@@ -119,12 +119,12 @@ describe('SafeExpressionEvaluator - Reference Token Error (lines 383-391)', () =
   it('tests the reference token error through public API', () => {
     // Try various expressions that should produce the error
     const testExpressions = [
-      '5 ${context.value}',         // Literal followed by reference
+      '5 ${context.value}', // Literal followed by reference
       '${context.value} ${context.value}', // Reference followed by reference
-      '"string" ${context.value}',  // String literal followed by reference
-      'true ${context.value}',      // Boolean literal followed by reference
+      '"string" ${context.value}', // String literal followed by reference
+      'true ${context.value}', // Boolean literal followed by reference
     ];
-    
+
     for (const expr of testExpressions) {
       logger.log(`Testing expression: ${expr}`);
       expect(() => {
@@ -138,14 +138,14 @@ describe('SafeExpressionEvaluator - Reference Token Error (lines 383-391)', () =
     try {
       // This is a direct test, but will help document our approach
       logger.log('Attempting to directly test lines 383-391');
-      
+
       // Create an expression with a literal followed immediately by a reference
       const expr = '5${context.value}';
-      
+
       // Get tokens for this expression
       const tokens = tokenize(expr, logger);
       logger.log('Tokens for direct test:', JSON.stringify(tokens));
-      
+
       // Try to parse these tokens (which should trigger error at lines 383-384)
       if (typeof evaluatorAny.parse === 'function') {
         try {
@@ -180,7 +180,6 @@ describe('SafeExpressionEvaluator - Reference Token Error (lines 383-391)', () =
     }
 
     // Even if the direct test fails, this is a regular test that should pass
-    expect(() => evaluator.evaluate('5 ${context.value}', {}))
-      .toThrow(/Unexpected reference/);
+    expect(() => evaluator.evaluate('5 ${context.value}', {})).toThrow(/Unexpected reference/);
   });
-}); 
+});

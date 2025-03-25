@@ -3,21 +3,25 @@
 ## Potential Improvements
 
 1. **Testability Enhancement**: Refactor private methods to be more testable by:
+
    - Extracting core logic into standalone, exported helper functions
    - Creating test-only exports to access critical private functionality
    - Using TypeScript's `protected` instead of `private` for methods that need testing
 
 2. **Coverage Gap Resolution**: Address known coverage gaps by:
+
    - Refactoring line 478-480 to use a more testable pattern
    - Making validation checks more accessible for testing
    - Adding test hooks for directly triggering specific error conditions
 
 3. **Error Message Improvements**:
+
    - Add more context to error messages (e.g., include the invalid token that caused the error)
    - Standardize error message format across the class
    - Add error codes for easier identification and documentation
 
 4. **Performance Optimizations**:
+
    - Consider memoizing frequently used path resolutions
    - Optimize tokenization for common patterns
    - Reduce recursive parsing where possible
@@ -59,4 +63,4 @@
 
 3. **Error Reporting**: Improve error reporting to help users identify and fix issues in their expressions more easily.
 
-These improvements would make the SafeExpressionEvaluator more robust, maintainable, and easier to test. 
+These improvements would make the SafeExpressionEvaluator more robust, maintainable, and easier to test.

@@ -80,6 +80,7 @@ public getDependencyGraph(): DependencyGraph {
    ```
 
 3. Test graph correctness:
+
    ```typescript
    it('returns same graph on subsequent calls', () => {
      const resolver = new DependencyResolver(flow, expressionEvaluator, logger);

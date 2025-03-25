@@ -28,17 +28,34 @@ describe('SafeExpressionEvaluator - getPrecedence Default Case', () => {
     it('should return 0 for unknown operators', () => {
       // Different approach: since we can't properly access the method directly,
       // we'll create a custom implementation and test all the cases including the default
-      
+
       // IMPORTANT: This test is specifically targeting the default case in getPrecedence
       // function that returns 0 for unknown operators
-      
+
       // First, let's define the operators that should return specific precedence values
-      const knownOperators = ['||', '&&', '==', '===', '!=', '!==', '<', '<=', '>', '>=', '+', '-', '*', '/', '%', '??'];
+      const knownOperators = [
+        '||',
+        '&&',
+        '==',
+        '===',
+        '!=',
+        '!==',
+        '<',
+        '<=',
+        '>',
+        '>=',
+        '+',
+        '-',
+        '*',
+        '/',
+        '%',
+        '??',
+      ];
       const unknownOperators = ['@', '#', '^', '~', 'UNKNOWN'];
-      
+
       // Test that evaluating expressions with various operators works
       // This will indirectly execute the getPrecedence method
-      
+
       // Test a known operator first to verify we can evaluate expressions
       try {
         const result = evaluator.evaluate('5 + 3', {});
@@ -46,7 +63,7 @@ describe('SafeExpressionEvaluator - getPrecedence Default Case', () => {
       } catch (error) {
         fail('Should evaluate known operators: ' + error);
       }
-      
+
       // For this test, we don't want to directly test the error message
       // We just want to ensure the code path is executed
       // The error message varies depending on the character, but the important part
@@ -63,28 +80,28 @@ describe('SafeExpressionEvaluator - getPrecedence Default Case', () => {
           logger.log(`Error for operator '${unknownOp}': ${(error as Error).message}`);
         }
       }
-      
+
       // Try a different approach: monkey patch the getPrecedence method temporarily
       try {
         // Use reflection to access the method
         const evaluatorAny = evaluator as any;
-        
+
         // Store the original method
         const originalGetPrecedence = evaluatorAny.getPrecedence;
-        
+
         // Only proceed if we can access it
         if (typeof originalGetPrecedence === 'function') {
           logger.log('Successfully accessed getPrecedence method!');
-          
+
           // Create a test-only implementation that directly exercises the default case
           // This is the crucial part of the test that hits line 478
           const testOperator = 'TEST_UNKNOWN_OPERATOR';
           const result = originalGetPrecedence.call(evaluatorAny, testOperator);
-          
+
           // The default case should return 0
           expect(result).toBe(0);
           logger.log(`Precedence of unknown operator '${testOperator}' is: ${result}`);
-          
+
           // Test a few more unusual operators to be thorough
           expect(originalGetPrecedence.call(evaluatorAny, '@')).toBe(0);
           expect(originalGetPrecedence.call(evaluatorAny, '#')).toBe(0);
@@ -97,4 +114,4 @@ describe('SafeExpressionEvaluator - getPrecedence Default Case', () => {
       }
     });
   });
-}); 
+});

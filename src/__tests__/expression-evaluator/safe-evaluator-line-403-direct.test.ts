@@ -23,11 +23,11 @@ describe('SafeExpressionEvaluator - Line 403 Direct Testing', () => {
 
   /**
    * These tests specifically target line 403 in safe-evaluator.ts:
-   * 
+   *
    * ```typescript
    * if (this.getPrecedence(topOperator as Operator) >= this.getPrecedence(op)) {
    * ```
-   * 
+   *
    * This line handles operator precedence when parsing expressions with multiple operators.
    */
   it('tests line 403 by validating operator precedence behavior', () => {
@@ -88,9 +88,9 @@ describe('SafeExpressionEvaluator - Line 403 Direct Testing', () => {
     // Test a wide variety of expressions to ensure comprehensive coverage
     const operators = ['+', '-', '*', '/', '&&', '||', '==', '!=', '>', '>=', '<', '<='];
     const operandPairs = [
-      ['5', '3'],        // numbers
+      ['5', '3'], // numbers
       ['true', 'false'], // booleans
-      ['"a"', '"b"'],    // strings
+      ['"a"', '"b"'], // strings
     ];
 
     // Track that at least one expression passes
@@ -101,8 +101,10 @@ describe('SafeExpressionEvaluator - Line 403 Direct Testing', () => {
       for (const op1 of operators) {
         for (const op2 of operators) {
           // Skip invalid combinations like 5 && 3
-          if ((op1 === '&&' || op1 === '||') && (operand1 !== 'true' && operand1 !== 'false')) continue;
-          if ((op2 === '&&' || op2 === '||') && (operand2 !== 'true' && operand2 !== 'false')) continue;
+          if ((op1 === '&&' || op1 === '||') && operand1 !== 'true' && operand1 !== 'false')
+            continue;
+          if ((op2 === '&&' || op2 === '||') && operand2 !== 'true' && operand2 !== 'false')
+            continue;
 
           // Create an expression with two operators
           const expression = `${operand1} ${op1} ${operand2} ${op2} ${operand1}`;
@@ -129,11 +131,20 @@ describe('SafeExpressionEvaluator - Line 403 Direct Testing', () => {
     const precedenceMap: Record<string, number> = {
       '||': 1,
       '&&': 2,
-      '==': 3, '===': 3, '!=': 3, '!==': 3,
-      '<': 4, '<=': 4, '>': 4, '>=': 4,
-      '+': 5, '-': 5,
-      '*': 6, '/': 6, '%': 6,
-      '??': 7
+      '==': 3,
+      '===': 3,
+      '!=': 3,
+      '!==': 3,
+      '<': 4,
+      '<=': 4,
+      '>': 4,
+      '>=': 4,
+      '+': 5,
+      '-': 5,
+      '*': 6,
+      '/': 6,
+      '%': 6,
+      '??': 7,
     };
 
     // Test various precedence comparisons (the logic in line 403)
@@ -144,18 +155,20 @@ describe('SafeExpressionEvaluator - Line 403 Direct Testing', () => {
       { top: '&&', op: '||', description: 'Logical operators', expectedResult: true },
       { top: '==', op: '!=', description: 'Equality operators', expectedResult: true },
       { top: '<', op: '>', description: 'Comparison operators', expectedResult: true },
-      { top: '*', op: '/', description: 'Multiplication and division', expectedResult: true }
+      { top: '*', op: '/', description: 'Multiplication and division', expectedResult: true },
     ];
 
     for (const pair of operatorPairs) {
       const topPrecedence = precedenceMap[pair.top];
       const opPrecedence = precedenceMap[pair.op];
-      
+
       // This is the actual condition in line 403
       const conditionResult = topPrecedence >= opPrecedence;
-      
-      logger.log(`Precedence comparison: ${pair.top} (${topPrecedence}) vs ${pair.op} (${opPrecedence}): ${conditionResult}`);
-      
+
+      logger.log(
+        `Precedence comparison: ${pair.top} (${topPrecedence}) vs ${pair.op} (${opPrecedence}): ${conditionResult}`,
+      );
+
       // Verify that our understanding of precedence matches the expected result
       expect(conditionResult).toBe(pair.expectedResult);
     }
@@ -163,10 +176,10 @@ describe('SafeExpressionEvaluator - Line 403 Direct Testing', () => {
     // Now validate that our precedence map matches the real implementation
     // by testing expressions that rely on these precedence rules
     const expressionTests = [
-      { expr: '2 * 3 + 4', expected: 10 },    // * has higher precedence than +
-      { expr: '2 + 3 * 4', expected: 14 },    // * has higher precedence than +
-      { expr: '10 - 5 - 2', expected: 3 },    // - and - have equal precedence
-      { expr: '10 * 2 / 5', expected: 4 }     // * and / have equal precedence
+      { expr: '2 * 3 + 4', expected: 10 }, // * has higher precedence than +
+      { expr: '2 + 3 * 4', expected: 14 }, // * has higher precedence than +
+      { expr: '10 - 5 - 2', expected: 3 }, // - and - have equal precedence
+      { expr: '10 * 2 / 5', expected: 4 }, // * and / have equal precedence
     ];
 
     for (const test of expressionTests) {
@@ -175,4 +188,4 @@ describe('SafeExpressionEvaluator - Line 403 Direct Testing', () => {
       expect(result).toBe(test.expected);
     }
   });
-}); 
+});

@@ -41,11 +41,11 @@ describe('SafeExpressionEvaluator - Array Case Coverage', () => {
     it('should throw when array node is missing elements property', () => {
       // Create a malformed AST node to trigger the error
       const malformedArrayNode: AstNode = { type: 'array' };
-      
+
       // We need to access the private evaluateAst method
       const evaluatorAny = evaluator as any;
       const evaluateAst = evaluatorAny.evaluateAst.bind(evaluator);
-      
+
       // Test that it throws the expected error for missing elements
       expect(() => {
         evaluateAst(malformedArrayNode, {}, Date.now());
@@ -56,21 +56,21 @@ describe('SafeExpressionEvaluator - Array Case Coverage', () => {
     it('should throw when spreading a non-object/non-array value in array', () => {
       // Create an AST with a spread of a primitive value
       context.primitive = 42;
-      
+
       const spreadPrimitiveNode: AstNode = {
         type: 'array',
         elements: [
           {
             value: { type: 'reference', path: 'context.primitive' },
-            spread: true
-          }
-        ]
+            spread: true,
+          },
+        ],
       };
-      
+
       // Access private method
       const evaluatorAny = evaluator as any;
       const evaluateAst = evaluatorAny.evaluateAst.bind(evaluator);
-      
+
       // Should throw because you can't spread a primitive
       expect(() => {
         evaluateAst(spreadPrimitiveNode, context, Date.now());
@@ -82,7 +82,7 @@ describe('SafeExpressionEvaluator - Array Case Coverage', () => {
       // Template literal with context reference (context is a special variable but should still be found)
       const expression = '`Hello ${user.name} from ${user.location}!`';
       const references = evaluator.extractReferences(expression);
-      
+
       // Should extract 'user'
       expect(references).toContain('user');
       expect(references.length).toBe(1); // Should have only 'user'
@@ -92,7 +92,7 @@ describe('SafeExpressionEvaluator - Array Case Coverage', () => {
     it('should handle errors in extractReferences gracefully', () => {
       // This is an invalid expression (unclosed template literal)
       const invalidExpression = '`This is an unclosed template literal with ${something';
-      
+
       // Should return empty array when there's a parsing error
       const references = evaluator.extractReferences(invalidExpression);
       expect(Array.isArray(references)).toBe(true);
@@ -103,7 +103,7 @@ describe('SafeExpressionEvaluator - Array Case Coverage', () => {
     it('should extract nested references correctly', () => {
       // Template with nested references
       const nestedExpression = '`${user.address.${city}.zipcode}`';
-      
+
       const references = evaluator.extractReferences(nestedExpression);
       expect(references).toContain('user');
       expect(references).toContain('city');
@@ -112,9 +112,9 @@ describe('SafeExpressionEvaluator - Array Case Coverage', () => {
     // Test special variable handling in extractReferences
     it('should ignore special variable names in extractReferences', () => {
       const specialVarsExpression = '`Loop variables ${item} and ${acc} and ${context}`';
-      
+
       const references = evaluator.extractReferences(specialVarsExpression);
-      
+
       // Special variables (item, acc, context) shouldn't be included
       expect(references).not.toContain('item');
       expect(references).not.toContain('acc');
@@ -129,17 +129,16 @@ describe('SafeExpressionEvaluator - Array Case Coverage', () => {
       context.obj = { a: 4, b: 5 };
       context.empty = [];
       context.nullValue = null;
-      
+
       // Test various array cases
-      expect(evaluator.evaluate('[...${context.items}, ...${context.obj}]', {}))
-        .toEqual([1, 2, 3, 4, 5]);
-      
-      expect(evaluator.evaluate('[...${context.empty}]', {}))
-        .toEqual([]);
-      
+      expect(evaluator.evaluate('[...${context.items}, ...${context.obj}]', {})).toEqual([
+        1, 2, 3, 4, 5,
+      ]);
+
+      expect(evaluator.evaluate('[...${context.empty}]', {})).toEqual([]);
+
       // Test error cases
-      expect(() => evaluator.evaluate('[...${context.nullValue}]', {}))
-        .toThrow(ExpressionError);
+      expect(() => evaluator.evaluate('[...${context.nullValue}]', {})).toThrow(ExpressionError);
     });
   });
-}); 
+});

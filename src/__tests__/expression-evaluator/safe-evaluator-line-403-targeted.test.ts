@@ -1,4 +1,7 @@
-import { SafeExpressionEvaluator, _UnknownReferenceError } from '../../expression-evaluator/safe-evaluator';
+import {
+  SafeExpressionEvaluator,
+  _UnknownReferenceError,
+} from '../../expression-evaluator/safe-evaluator';
 import { ReferenceResolver } from '../../reference-resolver';
 import { Token } from '../../expression-evaluator/tokenizer';
 import { Logger } from '../../util/logger';
@@ -35,9 +38,9 @@ describe('SafeExpressionEvaluator - Line 403 targeting', () => {
         throw new Error(`Cannot resolve ${path}`);
       }),
     } as unknown as ReferenceResolver;
-    
+
     evaluator = new SafeExpressionEvaluator(mockLogger, mockResolver);
-    
+
     // Mock Date.now for timeout tests
     global.Date.now = mockNow;
   });
@@ -108,17 +111,33 @@ describe('SafeExpressionEvaluator - Line 403 targeting', () => {
 
     // Create a direct test for the comparison in line 403
     it('handles precedence comparison (line 403) for all operator pairs', () => {
-      const operators = ['||', '&&', '==', '===', '!=', '!==', '>', '>=', '<', '<=', '+', '-', '*', '/', '%', '??'];
-      
+      const operators = [
+        '||',
+        '&&',
+        '==',
+        '===',
+        '!=',
+        '!==',
+        '>',
+        '>=',
+        '<',
+        '<=',
+        '+',
+        '-',
+        '*',
+        '/',
+        '%',
+        '??',
+      ];
+
       // Test all operator combinations to ensure line 403 is covered
       for (const op1 of operators) {
         for (const op2 of operators) {
           // Skip invalid combinations to prevent test errors
-          if ((op1 === '??' && op2 === '??') || 
-              (op1 === '%' && op2 === '%')) {
+          if ((op1 === '??' && op2 === '??') || (op1 === '%' && op2 === '%')) {
             continue;
           }
-          
+
           try {
             // Create a simple expression with the two operators
             // This ensures we hit the precedence comparison in line 403
@@ -133,4 +152,4 @@ describe('SafeExpressionEvaluator - Line 403 targeting', () => {
       }
     });
   });
-}); 
+});

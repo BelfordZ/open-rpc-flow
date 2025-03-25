@@ -39,11 +39,11 @@ describe('SafeExpressionEvaluator - Unexpected Reference Handling', () => {
       // This expression puts a reference (${context.value}) right after another reference or value,
       // which should expect an operator in between, not another reference
       const expression = '5 ${context.value}';
-      
+
       expect(() => {
         evaluator.evaluate(expression, {});
       }).toThrow(ExpressionError);
-      
+
       expect(() => {
         evaluator.evaluate(expression, {});
       }).toThrow('Unexpected reference');
@@ -52,11 +52,11 @@ describe('SafeExpressionEvaluator - Unexpected Reference Handling', () => {
     it('throws when a reference token appears after another reference', () => {
       // This puts two references next to each other which should also throw
       const expression = '${context.value} ${context.value}';
-      
+
       expect(() => {
         evaluator.evaluate(expression, {});
       }).toThrow(ExpressionError);
-      
+
       expect(() => {
         evaluator.evaluate(expression, {});
       }).toThrow('Unexpected reference');
@@ -72,7 +72,7 @@ describe('SafeExpressionEvaluator - Unexpected Reference Handling', () => {
     it('throws with the correct error when a reference follows a literal in an object key', () => {
       // Testing references in invalid positions in object literals
       const expression = '{ "key" ${context.value}: "value" }';
-      
+
       expect(() => {
         evaluator.evaluate(expression, {});
       }).toThrow(ExpressionError);
@@ -81,7 +81,7 @@ describe('SafeExpressionEvaluator - Unexpected Reference Handling', () => {
     it('throws with the correct error when a reference follows another reference in an array', () => {
       // Testing references in invalid positions in arrays
       const expression = '[${context.value} ${context.value}]';
-      
+
       expect(() => {
         evaluator.evaluate(expression, {});
       }).toThrow(ExpressionError);
@@ -91,11 +91,11 @@ describe('SafeExpressionEvaluator - Unexpected Reference Handling', () => {
     it('correctly sets expectOperator to true after evaluating a reference token', () => {
       // This test indirectly verifies line 385 where expectOperator is set to true
       // after processing a reference token
-      
+
       // If a reference is followed by an operator, it should work fine
       // This verifies that the expectOperator flag is correctly set to true
       expect(evaluator.evaluate('${context.value} + 3', {})).toBe(8);
-      
+
       // If we have two references separated by an operator, it should also work
       expect(evaluator.evaluate('${context.value} + ${context.value}', {})).toBe(10);
     });
@@ -104,10 +104,10 @@ describe('SafeExpressionEvaluator - Unexpected Reference Handling', () => {
     it('handles complex expressions with multiple references and operators', () => {
       context.a = 3;
       context.b = 7;
-      
+
       // This tests that references can appear in valid positions throughout a complex expression
       const expression = '(${context.a} + ${context.b}) * (${context.value} - 2)';
-      
+
       expect(evaluator.evaluate(expression, {})).toBe(30); // (3 + 7) * (5 - 2) = 10 * 3 = 30
     });
 
@@ -118,7 +118,9 @@ describe('SafeExpressionEvaluator - Unexpected Reference Handling', () => {
       } catch (error) {
         if (error instanceof ExpressionError) {
           // Updated to match the actual error message format
-          expect(error.message).toBe('Failed to evaluate expression: 5 ${context.value}. Got error: Unexpected reference');
+          expect(error.message).toBe(
+            'Failed to evaluate expression: 5 ${context.value}. Got error: Unexpected reference',
+          );
         } else {
           throw error;
         }
@@ -129,24 +131,24 @@ describe('SafeExpressionEvaluator - Unexpected Reference Handling', () => {
     it('parse method directly catches unexpected reference tokens', () => {
       // Instead of going through evaluate, we'll try to access the parse method directly
       const evaluatorAny = evaluator as any;
-      
+
       if (typeof evaluatorAny.parse === 'function') {
         // First create valid tokens that include a reference token where an operator is expected
         const tokens = tokenize('5', logger);
         const refTokens = tokenize('${context.value}', logger);
-        
+
         logger.log('Tokens for "5":', JSON.stringify(tokens));
         logger.log('Tokens for "${context.value}":', JSON.stringify(refTokens));
-        
+
         // Create a combined array of tokens where a number is followed by a reference
         // This should simulate the state where expectOperator is true but we encounter a reference token
         const combinedTokens = [...tokens, ...refTokens];
-        
+
         // Now try to parse these tokens directly
         expect(() => {
           evaluatorAny.parse(combinedTokens);
         }).toThrow(ExpressionError);
-        
+
         try {
           evaluatorAny.parse(combinedTokens);
         } catch (error: any) {
@@ -155,14 +157,14 @@ describe('SafeExpressionEvaluator - Unexpected Reference Handling', () => {
         }
       } else {
         logger.log('Cannot access parse method directly, trying alternative approach');
-        
+
         // If we can't access the parse method, we need to be creative
         // Create a custom token stream that would trigger the code path
         // This is a bit hacky but necessary for coverage
-        
+
         // Create a test expression with a reference right after a value
         const testExpr = '5 ${context.value}';
-        
+
         // Since we know evaluate will use parse internally, test evaluate and confirm it throws
         expect(() => evaluator.evaluate(testExpr, {})).toThrow('Unexpected reference');
       }
@@ -173,24 +175,24 @@ describe('SafeExpressionEvaluator - Unexpected Reference Handling', () => {
       // Save the original parse function (if it exists)
       const evaluatorAny = evaluator as any;
       const originalParse = evaluatorAny.parse;
-      
+
       // Track if our code path was hit
       let hitCodePath = false;
-      
+
       // If the parse method exists, monkey patch it
       if (typeof originalParse === 'function') {
         // Create a spy around the parse method that will help us track when it's triggered
-        evaluatorAny.parse = function(...args: any[]) {
+        evaluatorAny.parse = function (...args: any[]) {
           const tokens = args[0];
-          
+
           logger.log('Intercepted parse call with tokens:', JSON.stringify(tokens));
-          
+
           try {
             // For our test, manually craft a situation where a reference follows a value
             if (tokens.length >= 1) {
               // Create a state where expectOperator is true
-              let expectOperator = true;
-              
+              const expectOperator = true;
+
               // Manually trigger the code path in lines 383-391
               for (const token of tokens) {
                 if (token.type === 'reference' && expectOperator) {
@@ -200,7 +202,7 @@ describe('SafeExpressionEvaluator - Unexpected Reference Handling', () => {
                 }
               }
             }
-            
+
             // Otherwise, call the original function
             return originalParse.apply(this, args);
           } catch (error) {
@@ -208,25 +210,25 @@ describe('SafeExpressionEvaluator - Unexpected Reference Handling', () => {
             throw error;
           }
         };
-        
+
         // Now use the patched function
         try {
           evaluator.evaluate('5 ${context.value}', {});
         } catch (error) {
           // Expected to throw, that's fine
         }
-        
+
         // Check if our code path was hit
         expect(hitCodePath).toBe(true);
-        
+
         // Restore the original function
         evaluatorAny.parse = originalParse;
       } else {
         logger.log('Cannot access parse method, falling back to regular tests');
-        
+
         // Just rely on the other tests to hit the code path
         expect(() => evaluator.evaluate('5 ${context.value}', {})).toThrow('Unexpected reference');
       }
     });
   });
-}); 
+});

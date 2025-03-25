@@ -25,21 +25,21 @@ describe('SafeExpressionEvaluator - Debugging OperatorStack', () => {
   it('tests if operatorStack is always empty when processing references', () => {
     // First, let's modify the parse method to log the operator stack state
     const evaluatorAny = evaluator as any;
-    
+
     if (typeof evaluatorAny.parseExpression !== 'function') {
       logger.warn('Cannot access parseExpression method, skipping detailed debug test');
       return;
     }
-    
+
     // Save the original method
     const originalParseExpression = evaluatorAny.parseExpression;
-    
+
     // Replace with our debugging version
-    evaluatorAny.parseExpression = function(tokens: any[]) {
+    evaluatorAny.parseExpression = function (tokens: any[]) {
       const operatorStack: any[] = [];
       const outputQueue: any[] = [];
       let expectOperator = false;
-      
+
       for (let i = 0; i < tokens.length; i++) {
         const token = tokens[i];
         // Handle parentheses first
@@ -47,7 +47,7 @@ describe('SafeExpressionEvaluator - Debugging OperatorStack', () => {
           operatorStack.push('(');
           continue;
         }
-        
+
         if (token.value === ')') {
           let foundMatching = false;
           while (operatorStack.length > 0) {
@@ -62,7 +62,7 @@ describe('SafeExpressionEvaluator - Debugging OperatorStack', () => {
           }
           continue;
         }
-        
+
         // Check for reference tokens specifically
         if (token.type === 'reference') {
           if (expectOperator) {
@@ -73,13 +73,16 @@ describe('SafeExpressionEvaluator - Debugging OperatorStack', () => {
             throw new ExpressionError('Unexpected reference');
           }
           expectOperator = true;
-        } 
+        }
         // For simplicity, handle basic operators
-        else if (token.type === 'operator' || ['&&', '||', '+', '-', '*', '/'].includes(token.value)) {
+        else if (
+          token.type === 'operator' ||
+          ['&&', '||', '+', '-', '*', '/'].includes(token.value)
+        ) {
           if (!expectOperator) {
             throw new ExpressionError('Unexpected operator');
           }
-          
+
           operatorStack.push(token.value);
           expectOperator = false;
         }
@@ -92,58 +95,58 @@ describe('SafeExpressionEvaluator - Debugging OperatorStack', () => {
           expectOperator = true;
         }
       }
-      
+
       // Restore the original method and call it
       evaluatorAny.parseExpression = originalParseExpression;
       return originalParseExpression.call(this, tokens);
     };
-    
+
     try {
       // 1. Test with valid reference usage
       try {
-        logger.log("Testing with valid reference: ${context.value}");
+        logger.log('Testing with valid reference: ${context.value}');
         evaluator.evaluate('${context.value}', {});
       } catch (error: any) {
         logger.error(`Unexpected error with valid reference: ${error}`);
       }
-      
+
       // 2. Test with reference + operator (valid)
       try {
-        logger.log("Testing with valid reference + operator: ${context.value} + 3");
+        logger.log('Testing with valid reference + operator: ${context.value} + 3');
         evaluator.evaluate('${context.value} + 3', {});
       } catch (error: any) {
         logger.error(`Unexpected error with valid reference + operator: ${error}`);
       }
-      
+
       // 3. Test with operator + reference (valid)
       try {
-        logger.log("Testing with valid operator + reference: 3 + ${context.value}");
+        logger.log('Testing with valid operator + reference: 3 + ${context.value}');
         evaluator.evaluate('3 + ${context.value}', {});
       } catch (error: any) {
         logger.error(`Unexpected error with valid operator + reference: ${error}`);
       }
-      
+
       // 4. Test with reference + reference (should trigger error)
       try {
-        logger.log("Testing with invalid reference + reference: ${context.value} ${context.value}");
+        logger.log('Testing with invalid reference + reference: ${context.value} ${context.value}');
         evaluator.evaluate('${context.value} ${context.value}', {});
         logger.error('Error: Should have thrown but did not');
       } catch (error: any) {
         logger.log(`Got expected error with reference + reference: ${error.message}`);
       }
-      
+
       // 5. Test with number + reference (should trigger error)
       try {
-        logger.log("Testing with invalid number + reference: 5 ${context.value}");
+        logger.log('Testing with invalid number + reference: 5 ${context.value}');
         evaluator.evaluate('5 ${context.value}', {});
         logger.error('Error: Should have thrown but did not');
       } catch (error: any) {
         logger.log(`Got expected error with number + reference: ${error.message}`);
       }
-      
+
       // 6. Test with parenthesized expression to see if operatorStack gets populated
       try {
-        logger.log("Testing with parenthesized expression: (${context.value} + 3) * 2");
+        logger.log('Testing with parenthesized expression: (${context.value} + 3) * 2');
         evaluator.evaluate('(${context.value} + 3) * 2', {});
       } catch (error: any) {
         logger.error(`Unexpected error with parenthesized expression: ${error}`);
@@ -153,4 +156,4 @@ describe('SafeExpressionEvaluator - Debugging OperatorStack', () => {
       evaluatorAny.parseExpression = originalParseExpression;
     }
   });
-}); 
+});

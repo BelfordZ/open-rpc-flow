@@ -19,13 +19,13 @@ describe('Tokenizer Special Spread Operator Cases', () => {
       // Just verify it parses in some way
       expect(result).toBeDefined();
     });
-    
+
     it('handles object with a single dot', () => {
       const result = tokenize('{ . }', logger);
       // Just verify it parses in some way
       expect(result).toBeDefined();
     });
-    
+
     it('handles various dot patterns', () => {
       const dotPatterns = [
         '{.}',
@@ -42,7 +42,7 @@ describe('Tokenizer Special Spread Operator Cases', () => {
         '{ .key: value }',
         '{ key:. }',
       ];
-      
+
       for (const pattern of dotPatterns) {
         try {
           const result = tokenize(pattern, logger);
@@ -53,7 +53,7 @@ describe('Tokenizer Special Spread Operator Cases', () => {
         }
       }
     });
-    
+
     it('handles non-spread dots in object literals', () => {
       try {
         // Using a float number should cause the dots to be treated differently
@@ -63,7 +63,7 @@ describe('Tokenizer Special Spread Operator Cases', () => {
         // May throw an error, which is fine
       }
     });
-    
+
     it('handles dot followed immediately by a spread operator', () => {
       try {
         // This unusual pattern might force the tokenizer to handle each dot separately
@@ -73,7 +73,7 @@ describe('Tokenizer Special Spread Operator Cases', () => {
         // May throw an error, which is fine
       }
     });
-    
+
     it('handles special edge cases with text buffer and dots', () => {
       try {
         // Trying to create a situation where there's content in the textBuffer
@@ -85,4 +85,4 @@ describe('Tokenizer Special Spread Operator Cases', () => {
       }
     });
   });
-}); 
+});

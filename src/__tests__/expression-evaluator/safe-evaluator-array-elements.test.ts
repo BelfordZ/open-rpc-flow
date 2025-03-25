@@ -41,16 +41,16 @@ describe('SafeExpressionEvaluator - Array Elements Handling', () => {
     it('throws when evaluating an array AST node with missing elements', () => {
       // Create a malformed AST node by accessing evaluator's private evaluateAst method directly
       const malformedAst: AstNode = { type: 'array' };
-      
+
       // We need to use a little trick to access the private method and test it
       // @ts-ignore - Ignore TypeScript errors for accessing private methods in tests
       const evaluateAst = evaluator['evaluateAst'].bind(evaluator);
-      
+
       // Test that it throws the expected error
       expect(() => {
         evaluateAst(malformedAst, {}, Date.now());
       }).toThrow(ExpressionError);
-      
+
       expect(() => {
         evaluateAst(malformedAst, {}, Date.now());
       }).toThrow('Internal error: Array node missing elements');
@@ -58,14 +58,14 @@ describe('SafeExpressionEvaluator - Array Elements Handling', () => {
 
     // Test with an empty array elements property
     it('handles array AST node with empty elements array', () => {
-      const emptyElementsAst: AstNode = { 
-        type: 'array', 
-        elements: [] 
+      const emptyElementsAst: AstNode = {
+        type: 'array',
+        elements: [],
       };
-      
+
       // @ts-ignore - Ignore TypeScript errors for accessing private methods in tests
       const evaluateAst = evaluator['evaluateAst'].bind(evaluator);
-      
+
       // Should not throw, should return an empty array
       const result = evaluateAst(emptyElementsAst, {}, Date.now());
       expect(result).toEqual([]);
@@ -73,23 +73,23 @@ describe('SafeExpressionEvaluator - Array Elements Handling', () => {
 
     // Test with valid array elements
     it('evaluates array AST node with valid elements', () => {
-      const validElementsAst: AstNode = { 
-        type: 'array', 
+      const validElementsAst: AstNode = {
+        type: 'array',
         elements: [
           {
             value: { type: 'literal', value: 1 },
-            spread: false
+            spread: false,
           },
           {
             value: { type: 'literal', value: 2 },
-            spread: false
-          }
-        ] 
+            spread: false,
+          },
+        ],
       };
-      
+
       // @ts-ignore - Ignore TypeScript errors for accessing private methods in tests
       const evaluateAst = evaluator['evaluateAst'].bind(evaluator);
-      
+
       const result = evaluateAst(validElementsAst, {}, Date.now());
       expect(result).toEqual([1, 2]);
     });
@@ -97,28 +97,28 @@ describe('SafeExpressionEvaluator - Array Elements Handling', () => {
     // Test with spread operator in array elements
     it('handles spread operator in array elements', () => {
       context.arr = [3, 4, 5];
-      
-      const spreadElementsAst: AstNode = { 
-        type: 'array', 
+
+      const spreadElementsAst: AstNode = {
+        type: 'array',
         elements: [
           {
             value: { type: 'literal', value: 1 },
-            spread: false
+            spread: false,
           },
           {
             value: { type: 'literal', value: 2 },
-            spread: false
+            spread: false,
           },
           {
             value: { type: 'reference', path: 'context.arr' },
-            spread: true
-          }
-        ] 
+            spread: true,
+          },
+        ],
       };
-      
+
       // @ts-ignore - Ignore TypeScript errors for accessing private methods in tests
       const evaluateAst = evaluator['evaluateAst'].bind(evaluator);
-      
+
       const result = evaluateAst(spreadElementsAst, context, Date.now());
       expect(result).toEqual([1, 2, 3, 4, 5]);
     });
@@ -126,45 +126,45 @@ describe('SafeExpressionEvaluator - Array Elements Handling', () => {
     // Test spreading non-array values
     it('handles spreading non-array object values', () => {
       context.obj = { a: 1, b: 2 };
-      
-      const spreadObjectAst: AstNode = { 
-        type: 'array', 
+
+      const spreadObjectAst: AstNode = {
+        type: 'array',
         elements: [
           {
             value: { type: 'reference', path: 'context.obj' },
-            spread: true
-          }
-        ] 
+            spread: true,
+          },
+        ],
       };
-      
+
       // @ts-ignore - Ignore TypeScript errors for accessing private methods in tests
       const evaluateAst = evaluator['evaluateAst'].bind(evaluator);
-      
+
       const result = evaluateAst(spreadObjectAst, context, Date.now());
       expect(result).toEqual([1, 2]); // Should be Object.values(obj)
     });
 
     // Test spreading invalid values (not array or object)
     it('throws when spreading invalid values', () => {
-      context.str = "not spreadable";
-      
-      const invalidSpreadAst: AstNode = { 
-        type: 'array', 
+      context.str = 'not spreadable';
+
+      const invalidSpreadAst: AstNode = {
+        type: 'array',
         elements: [
           {
             value: { type: 'reference', path: 'context.str' },
-            spread: true
-          }
-        ] 
+            spread: true,
+          },
+        ],
       };
-      
+
       // @ts-ignore - Ignore TypeScript errors for accessing private methods in tests
       const evaluateAst = evaluator['evaluateAst'].bind(evaluator);
-      
+
       expect(() => {
         evaluateAst(invalidSpreadAst, context, Date.now());
       }).toThrow(ExpressionError);
-      
+
       expect(() => {
         evaluateAst(invalidSpreadAst, context, Date.now());
       }).toThrow('Invalid spread operator usage: can only spread arrays or objects');
@@ -174,35 +174,35 @@ describe('SafeExpressionEvaluator - Array Elements Handling', () => {
     it('handles null and undefined spread attempts correctly', () => {
       context.nullVal = null;
       context.undefinedVal = undefined;
-      
-      const nullSpreadAst: AstNode = { 
-        type: 'array', 
+
+      const nullSpreadAst: AstNode = {
+        type: 'array',
         elements: [
           {
             value: { type: 'reference', path: 'context.nullVal' },
-            spread: true
-          }
-        ] 
+            spread: true,
+          },
+        ],
       };
-      
-      const undefinedSpreadAst: AstNode = { 
-        type: 'array', 
+
+      const undefinedSpreadAst: AstNode = {
+        type: 'array',
         elements: [
           {
             value: { type: 'reference', path: 'context.undefinedVal' },
-            spread: true
-          }
-        ] 
+            spread: true,
+          },
+        ],
       };
-      
+
       // @ts-ignore - Ignore TypeScript errors for accessing private methods in tests
       const evaluateAst = evaluator['evaluateAst'].bind(evaluator);
-      
+
       // Both should throw since they're not arrays or valid objects
       expect(() => {
         evaluateAst(nullSpreadAst, context, Date.now());
       }).toThrow(ExpressionError);
-      
+
       expect(() => {
         evaluateAst(undefinedSpreadAst, context, Date.now());
       }).toThrow(ExpressionError);
@@ -217,7 +217,10 @@ describe('SafeExpressionEvaluator - Array Elements Handling', () => {
     });
 
     it('evaluates nested array literals', () => {
-      expect(evaluator.evaluate('[[1, 2], [3, 4]]', {})).toEqual([[1, 2], [3, 4]]);
+      expect(evaluator.evaluate('[[1, 2], [3, 4]]', {})).toEqual([
+        [1, 2],
+        [3, 4],
+      ]);
     });
 
     it('evaluates array literals with computed values', () => {
@@ -241,8 +244,9 @@ describe('SafeExpressionEvaluator - Array Elements Handling', () => {
     it('evaluates array literals with multiple spread operators', () => {
       context.arr1 = [2, 3];
       context.arr2 = [4, 5];
-      expect(evaluator.evaluate('[1, ...${context.arr1}, ...${context.arr2}, 6]', {}))
-        .toEqual([1, 2, 3, 4, 5, 6]);
+      expect(evaluator.evaluate('[1, ...${context.arr1}, ...${context.arr2}, 6]', {})).toEqual([
+        1, 2, 3, 4, 5, 6,
+      ]);
     });
 
     it('evaluates array literals with object spread', () => {
@@ -251,8 +255,8 @@ describe('SafeExpressionEvaluator - Array Elements Handling', () => {
     });
 
     it('throws for invalid spread values', () => {
-      context.str = "not spreadable";
+      context.str = 'not spreadable';
       expect(() => evaluator.evaluate('[...${context.str}]', {})).toThrow(ExpressionError);
     });
   });
-}); 
+});

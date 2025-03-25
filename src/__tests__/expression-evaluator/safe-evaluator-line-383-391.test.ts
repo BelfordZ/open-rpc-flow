@@ -24,7 +24,7 @@ describe('SafeExpressionEvaluator - Line 383-391 Coverage Test', () => {
 
   /**
    * This test aims specifically to cover lines 383-391 in the safe-evaluator.ts file:
-   * 
+   *
    * ```typescript
    * else if (token.type === 'reference') {
    *   if (expectOperator) {
@@ -47,11 +47,11 @@ describe('SafeExpressionEvaluator - Line 383-391 Coverage Test', () => {
       // This expression puts a reference (${context.value}) right after another reference,
       // which should expect an operator in between, not another reference
       const expression = '${context.value} ${context.value}';
-      
+
       expect(() => {
         evaluator.evaluate(expression, {});
       }).toThrow(ExpressionError);
-      
+
       expect(() => {
         evaluator.evaluate(expression, {});
       }).toThrow('Unexpected reference');
@@ -61,11 +61,11 @@ describe('SafeExpressionEvaluator - Line 383-391 Coverage Test', () => {
     it('throws when a reference token appears after a literal', () => {
       // Here a literal (5) is followed by a reference, which should throw
       const expression = '5 ${context.value}';
-      
+
       expect(() => {
         evaluator.evaluate(expression, {});
       }).toThrow(ExpressionError);
-      
+
       expect(() => {
         evaluator.evaluate(expression, {});
       }).toThrow('Unexpected reference');
@@ -75,7 +75,7 @@ describe('SafeExpressionEvaluator - Line 383-391 Coverage Test', () => {
     it('allows references after operators', () => {
       const expression = '5 + ${context.value}';
       expect(evaluator.evaluate(expression, {})).toBe(10);
-      
+
       // After + operator, reference is allowed because expectOperator is false
       const expression2 = '${context.value} + ${context.value}';
       expect(evaluator.evaluate(expression2, {})).toBe(10);
@@ -85,10 +85,10 @@ describe('SafeExpressionEvaluator - Line 383-391 Coverage Test', () => {
     it('handles complex expressions with references in valid positions', () => {
       context.a = 10;
       context.b = 20;
-      
+
       // Multiple operations with references
       const expression = '${context.a} + ${context.b} * ${context.value}';
-      
+
       // 10 + 20 * 5 = 10 + 100 = 110
       expect(evaluator.evaluate(expression, {})).toBe(110);
     });
@@ -96,7 +96,7 @@ describe('SafeExpressionEvaluator - Line 383-391 Coverage Test', () => {
     // Test case 6: Additional test with reference after reference in object literal
     it('throws when a reference appears after another reference in object literal key', () => {
       const expression = '{ ${context.value} ${context.value}: "test" }';
-      
+
       expect(() => {
         evaluator.evaluate(expression, {});
       }).toThrow(ExpressionError);
@@ -105,7 +105,7 @@ describe('SafeExpressionEvaluator - Line 383-391 Coverage Test', () => {
     // Test case 7: Additional test with reference after reference in array literal
     it('throws when a reference appears after another reference in array literal', () => {
       const expression = '[${context.value} ${context.value}]';
-      
+
       expect(() => {
         evaluator.evaluate(expression, {});
       }).toThrow(ExpressionError);
@@ -117,9 +117,9 @@ describe('SafeExpressionEvaluator - Line 383-391 Coverage Test', () => {
       const testCases = [
         '5 ${context.value}',
         '${context.value} ${context.value}',
-        '"string" ${context.value}'
+        '"string" ${context.value}',
       ];
-      
+
       for (const expr of testCases) {
         logger.log(`Testing expression: ${expr}`);
         expect(() => {
@@ -132,7 +132,7 @@ describe('SafeExpressionEvaluator - Line 383-391 Coverage Test', () => {
     it('creates a focused test for line 384 specifically', () => {
       const testAst = () => {
         const evaluatorAny = evaluator as any;
-        
+
         // If we can access the parse method directly
         if (typeof evaluatorAny.parse === 'function') {
           // Let's try to create a test that will specifically hit our target code
@@ -144,13 +144,13 @@ describe('SafeExpressionEvaluator - Line 383-391 Coverage Test', () => {
             const refValue = [
               { type: 'identifier', value: 'context', raw: 'context' },
               { type: 'operator', value: '.', raw: '.' },
-              { type: 'identifier', value: 'value', raw: 'value' }
+              { type: 'identifier', value: 'value', raw: 'value' },
             ];
             const refToken = { type: 'reference', value: refValue, raw: '${context.value}' };
-            
+
             // Call parse with our crafted tokens
             evaluatorAny.parse([numberToken, refToken]);
-            
+
             // Should not reach here
             fail('Expected to throw an error');
           } catch (error: any) {
@@ -166,20 +166,18 @@ describe('SafeExpressionEvaluator - Line 383-391 Coverage Test', () => {
           // If we can't access the parse method directly
           logger.warn('Cannot access parse method directly');
           // Use the full evaluation path as a fallback
-          expect(() => evaluator.evaluate('5 ${context.value}', {}))
-            .toThrow(ExpressionError);
+          expect(() => evaluator.evaluate('5 ${context.value}', {})).toThrow(ExpressionError);
         }
       };
-      
+
       // Run the test, but don't fail the overall test if it doesn't work
       try {
         testAst();
       } catch (error) {
         logger.warn('AST test failed:', error);
         // Fallback to using the regular approach
-        expect(() => evaluator.evaluate('5 ${context.value}', {}))
-          .toThrow(/Unexpected reference/);
+        expect(() => evaluator.evaluate('5 ${context.value}', {})).toThrow(/Unexpected reference/);
       }
     });
   });
-}); 
+});

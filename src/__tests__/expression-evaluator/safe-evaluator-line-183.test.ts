@@ -23,17 +23,17 @@ describe('SafeEvaluator Line 183 Test', () => {
       // - PathSyntaxError
       // - PropertyAccessError
       // - ExpressionError
-      
+
       // Let's monkey patch the tokenize method to throw a custom error
       const evaluatorAny = evaluator as any;
       const originalTokenize = evaluatorAny.tokenize;
-      
+
       if (typeof evaluatorAny.tokenize === 'function') {
         // Replace with a function that throws a custom Error
-        evaluatorAny.tokenize = function() {
+        evaluatorAny.tokenize = function () {
           throw new Error('Custom non-standard error');
         };
-        
+
         try {
           // This should now trigger our custom error
           evaluator.evaluate('1 + 1', {});
@@ -55,15 +55,15 @@ describe('SafeEvaluator Line 183 Test', () => {
       } else {
         // If we can't access tokenize, try another method
         logger.warn('Cannot access tokenize method, attempting alternative approach');
-        
+
         // Mock the evaluateAst method instead
         if (typeof evaluatorAny.evaluateAst === 'function') {
           const originalEvaluateAst = evaluatorAny.evaluateAst;
-          
-          evaluatorAny.evaluateAst = function() {
+
+          evaluatorAny.evaluateAst = function () {
             throw new Error('Custom non-standard error');
           };
-          
+
           try {
             evaluator.evaluate('1 + 1', {});
             fail('Expected an error to be thrown');
@@ -87,4 +87,4 @@ describe('SafeEvaluator Line 183 Test', () => {
       }
     });
   });
-}); 
+});

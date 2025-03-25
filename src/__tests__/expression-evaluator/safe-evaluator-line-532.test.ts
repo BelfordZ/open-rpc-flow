@@ -12,7 +12,7 @@ describe('SafeExpressionEvaluator Line 532 Coverage', () => {
   beforeEach(() => {
     stepResults = new Map();
     context = {
-      arr: [3, 4, 5]
+      arr: [3, 4, 5],
     };
     referenceResolver = new ReferenceResolver(stepResults, context, logger);
     evaluator = new SafeExpressionEvaluator(logger, referenceResolver);
@@ -27,4 +27,4 @@ describe('SafeExpressionEvaluator Line 532 Coverage', () => {
     const result = evaluator.evaluate('[...${context.arr}]', {});
     expect(result).toEqual([3, 4, 5]);
   });
-}); 
+});

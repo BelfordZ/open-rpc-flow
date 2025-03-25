@@ -257,76 +257,76 @@ describe('Tokenizer Coverage Improvements', () => {
 
     it('handles closing braces correctly (lines 238-239)', () => {
       const tokens = tokenize('${foo}', logger);
-      
+
       expect(tokens).toHaveLength(1);
       expect(tokens[0].type).toBe('reference');
-      
+
       const refTokens = tokens[0].value as any[];
       expect(Array.isArray(refTokens)).toBe(true);
-      
+
       expect(() => tokenize('${foo', logger)).toThrow(TokenizerError);
       expect(() => tokenize('${foo', logger)).toThrow('Unterminated reference');
     });
 
     it('handles nested reference with closing brace', () => {
       const tokens = tokenize('${foo${bar}}', logger);
-      
+
       expect(tokens).toHaveLength(1);
       expect(tokens[0].type).toBe('reference');
-      
+
       const refTokens = tokens[0].value as any[];
       expect(Array.isArray(refTokens)).toBe(true);
-      
-      const hasNestedRef = refTokens.some(token => 
-        token.type === 'reference' || 
-        (Array.isArray(token.value) && token.value.some((t: any) => t.type === 'reference'))
+
+      const hasNestedRef = refTokens.some(
+        (token) =>
+          token.type === 'reference' ||
+          (Array.isArray(token.value) && token.value.some((t: any) => t.type === 'reference')),
       );
       expect(hasNestedRef).toBe(true);
     });
 
     it('processes non-special characters in references (lines 238-239)', () => {
       const tokens = tokenize('${abc123XYZ_@#$%^&*()}', logger);
-      
+
       expect(tokens).toHaveLength(1);
       expect(tokens[0].type).toBe('reference');
-      
+
       const refTokens = tokens[0].value as any[];
-      const identifiers = refTokens.filter(token => token.type === 'identifier');
-      
+      const identifiers = refTokens.filter((token) => token.type === 'identifier');
+
       expect(identifiers.length).toBeGreaterThan(0);
-      
-      const hasNonSpecialChars = identifiers.some(token => 
-        typeof token.value === 'string' && 
-        /[a-zA-Z0-9_@#$%^&*]/.test(token.value)
+
+      const hasNonSpecialChars = identifiers.some(
+        (token) => typeof token.value === 'string' && /[a-zA-Z0-9_@#$%^&*]/.test(token.value),
       );
       expect(hasNonSpecialChars).toBe(true);
     });
 
     it('handles mix of special and non-special characters in references', () => {
       const tokens = tokenize('${some.value[index]@special?chars}', logger);
-      
+
       expect(tokens).toHaveLength(1);
       expect(tokens[0].type).toBe('reference');
-      
+
       const refTokens = tokens[0].value as any[];
-      
-      const hasDot = refTokens.some(token => token.type === 'operator' && token.value === '.');
-      const hasBrackets = refTokens.some(token => 
-        token.type === 'punctuation' && 
-        (token.value === '[' || token.value === ']')
+
+      const hasDot = refTokens.some((token) => token.type === 'operator' && token.value === '.');
+      const hasBrackets = refTokens.some(
+        (token) => token.type === 'punctuation' && (token.value === '[' || token.value === ']'),
       );
-      const hasIdentifiers = refTokens.some(token => token.type === 'identifier');
-      
+      const hasIdentifiers = refTokens.some((token) => token.type === 'identifier');
+
       expect(hasDot).toBe(true);
       expect(hasBrackets).toBe(true);
       expect(hasIdentifiers).toBe(true);
-      
-      const identifierWithSpecialChars = refTokens.find(token => 
-        token.type === 'identifier' && 
-        typeof token.value === 'string' && 
-        /[@?]/.test(token.value)
+
+      const identifierWithSpecialChars = refTokens.find(
+        (token) =>
+          token.type === 'identifier' &&
+          typeof token.value === 'string' &&
+          /[@?]/.test(token.value),
       );
-      
+
       expect(identifierWithSpecialChars).toBeDefined();
     });
   });

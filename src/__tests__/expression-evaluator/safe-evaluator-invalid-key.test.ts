@@ -28,7 +28,7 @@ describe('SafeExpressionEvaluator Invalid Key Coverage', () => {
       expect(() => {
         evaluator.evaluate('{ 1 + 2: "value" }', {});
       }).toThrow(ExpressionError);
-      
+
       expect(() => {
         evaluator.evaluate('{ 1 + 2: "value" }', {});
       }).toThrow('Invalid object literal: invalid key');
@@ -39,21 +39,21 @@ describe('SafeExpressionEvaluator Invalid Key Coverage', () => {
       expect(() => {
         evaluator.evaluate('{ a b: "value" }', {});
       }).toThrow(ExpressionError);
-      
+
       expect(() => {
         evaluator.evaluate('{ a b: "value" }', {});
       }).toThrow('Invalid object literal: invalid key');
     });
-    
+
     it('throws an error for object with invalid key expressions', () => {
       // Test with various invalid key expressions
       expect(() => {
         evaluator.evaluate('{ (a + b): "value" }', {});
       }).toThrow('Invalid object literal: invalid key');
-      
+
       expect(() => {
         evaluator.evaluate('{ "a" "b": "value" }', {});
       }).toThrow('Invalid object literal: invalid key');
     });
   });
-}); 
+});

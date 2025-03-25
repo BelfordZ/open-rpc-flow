@@ -15,10 +15,10 @@ describe('Tokenizer Lines 238-239 Analysis', () => {
    * This test demonstrates that lines 238-239 in tokenizer.ts are part of the character handling in
    * the handleReference function. These lines specifically handle adding ordinary text characters to
    * the textBuffer when none of the special character conditions are met.
-   * 
+   *
    * The core issue is these lines handle the general case for non-special characters, but the test coverage
    * is showing them as untested even though many tests pass through this path. This could be due to how
-   * Istanbul instruments the code - when there are multiple consecutive statements on separate lines that 
+   * Istanbul instruments the code - when there are multiple consecutive statements on separate lines that
    * don't have any branching, sometimes only the first statement gets marked as covered.
    */
   it('demonstrates character accumulation in references', () => {
@@ -55,7 +55,7 @@ describe('Tokenizer Lines 238-239 Analysis', () => {
     expect(result2[0].type).toBe('reference');
     expect(result2[0].value[0].type).toBe('identifier');
     expect(result2[0].value[0].value).toBe('_abc123');
-    
+
     // A more complex reference with operators that require the buffer to be flushed
     const result3 = tokenize('${a.b}', logger);
     expect(result3[0].type).toBe('reference');
@@ -67,14 +67,14 @@ describe('Tokenizer Lines 238-239 Analysis', () => {
     expect(result3[0].value[2].type).toBe('identifier');
     expect(result3[0].value[2].value).toBe('b');
   });
-  
+
   /**
    * Conclusion: Lines 238-239 are essential to the operation of the tokenizer and are executed
    * whenever a non-special character is encountered in a reference. While coverage tools may not
    * mark these lines as covered due to instrumentation details, they are functional and used.
-   * 
+   *
    * In general, there are limitations to 100% line coverage in complex parsers like this, where
    * some error paths or edge cases may be theoretically reachable but practically difficult to
    * test without extensive modifications to the code structure specifically for testing purposes.
    */
-}); 
+});

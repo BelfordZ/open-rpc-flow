@@ -1,0 +1,42 @@
+/**
+ * Categories of errors that can occur in the flow
+ */
+export enum ErrorCategory {
+  VALIDATION = 'VALIDATION',
+  EXECUTION = 'EXECUTION',
+  TIMEOUT = 'TIMEOUT',
+  STATE = 'STATE',
+  SYSTEM = 'SYSTEM',
+}
+
+/**
+ * Specific error codes for different types of errors
+ */
+export enum ErrorCode {
+  // Validation errors
+  VALIDATION_ERROR = 'VALIDATION_ERROR',
+  INVALID_INPUT = 'INVALID_INPUT',
+  SCHEMA_VALIDATION = 'SCHEMA_VALIDATION',
+  TYPE_ERROR = 'TYPE_ERROR',
+
+  // Execution errors
+  EXECUTION_ERROR = 'EXECUTION_ERROR',
+  RUNTIME_ERROR = 'RUNTIME_ERROR',
+  NETWORK_ERROR = 'NETWORK_ERROR',
+  RESOURCE_ERROR = 'RESOURCE_ERROR',
+  MAX_RETRIES_EXCEEDED = 'MAX_RETRIES_EXCEEDED',
+
+  // Timeout errors
+  TIMEOUT_ERROR = 'TIMEOUT_ERROR',
+  OPERATION_TIMEOUT = 'OPERATION_TIMEOUT',
+  DEADLINE_EXCEEDED = 'DEADLINE_EXCEEDED',
+
+  // State errors
+  STATE_ERROR = 'STATE_ERROR',
+  INVALID_STATE = 'INVALID_STATE',
+  MISSING_DEPENDENCY = 'MISSING_DEPENDENCY',
+
+  // System errors
+  INTERNAL_ERROR = 'INTERNAL_ERROR',
+  CONFIG_ERROR = 'CONFIG_ERROR',
+}

@@ -56,7 +56,7 @@ export class FlowExecutor {
 
     // Initialize step executors in order of specificity
     this.stepExecutors = [
-      new RequestStepExecutor(jsonRpcHandler, this.logger),
+      new RequestStepExecutor(this.jsonRpcHandler, this.logger),
       new LoopStepExecutor(this.executeStep.bind(this), this.logger),
       new ConditionStepExecutor(this.executeStep.bind(this), this.logger),
       new TransformStepExecutor(

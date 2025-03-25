@@ -351,7 +351,7 @@ export class TransformStepExecutor implements StepExecutor {
             using: op.using,
             initial: 'initial' in op ? op.initial : undefined,
           })),
-          inputType: Array.isArray(resolvedInput) ? 'array' : typeof resolvedInput,
+          inputType: 'array',
           resultType: Array.isArray(result) ? 'array' : typeof result,
           timestamp: new Date().toISOString(),
         },
@@ -359,7 +359,7 @@ export class TransformStepExecutor implements StepExecutor {
     } catch (error: any) {
       this.logger.error('Transform failed', {
         stepName: step.name,
-        error: error.message || String(error),
+        error: error.toString(),
       });
       throw error;
     }

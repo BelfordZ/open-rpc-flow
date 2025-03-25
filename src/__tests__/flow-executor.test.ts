@@ -1,14 +1,12 @@
 import { FlowExecutor } from '../flow-executor';
 import { Flow } from '../types';
-import { defaultLogger, noLogger } from '../util/logger';
+import { TestLogger } from '../util/logger';
 import { TransformStepExecutor } from '../step-executors/transform-executor';
-
-// spy on defaultLogger
-const defaultLoggerSpy = jest.spyOn(defaultLogger, 'createNested');
 
 describe('FlowExecutor', () => {
   let executor: FlowExecutor;
   let jsonRpcHandler: jest.Mock;
+  let testLogger: TestLogger;
 
   beforeEach(() => {
     jsonRpcHandler = jest.fn();
@@ -17,7 +15,12 @@ describe('FlowExecutor', () => {
       description: 'Test flow for unit tests',
       steps: [],
     };
-    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
+    testLogger = new TestLogger('FlowExecutorTest');
+    executor = new FlowExecutor(flow, jsonRpcHandler, testLogger);
+  });
+
+  afterEach(() => {
+    testLogger.clear();
   });
 
   it('uses the default logger if not provided', async () => {
@@ -39,8 +42,8 @@ describe('FlowExecutor', () => {
     executor = new FlowExecutor(flow, jsonRpcHandler);
     await executor.execute();
 
-    // expect defaultLogger to have been used
-    expect(defaultLoggerSpy).toHaveBeenCalled();
+    // expect testLogger to have captured logs
+    expect(testLogger.getLogs().length).toBeGreaterThan(0);
   });
 
   it('executes a simple request step', async () => {
@@ -59,7 +62,7 @@ describe('FlowExecutor', () => {
     };
 
     jsonRpcHandler.mockResolvedValue({ success: true });
-    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
+    executor = new FlowExecutor(flow, jsonRpcHandler, testLogger);
     const results = await executor.execute();
 
     expect(results.get('get_data').result).toEqual({ success: true });
@@ -97,7 +100,7 @@ describe('FlowExecutor', () => {
     };
 
     jsonRpcHandler.mockResolvedValue({ success: true });
-    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
+    executor = new FlowExecutor(flow, jsonRpcHandler, testLogger);
     const results = await executor.execute();
 
     const loopResult = results.get('process_items');
@@ -137,7 +140,7 @@ describe('FlowExecutor', () => {
     };
 
     jsonRpcHandler.mockResolvedValue({ success: true });
-    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
+    executor = new FlowExecutor(flow, jsonRpcHandler, testLogger);
     const results = await executor.execute();
 
     const conditionResult = results.get('check_condition');
@@ -176,7 +179,7 @@ describe('FlowExecutor', () => {
       ],
     };
 
-    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
+    executor = new FlowExecutor(flow, jsonRpcHandler, testLogger);
     const results = await executor.execute();
 
     const transformResult = results.get('transform_data').result;
@@ -201,7 +204,7 @@ describe('FlowExecutor', () => {
     };
 
     jsonRpcHandler.mockRejectedValue(new Error('Test error'));
-    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
+    executor = new FlowExecutor(flow, jsonRpcHandler, testLogger);
     await expect(executor.execute()).rejects.toThrow('Test error');
   });
 
@@ -232,7 +235,7 @@ describe('FlowExecutor', () => {
       ],
     };
 
-    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
+    executor = new FlowExecutor(flow, jsonRpcHandler, testLogger);
     await expect(executor.execute()).rejects.toThrow(
       'Failed to execute step error_step: Custom error without message',
     );
@@ -258,7 +261,7 @@ describe('FlowExecutor', () => {
       ],
     };
 
-    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
+    executor = new FlowExecutor(flow, jsonRpcHandler, testLogger);
     await expect(executor.execute()).rejects.toThrow('No executor found for step unknown_step');
   });
 
@@ -287,7 +290,7 @@ describe('FlowExecutor', () => {
     };
 
     jsonRpcHandler.mockResolvedValue({ success: true });
-    executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
+    executor = new FlowExecutor(flow, jsonRpcHandler, testLogger);
     const results = await executor.execute();
 
     const conditionResult = results.get('check_condition');

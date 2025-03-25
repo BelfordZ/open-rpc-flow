@@ -1,5 +1,6 @@
 import { RequestStepExecutor } from '../../step-executors';
 import { StepExecutionContext, Step } from '../../types';
+import { JsonRpcRequestError } from '../../step-executors/types';
 import { createMockContext } from '../test-utils';
 import { noLogger } from '../../util/logger';
 
@@ -313,6 +314,31 @@ describe('RequestStepExecutor', () => {
     // The error should be rethrown as-is, not wrapped in another error
     await expect(executor.execute(step, context)).rejects.toThrow(
       'Failed to execute request step "jsonRpcError": Kaboom',
+    );
+  });
+
+  it('rethrows JsonRpcRequestError as-is', async () => {
+    const step: RequestStep = {
+      name: 'jsonRpcRequestError',
+      request: {
+        method: 'test.method',
+        params: {},
+      },
+    };
+
+    // Create a JsonRpcRequestError instance
+    const jsonRpcRequestError = new JsonRpcRequestError('JSON-RPC error occurred', {
+      code: -32000,
+      message: 'Internal error',
+    });
+
+    jsonRpcHandler.mockRejectedValue(jsonRpcRequestError);
+
+    // The JsonRpcRequestError should be rethrown as-is, not wrapped
+    await expect(executor.execute(step, context)).rejects.toThrow(jsonRpcRequestError);
+    // Make sure it doesn't wrap the error in another error message
+    await expect(executor.execute(step, context)).rejects.not.toThrow(
+      'Failed to execute request step',
     );
   });
 });

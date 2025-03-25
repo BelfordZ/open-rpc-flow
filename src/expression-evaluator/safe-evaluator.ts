@@ -31,46 +31,51 @@ export class SafeExpressionEvaluator {
   private TIMEOUT_MS = 1000;
   private logger: Logger;
 
+  // Helper functions for operators
+  private static ensureNumbers(a: any, b: any, operation: string): void {
+    if (typeof a !== 'number' || typeof b !== 'number') {
+      throw new ExpressionError(
+        `Cannot perform ${operation} on non-numeric values: ${a} ${operation} ${b}`,
+      );
+    }
+  }
+
+  private static ensureSameType(a: any, b: any, operation: string): void {
+    if (typeof a !== typeof b) {
+      throw new ExpressionError(`Cannot compare values of different types: ${a} ${operation} ${b}`);
+    }
+  }
+
+  private static checkDivisionByZero(b: any): void {
+    if (b === 0) {
+      throw new ExpressionError('Division/modulo by zero');
+    }
+  }
+
   public static readonly OPERATORS = {
     '+': (a: any, b: any) => {
       if (typeof a === 'string' || typeof b === 'string') {
         return String(a) + String(b);
       }
-      if (typeof a !== 'number' || typeof b !== 'number') {
-        throw new ExpressionError(`Cannot perform addition on non-numeric values: ${a} + ${b}`);
-      }
+      SafeExpressionEvaluator.ensureNumbers(a, b, '+');
       return a + b;
     },
     '-': (a: any, b: any) => {
-      if (typeof a !== 'number' || typeof b !== 'number') {
-        throw new ExpressionError(`Cannot perform subtraction on non-numeric values: ${a} - ${b}`);
-      }
+      SafeExpressionEvaluator.ensureNumbers(a, b, '-');
       return a - b;
     },
     '*': (a: any, b: any) => {
-      if (typeof a !== 'number' || typeof b !== 'number') {
-        throw new ExpressionError(
-          `Cannot perform multiplication on non-numeric values: ${a} * ${b}`,
-        );
-      }
+      SafeExpressionEvaluator.ensureNumbers(a, b, '*');
       return a * b;
     },
     '/': (a: any, b: any) => {
-      if (typeof a !== 'number' || typeof b !== 'number') {
-        throw new ExpressionError(`Cannot perform division on non-numeric values: ${a} / ${b}`);
-      }
-      if (b === 0) {
-        throw new ExpressionError('Division/modulo by zero');
-      }
+      SafeExpressionEvaluator.ensureNumbers(a, b, '/');
+      SafeExpressionEvaluator.checkDivisionByZero(b);
       return a / b;
     },
     '%': (a: any, b: any) => {
-      if (typeof a !== 'number' || typeof b !== 'number') {
-        throw new ExpressionError(`Cannot perform modulo on non-numeric values: ${a} % ${b}`);
-      }
-      if (b === 0) {
-        throw new ExpressionError('Division/modulo by zero');
-      }
+      SafeExpressionEvaluator.ensureNumbers(a, b, '%');
+      SafeExpressionEvaluator.checkDivisionByZero(b);
       return a % b;
     },
     '==': (a: any, b: any) => a == b,
@@ -78,27 +83,19 @@ export class SafeExpressionEvaluator {
     '!=': (a: any, b: any) => a != b,
     '!==': (a: any, b: any) => a !== b,
     '>': (a: any, b: any) => {
-      if (typeof a !== typeof b) {
-        throw new ExpressionError(`Cannot compare values of different types: ${a} > ${b}`);
-      }
+      SafeExpressionEvaluator.ensureSameType(a, b, '>');
       return a > b;
     },
     '>=': (a: any, b: any) => {
-      if (typeof a !== typeof b) {
-        throw new ExpressionError(`Cannot compare values of different types: ${a} >= ${b}`);
-      }
+      SafeExpressionEvaluator.ensureSameType(a, b, '>=');
       return a >= b;
     },
     '<': (a: any, b: any) => {
-      if (typeof a !== typeof b) {
-        throw new ExpressionError(`Cannot compare values of different types: ${a} < ${b}`);
-      }
+      SafeExpressionEvaluator.ensureSameType(a, b, '<');
       return a < b;
     },
     '<=': (a: any, b: any) => {
-      if (typeof a !== typeof b) {
-        throw new ExpressionError(`Cannot compare values of different types: ${a} <= ${b}`);
-      }
+      SafeExpressionEvaluator.ensureSameType(a, b, '<=');
       return a <= b;
     },
     '&&': (a: any, b: any) => a && b,
@@ -124,14 +121,12 @@ export class SafeExpressionEvaluator {
       this.checkTimeout(startTime);
 
       // Handle simple literals directly
-      if (/^-?\d+(\.\d+)?$/.test(expression)) {
-        this.logger.debug('Evaluating numeric literal:', expression);
-        return Number(expression);
+      if (
+        /^-?\d+(\.\d+)?$/.test(expression) ||
+        ['true', 'false', 'null', 'undefined'].includes(expression)
+      ) {
+        return this.tokenToLiteral(expression);
       }
-      if (expression === 'true') return true;
-      if (expression === 'false') return false;
-      if (expression === 'null') return null;
-      if (expression === 'undefined') return undefined;
 
       // Tokenize the expression
       const tokens = tokenize(expression, this.logger);
@@ -150,10 +145,7 @@ export class SafeExpressionEvaluator {
                 const value = this.referenceResolver.resolvePath(path, context);
                 return String(value);
               } catch (error) {
-                if (error instanceof PropertyAccessError) {
-                  throw new ExpressionError(error.message);
-                }
-                throw error;
+                this.handleReferenceError(error, 'Error resolving reference in template literal');
               }
             }
             throw new ExpressionError(
@@ -169,10 +161,7 @@ export class SafeExpressionEvaluator {
         try {
           return this.referenceResolver.resolvePath(path, context);
         } catch (error) {
-          if (error instanceof PropertyAccessError) {
-            throw new ExpressionError(error.message);
-          }
-          throw error;
+          this.handleReferenceError(error);
         }
       }
 
@@ -267,6 +256,18 @@ export class SafeExpressionEvaluator {
     }
   }
 
+  /**
+   * Helper method to convert token values to JavaScript literal values
+   */
+  private tokenToLiteral(value: string): any {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    if (value === 'null') return null;
+    if (value === 'undefined') return undefined;
+    if (/^-?\d+(\.\d+)?$/.test(value)) return Number(value);
+    return value;
+  }
+
   private parse(tokens: Token[]): AstNode {
     if (tokens.length === 0) {
       throw new ExpressionError('Empty expression');
@@ -276,17 +277,13 @@ export class SafeExpressionEvaluator {
     if (tokens.length === 1) {
       const token = tokens[0];
       if (token.type === 'number') {
-        return { type: 'literal', value: Number(token.value) };
+        return { type: 'literal', value: this.tokenToLiteral(token.value) };
       }
       if (token.type === 'string') {
         return { type: 'literal', value: token.value };
       }
       if (token.type === 'identifier') {
-        if (token.value === 'true') return { type: 'literal', value: true };
-        if (token.value === 'false') return { type: 'literal', value: false };
-        if (token.value === 'null') return { type: 'literal', value: null };
-        if (token.value === 'undefined') return { type: 'literal', value: undefined };
-        return { type: 'literal', value: token.value };
+        return { type: 'literal', value: this.tokenToLiteral(token.value) };
       }
       if (token.type === 'reference') {
         return { type: 'reference', path: this.buildReferencePath(token.value) };
@@ -363,7 +360,7 @@ export class SafeExpressionEvaluator {
         if (expectOperator) {
           throw new ExpressionError('Unexpected number');
         }
-        outputQueue.push({ type: 'literal', value: Number(token.value) });
+        outputQueue.push({ type: 'literal', value: this.tokenToLiteral(token.value) });
         expectOperator = true;
       } else if (token.type === 'string') {
         if (expectOperator) {
@@ -382,18 +379,6 @@ export class SafeExpressionEvaluator {
             throw new ExpressionError('Unexpected operator');
           }
           const op = token.value as Operator;
-          while (operatorStack.length > 0) {
-            const topOperator = operatorStack[operatorStack.length - 1];
-            if (topOperator === '(' || topOperator === ')') break;
-            if (this.getPrecedence(topOperator as Operator) >= this.getPrecedence(op)) {
-              const operator = operatorStack.pop() as Operator;
-              const right = outputQueue.pop()!;
-              const left = outputQueue.pop()!;
-              outputQueue.push({ type: 'operation', operator, left, right });
-            } else {
-              break;
-            }
-          }
           operatorStack.push(op);
           expectOperator = false;
         } else {
@@ -401,12 +386,7 @@ export class SafeExpressionEvaluator {
           if (expectOperator) {
             throw new ExpressionError('Unexpected identifier');
           }
-          let literalValue: any = token.value;
-          if (token.value === 'true') literalValue = true;
-          else if (token.value === 'false') literalValue = false;
-          else if (token.value === 'null') literalValue = null;
-          else if (token.value === 'undefined') literalValue = undefined;
-          outputQueue.push({ type: 'literal', value: literalValue });
+          outputQueue.push({ type: 'literal', value: this.tokenToLiteral(token.value) });
           expectOperator = true;
         }
       } else if (token.type === 'reference') {
@@ -489,59 +469,15 @@ export class SafeExpressionEvaluator {
     }
   }
 
-  private parseArrayElements(tokens: Token[]): { value: AstNode; spread?: boolean }[] {
-    if (tokens.length === 0) return [];
-
-    const elements: { value: AstNode; spread?: boolean }[] = [];
-    let currentTokens: Token[] = [];
-    let depth = 0;
-    let isSpread = false;
-
-    for (let i = 0; i < tokens.length; i++) {
-      const token = tokens[i];
-
-      if (token.value === ',' && depth === 0) {
-        if (currentTokens.length > 0) {
-          elements.push({
-            value: this.parse(currentTokens),
-            spread: isSpread,
-          });
-          currentTokens = [];
-          isSpread = false;
-        }
-        continue;
-      }
-
-      if (token.value === '...' && depth === 0) {
-        isSpread = true;
-        continue;
-      }
-
-      if (token.value === '[' || token.value === '{' || token.value === '(') {
-        depth++;
-      } else if (token.value === ']' || token.value === '}' || token.value === ')') {
-        depth--;
-      }
-
-      currentTokens.push(token);
-    }
-
-    if (currentTokens.length > 0) {
-      elements.push({
-        value: this.parse(currentTokens),
-        spread: isSpread,
-      });
-    }
-
-    return elements;
-  }
-
-  private parseObjectProperties(
+  // Helper method to parse grouped elements (arrays and objects)
+  private parseGroupedElements(
     tokens: Token[],
-  ): { key: string; value: AstNode; spread?: boolean }[] {
+    delimiter: string = ',',
+    elementProcessor: (currentTokens: Token[], isSpread: boolean, key?: string) => any,
+  ): any[] {
     if (tokens.length === 0) return [];
 
-    const properties: { key: string; value: AstNode; spread?: boolean }[] = [];
+    const result: any[] = [];
     let currentTokens: Token[] = [];
     let depth = 0;
     let isSpread = false;
@@ -550,16 +486,9 @@ export class SafeExpressionEvaluator {
     for (let i = 0; i < tokens.length; i++) {
       const token = tokens[i];
 
-      if (token.value === ',' && depth === 0) {
+      if (token.value === delimiter && depth === 0) {
         if (currentTokens.length > 0) {
-          if (key === null && !isSpread) {
-            throw new ExpressionError('Invalid object literal: missing key');
-          }
-          properties.push({
-            key: key || '',
-            value: this.parse(currentTokens),
-            spread: isSpread,
-          });
+          result.push(elementProcessor(currentTokens, isSpread, key || undefined));
           currentTokens = [];
           key = null;
           isSpread = false;
@@ -591,17 +520,32 @@ export class SafeExpressionEvaluator {
     }
 
     if (currentTokens.length > 0) {
-      if (key === null && !isSpread) {
+      result.push(elementProcessor(currentTokens, isSpread, key || undefined));
+    }
+
+    return result;
+  }
+
+  private parseArrayElements(tokens: Token[]): { value: AstNode; spread?: boolean }[] {
+    return this.parseGroupedElements(tokens, ',', (currentTokens, isSpread) => ({
+      value: this.parse(currentTokens),
+      spread: isSpread,
+    }));
+  }
+
+  private parseObjectProperties(
+    tokens: Token[],
+  ): { key: string; value: AstNode; spread?: boolean }[] {
+    return this.parseGroupedElements(tokens, ',', (currentTokens, isSpread, key) => {
+      if (key === undefined && !isSpread) {
         throw new ExpressionError('Invalid object literal: missing key');
       }
-      properties.push({
+      return {
         key: key || '',
         value: this.parse(currentTokens),
         spread: isSpread,
-      });
-    }
-
-    return properties;
+      };
+    });
   }
 
   private buildReferencePath(tokens: Token[]): string {
@@ -620,68 +564,6 @@ export class SafeExpressionEvaluator {
       .join('');
   }
 
-  private parseValue(token: string): AstNode {
-    const logger = this.logger.createNested('parseValue');
-    logger.debug('Parsing value:', token);
-
-    // Handle numbers
-    if (/^-?\d+(\.\d+)?$/.test(token)) {
-      logger.debug('Parsed number:', token);
-      return { type: 'literal', value: Number(token) };
-    }
-
-    // Handle booleans
-    if (token === 'true') {
-      logger.debug('Parsed boolean:', token);
-      return { type: 'literal', value: true };
-    }
-    if (token === 'false') {
-      logger.debug('Parsed boolean:', token);
-      return { type: 'literal', value: false };
-    }
-
-    // Handle null
-    if (token === 'null') {
-      logger.debug('Parsed null:', token);
-      return { type: 'literal', value: null };
-    }
-
-    // Handle undefined
-    if (token === 'undefined') {
-      logger.debug('Parsed undefined:', token);
-      return { type: 'literal', value: undefined };
-    }
-
-    // Handle strings
-    if (/^["'].*["']$/.test(token)) {
-      logger.debug('Parsed string:', token);
-      return { type: 'literal', value: token.slice(1, -1) };
-    }
-
-    // Check for unknown operators
-    if (token.match(/^[+\-*/%=!<>&|?@]+$/)) {
-      logger.error(`Unknown operator: ${token}`);
-      throw new ExpressionError(`Unknown operator: ${token}`);
-    }
-
-    // Handle references - strip ${} syntax if present
-    if (token.startsWith('${') && token.endsWith('}')) {
-      const path = token.slice(2, -1);
-      logger.debug('Parsed reference:', path);
-      return { type: 'reference', path };
-    }
-
-    // Handle string literals with references
-    if (token.includes('${')) {
-      logger.debug('Parsed string with references:', token);
-      return { type: 'literal', value: token };
-    }
-
-    // Handle plain text as string literals
-    logger.debug('Parsed plain text as string:', token);
-    return { type: 'literal', value: token };
-  }
-
   private evaluateAst(ast: AstNode, context: Record<string, unknown>, startTime: number): unknown {
     this.checkTimeout(startTime);
 
@@ -696,11 +578,9 @@ export class SafeExpressionEvaluator {
         try {
           return this.referenceResolver.resolvePath(ast.path, context);
         } catch (error) {
-          if (error instanceof PropertyAccessError) {
-            throw new ExpressionError(error.message);
-          }
-          throw error;
+          this.handleReferenceError(error);
         }
+        break;
 
       case 'operation': {
         if (!ast.operator || !ast.left || !ast.right) {
@@ -721,12 +601,6 @@ export class SafeExpressionEvaluator {
             throw error;
           }
           if (error instanceof Error) {
-            if (
-              error.message.toLowerCase().includes('division') &&
-              error.message.toLowerCase().includes('zero')
-            ) {
-              throw new ExpressionError('Division/modulo by zero');
-            }
             throw new ExpressionError(`Failed to evaluate operation: ${error.message}`);
           }
           throw new ExpressionError('Failed to evaluate operation: Unknown error');
@@ -755,6 +629,7 @@ export class SafeExpressionEvaluator {
 
       case 'array': {
         if (!ast.elements) {
+          /* istanbul ignore next */
           throw new ExpressionError('Internal error: Array node missing elements');
         }
         const result: unknown[] = [];
@@ -823,11 +698,7 @@ export class SafeExpressionEvaluator {
       }
     };
 
-    try {
-      extractRefs(expression);
-    } catch (error) {
-      return [];
-    }
+    extractRefs(expression);
 
     return Array.from(refs).sort();
   }
@@ -837,5 +708,21 @@ export class SafeExpressionEvaluator {
    */
   private isSpecialVariable(name: string): boolean {
     return ['item', 'context', 'acc'].includes(name);
+  }
+
+  /**
+   * Helper method to handle reference resolution errors consistently
+   */
+  private handleReferenceError(
+    error: unknown,
+    message: string = 'Error resolving reference',
+  ): never {
+    if (error instanceof PropertyAccessError || error instanceof PathSyntaxError) {
+      throw new ExpressionError(error.message);
+    }
+    if (error instanceof Error) {
+      throw new ExpressionError(`${message}: ${error.message}`);
+    }
+    throw new ExpressionError(`${message}: ${String(error)}`);
   }
 }

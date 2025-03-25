@@ -1,12 +1,13 @@
-import { Flow, Step, DependencyGraph, DependencyNode } from './types';
-import { Logger } from './util/logger';
+import { Flow, Step, DependencyGraph, DependencyNode } from '../types';
+import { Logger } from '../util/logger';
 import {
   isLoopStep,
   isRequestStep,
   isConditionStep,
   isTransformStep,
-} from './step-executors/types';
-import { SafeExpressionEvaluator } from './expression-evaluator/safe-evaluator';
+} from '../step-executors/types';
+import { SafeExpressionEvaluator } from '../expression-evaluator/safe-evaluator';
+import { StepNotFoundError, UnknownDependencyError, CircularDependencyError } from './errors';
 
 export class DependencyResolver {
   private logger: Logger;
@@ -25,8 +26,9 @@ export class DependencyResolver {
    * Get the execution order for all steps in the flow
    */
   getExecutionOrder(): Step[] {
-    this.logger.debug('Getting execution order');
-    const graph = this.buildDependencyGraph();
+    const logger = this.logger.createNested('getExecutionOrder');
+    logger.debug('Getting execution order');
+    const graph = this.buildDependencyGraph(logger);
     return this.topologicalSort(graph);
   }
 
@@ -34,11 +36,17 @@ export class DependencyResolver {
    * Get all dependencies for a given step
    */
   getDependencies(stepName: string): string[] {
-    this.logger.debug(`Getting dependencies for step: ${stepName}`);
-    const graph = this.buildDependencyGraph();
+    const logger = this.logger.createNested(`getDependencies: ${stepName}`);
+    logger.debug(`Getting dependencies for step: ${stepName}`);
+    const graph = this.buildDependencyGraph(logger);
     const deps = graph.get(stepName);
     if (!deps) {
-      throw new Error(`Step '${stepName}' not found in dependency graph`);
+      const availableSteps = Array.from(graph.keys());
+      throw new StepNotFoundError(
+        `Step '${stepName}' not found in dependency graph`,
+        stepName,
+        availableSteps,
+      );
     }
     return Array.from(deps);
   }
@@ -47,8 +55,9 @@ export class DependencyResolver {
    * Get all steps that depend on a given step
    */
   getDependents(stepName: string): string[] {
-    this.logger.debug(`Getting dependents for step: ${stepName}`);
-    const graph = this.buildDependencyGraph();
+    const logger = this.logger.createNested(`getDependents: ${stepName}`);
+    logger.debug(`Getting dependents for step: ${stepName}`);
+    const graph = this.buildDependencyGraph(logger);
     const dependents: string[] = [];
 
     for (const [step, deps] of graph.entries()) {
@@ -63,8 +72,9 @@ export class DependencyResolver {
   /**
    * Build a dependency graph for all steps in the flow
    */
-  private buildDependencyGraph(): Map<string, Set<string>> {
-    this.logger.debug('Building dependency graph');
+  private buildDependencyGraph(parentLogger: Logger): Map<string, Set<string>> {
+    const logger = parentLogger.createNested('buildDependencyGraph');
+    logger.debug('Building dependency graph');
     const graph = new Map<string, Set<string>>();
 
     // Initialize graph with all steps
@@ -72,12 +82,20 @@ export class DependencyResolver {
       graph.set(step.name, new Set());
     }
 
+    logger.debug(`Initialized graph with ${graph.size} steps`);
+
     // Add dependencies for each step
     for (const step of this.flow.steps) {
-      const deps = this.findStepDependencies(step);
+      const deps = this.findStepDependencies(step, logger);
       for (const dep of deps) {
         if (!graph.has(dep)) {
-          throw new Error(`Step '${step.name}' depends on unknown step '${dep}'`);
+          const availableSteps = Array.from(graph.keys());
+          throw new UnknownDependencyError(
+            `Step '${step.name}' depends on unknown step '${dep}'`,
+            step.name,
+            dep,
+            availableSteps,
+          );
         }
         graph.get(step.name)?.add(dep);
       }
@@ -90,12 +108,13 @@ export class DependencyResolver {
   /**
    * Find all dependencies for a step
    */
-  private findStepDependencies(step: Step): string[] {
-    this.logger.debug(`Finding dependencies for step: ${step.name}`);
+  private findStepDependencies(step: Step, parentLogger: Logger): string[] {
+    const logger = parentLogger.createNested(`findStepDependencies: ${step.name}`);
     const deps = new Set<string>();
 
     // Extract references from loop steps
     if (isLoopStep(step)) {
+      logger.debug('handling loop step');
       // Add dependencies from the loop's "over" expression
       this.extractReferences(step.loop.over).forEach((dep) => deps.add(dep));
 
@@ -110,7 +129,7 @@ export class DependencyResolver {
 
         // Process the loop's step
         if (step.loop.step) {
-          this.findStepDependencies(step.loop.step).forEach((dep) => deps.add(dep));
+          this.findStepDependencies(step.loop.step, logger).forEach((dep) => deps.add(dep));
         }
 
         // Remove the loop variable from loopVars
@@ -123,7 +142,7 @@ export class DependencyResolver {
           this.loopVars.add(loopVar);
 
           // Find dependencies in the loop step
-          this.findStepDependencies(step.loop.step).forEach((dep) => deps.add(dep));
+          this.findStepDependencies(step.loop.step, logger).forEach((dep) => deps.add(dep));
 
           // Remove the loop variable from loopVars
           this.loopVars.delete(loopVar);
@@ -132,13 +151,14 @@ export class DependencyResolver {
 
       // Process the loop's steps if present
       if (step.loop.steps) {
+        logger.debug('handling loop steps');
         // Add the loop variable to loopVars temporarily
         const loopVar = step.loop.as;
         this.loopVars.add(loopVar);
 
         // Find dependencies in each step
         for (const subStep of step.loop.steps) {
-          this.findStepDependencies(subStep).forEach((dep) => deps.add(dep));
+          this.findStepDependencies(subStep, logger).forEach((dep) => deps.add(dep));
         }
 
         // Remove the loop variable from loopVars
@@ -148,17 +168,19 @@ export class DependencyResolver {
 
     // Extract references from condition steps
     if (isConditionStep(step)) {
+      logger.debug('handling condition step');
       this.extractReferences(step.condition.if).forEach((dep) => deps.add(dep));
       if (step.condition.then) {
-        this.findStepDependencies(step.condition.then).forEach((dep) => deps.add(dep));
+        this.findStepDependencies(step.condition.then, logger).forEach((dep) => deps.add(dep));
       }
       if (step.condition.else) {
-        this.findStepDependencies(step.condition.else).forEach((dep) => deps.add(dep));
+        this.findStepDependencies(step.condition.else, logger).forEach((dep) => deps.add(dep));
       }
     }
 
     // Extract references from request steps
     if (isRequestStep(step)) {
+      logger.debug('handling request step');
       const params = step.request.params;
       for (const value of Object.values(params)) {
         if (typeof value === 'string') {
@@ -169,6 +191,7 @@ export class DependencyResolver {
 
     // Extract references from transform steps
     if (isTransformStep(step)) {
+      logger.debug('handling transform step');
       if (typeof step.transform.input === 'string') {
         this.extractReferences(step.transform.input).forEach((dep) => deps.add(dep));
       }
@@ -199,7 +222,7 @@ export class DependencyResolver {
       }
     }
 
-    this.logger.debug(`Found dependencies: ${Array.from(deps).join(', ')}`);
+    logger.debug(`Found dependencies: ${Array.from(deps).join(', ')}`);
     return Array.from(deps);
   }
 
@@ -221,17 +244,22 @@ export class DependencyResolver {
     const temp = new Set<string>();
     const order: string[] = [];
 
-    const visit = (node: string) => {
+    const visit = (node: string, path: string[] = []) => {
       if (temp.has(node)) {
-        throw new Error(`Circular dependency detected: ${node}`);
+        const cycle = [...path.slice(path.indexOf(node)), node];
+        throw new CircularDependencyError(
+          `Circular dependency detected: ${cycle.join(' → ')}`,
+          cycle,
+        );
       }
       if (visited.has(node)) {
         return;
       }
       temp.add(node);
+      path.push(node);
       const deps = graph.get(node) || new Set();
       for (const dep of deps) {
-        visit(dep);
+        visit(dep, [...path]);
       }
       temp.delete(node);
       visited.add(node);
@@ -254,14 +282,16 @@ export class DependencyResolver {
    * Get a UI-friendly representation of the dependency graph
    */
   getDependencyGraph(): DependencyGraph {
-    this.logger.debug('Getting dependency graph representation');
-    const graph = this.buildDependencyGraph();
+    const logger = this.logger.createNested('getDependencyGraph');
+    const graph = this.buildDependencyGraph(logger);
+
     const nodes: DependencyNode[] = [];
     const edges: Array<{ from: string; to: string }> = [];
 
     // Create nodes
     for (const step of this.flow.steps) {
-      const dependencies = Array.from(graph.get(step.name) || []);
+      const deps = graph.get(step.name) as Set<string>;
+      const dependencies = Array.from(deps);
       const dependents = this.getDependents(step.name);
 
       // Determine step type

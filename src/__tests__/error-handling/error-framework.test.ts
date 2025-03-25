@@ -19,7 +19,7 @@ describe('Error Framework', () => {
   });
 
   afterEach(() => {
-    testLogger.print();
+    //testLogger.print();
     testLogger.clear();
   });
 

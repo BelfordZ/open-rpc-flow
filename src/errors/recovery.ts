@@ -109,21 +109,9 @@ export class RetryableOperation<T> {
       }
     }
 
-    this.logger.debug('Unexpected end of retry loop', {
-      attempt,
-      maxAttempts: this.policy.maxAttempts,
-      lastError: lastError?.message,
-    });
-    throw new ExecutionError(
-      'Max retry attempts exceeded',
-      {
-        code: ErrorCode.MAX_RETRIES_EXCEEDED,
-        attempts: attempt,
-        lastError: lastError?.message || 'Unknown error',
-        policy: this.policy,
-      },
-      lastError,
-    );
+
+    /* istanbul ignore next */
+    throw new Error('unreachable code')
   }
 
   /**

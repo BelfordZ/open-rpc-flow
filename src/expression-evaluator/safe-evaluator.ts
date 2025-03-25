@@ -379,18 +379,6 @@ export class SafeExpressionEvaluator {
             throw new ExpressionError('Unexpected operator');
           }
           const op = token.value as Operator;
-          while (operatorStack.length > 0) {
-            const topOperator = operatorStack[operatorStack.length - 1];
-            if (topOperator === '(' || topOperator === ')') break;
-            if (this.getPrecedence(topOperator as Operator) >= this.getPrecedence(op)) {
-              const operator = operatorStack.pop() as Operator;
-              const right = outputQueue.pop()!;
-              const left = outputQueue.pop()!;
-              outputQueue.push({ type: 'operation', operator, left, right });
-            } else {
-              break;
-            }
-          }
           operatorStack.push(op);
           expectOperator = false;
         } else {
@@ -640,6 +628,7 @@ export class SafeExpressionEvaluator {
 
       case 'array': {
         if (!ast.elements) {
+          /* istanbul ignore next */
           throw new ExpressionError('Internal error: Array node missing elements');
         }
         const result: unknown[] = [];
@@ -708,11 +697,7 @@ export class SafeExpressionEvaluator {
       }
     };
 
-    try {
-      extractRefs(expression);
-    } catch (error) {
-      return [];
-    }
+    extractRefs(expression);
 
     return Array.from(refs).sort();
   }

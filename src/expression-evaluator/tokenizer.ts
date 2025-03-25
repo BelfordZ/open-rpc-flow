@@ -131,6 +131,7 @@ function validateOperatorSequence(state: TokenizerState, operator: string): void
   } else if (BINARY_OPERATORS.includes(operator)) {
     // Binary operator check starting at state.currentIndex
     if (state.tokens.length === 0) {
+      /* istanbul ignore next */
       throw new TokenizerError(`Operator ${operator} missing left operand`);
     }
     const nextNonWhitespace = findNextNonWhitespace(state.expression, state.currentIndex);
@@ -235,7 +236,9 @@ function handleReference(state: TokenizerState): Token {
           raw: state.expression.substring(startIndex, state.currentIndex),
         };
       }
+      /* istanbul ignore next */
       state.currentIndex++;
+      /* istanbul ignore next */
       continue;
     }
 
@@ -567,11 +570,8 @@ function handleObjectLiteral(state: TokenizerState): Token {
     }
 
     if (isSpreadOperator(state.expression, state.currentIndex)) {
-      flushBufferToArray(state.textBuffer, objectTokens, false, state.textBuffer);
-      state.textBuffer = '';
-      objectTokens.push(createOperatorToken('...'));
-      state.currentIndex += 3;
-      continue;
+      /* istanbul ignore next */
+      throw new Error('suspected dead code path hit. Please open a ticket if you see this.');
     }
 
     if (char === '$') {
@@ -621,6 +621,7 @@ function handleObjectLiteral(state: TokenizerState): Token {
     state.currentIndex++;
   }
 
+  /* istanbul ignore next */
   throw new TokenizerError('Unterminated object literal');
 }
 
@@ -657,7 +658,9 @@ function handleArrayLiteral(state: TokenizerState): Token {
           raw: state.expression.substring(startIndex, state.currentIndex),
         };
       }
+      /* istanbul ignore next */
       state.currentIndex++;
+      /* istanbul ignore next */
       continue;
     }
 

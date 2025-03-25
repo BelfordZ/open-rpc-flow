@@ -473,7 +473,7 @@ describe('SafeExpressionEvaluator Coverage Improvements', () => {
   describe('null reference handling', () => {
     it('handles missing or invalid AST node properties gracefully', () => {
       // Simulate operation with missing properties by directly calling evaluateAst
-      const invalidOp = { type: 'operation' as const };
+      const invalidOp = { type: 'operation' };
       try {
         // @ts-expect-error - intentionally passing invalid ast
         evaluator['evaluateAst'](invalidOp, {}, Date.now());

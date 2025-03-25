@@ -46,6 +46,18 @@ export class RetryableOperation<T> {
         return result;
       } catch (error: unknown) {
         lastError = error instanceof Error ? error : new Error(String(error));
+        
+        // Add detailed debugging
+        if (error instanceof FlowError) {
+          this.logger.debug('Caught FlowError', {
+            code: error.code,
+            codeType: typeof error.code,
+            message: error.message,
+            name: error.name,
+            context: error.context,
+            isFlowError: error instanceof FlowError,
+          });
+        }
 
         this.logger.debug('Operation failed', {
           attempt,
@@ -118,20 +130,42 @@ export class RetryableOperation<T> {
    * Check if an error is retryable based on the policy
    */
   private isRetryable(error: unknown): boolean {
-    this.logger.debug('Checking if error is retryable', {
+    const errorDetails = {
       errorType: error?.constructor?.name,
       errorMessage: error instanceof Error ? error.message : String(error),
       retryableErrors: this.policy.retryableErrors,
-      errorCode:
-        (error instanceof Error && 'context' in error && (error as any).context?.code) || 'unknown',
-    });
+    };
 
-    if (error instanceof Error && 'context' in error && (error as any).context?.code) {
-      const errorCode = (error as any).context.code;
-      const isRetryable = this.policy.retryableErrors.includes(errorCode);
+    // Check by constructor name instead of instanceof
+    if (error && typeof error === 'object' && error.constructor && 
+        (error.constructor.name === 'FlowError' || 
+         error.constructor.name === 'ExecutionError' ||
+         error.constructor.name === 'ValidationError' ||
+         error.constructor.name === 'TimeoutError' ||
+         error.constructor.name === 'StateError')) {
+      
+      // We know it's a FlowError-like object, so access properties accordingly
+      const flowError = error as any;
+      const errorCode = flowError.code;
+
+      this.logger.debug('Checking if error is retryable', {
+        ...errorDetails,
+        errorCode,
+        errorCodeType: typeof errorCode,
+      });
+
+      // Convert both sides to strings before comparing
+      const errorCodeStr = String(errorCode);
+      
+      // Compare each retryable error with the error code using string comparison
+      const isRetryable = this.policy.retryableErrors.some(
+        retryableError => String(retryableError) === errorCodeStr
+      );
 
       this.logger.debug('Retryable check result', {
         errorCode,
+        errorCodeAsString: errorCodeStr,
+        retryableErrorsAsStrings: this.policy.retryableErrors.map(e => String(e)),
         isRetryable,
         errorType: error.constructor.name,
       });
@@ -139,10 +173,7 @@ export class RetryableOperation<T> {
       return isRetryable;
     }
 
-    this.logger.debug('Error is not retryable', {
-      errorType: error?.constructor?.name,
-      errorMessage: error instanceof Error ? error.message : String(error),
-    });
+    this.logger.debug('Error is not retryable', errorDetails);
     return false;
   }
 

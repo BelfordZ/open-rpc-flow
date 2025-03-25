@@ -6,7 +6,7 @@ import { ErrorCode } from './codes';
 export class FlowError extends Error {
   constructor(
     message: string,
-    public readonly code: string,
+    public readonly code: ErrorCode,
     public readonly context: Record<string, any>,
     public readonly cause?: Error,
   ) {
@@ -19,7 +19,7 @@ export class FlowError extends Error {
     }
 
     // Set up the prototype chain for instanceof checks
-    Object.setPrototypeOf(this, Object.getPrototypeOf(this.constructor.prototype));
+    Object.setPrototypeOf(this, FlowError.prototype);
   }
 }
 

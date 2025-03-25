@@ -49,9 +49,9 @@ describe('DependencyResolver - Loop Steps with Conditions', () => {
               name: 'processUser',
               request: {
                 method: 'user.process',
-                params: { 
+                params: {
                   id: '${user.id}',
-                  action: '${getFlag} ? "full" : "partial"' 
+                  action: '${getFlag} ? "full" : "partial"',
                 },
               },
             },
@@ -61,22 +61,22 @@ describe('DependencyResolver - Loop Steps with Conditions', () => {
     };
 
     const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
-    
+
     // Test getDependencies for the loop step
     const dependencies = resolver.getDependencies('processUsers');
-    
+
     // Verify dependencies from the loop
     expect(dependencies).toContain('getUsers');
-    
+
     // Verify dependencies from the condition
     expect(dependencies).toContain('getFlag');
-    
+
     // Make sure we don't include loop variables as dependencies
     expect(dependencies).not.toContain('user');
-    
+
     // Test the dependency graph
     const graph = resolver.getDependencyGraph();
-    
+
     // Verify nodes
     expect(graph.nodes).toHaveLength(3);
     expect(graph.nodes).toEqual(
@@ -101,7 +101,7 @@ describe('DependencyResolver - Loop Steps with Conditions', () => {
         },
       ]),
     );
-    
+
     // Verify edges
     expect(graph.edges).toContainEqual({ from: 'getUsers', to: 'processUsers' });
     expect(graph.edges).toContainEqual({ from: 'getFlag', to: 'processUsers' });
@@ -157,14 +157,14 @@ describe('DependencyResolver - Loop Steps with Conditions', () => {
     };
 
     const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
-    
+
     // Test getDependencies for the processData step
     const dependencies = resolver.getDependencies('processData');
-    
+
     // Verify dependencies
     expect(dependencies).toEqual(expect.arrayContaining(['getData', 'getConfig', 'getSettings']));
-    
+
     // Verify that loop variables are not included
     expect(dependencies).not.toContain('item');
   });
-}); 
+});

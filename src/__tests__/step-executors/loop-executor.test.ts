@@ -614,7 +614,7 @@ describe('LoopStepExecutor', () => {
 
     // The loop executor should handle this gracefully and use 'Unknown error'
     await expect(executor.execute(step, context)).rejects.toThrow(
-      'Failed to execute loop step "processItems": Unknown error'
+      'Failed to execute loop step "processItems": Unknown error',
     );
   });
 

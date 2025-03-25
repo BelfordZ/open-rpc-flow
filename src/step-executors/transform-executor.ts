@@ -359,7 +359,7 @@ export class TransformStepExecutor implements StepExecutor {
     } catch (error: any) {
       this.logger.error('Transform failed', {
         stepName: step.name,
-        error: error.toString()
+        error: error.toString(),
       });
       throw error;
     }

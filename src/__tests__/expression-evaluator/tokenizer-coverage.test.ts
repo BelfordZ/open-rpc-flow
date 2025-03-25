@@ -30,14 +30,12 @@ describe('Tokenizer Coverage Improvements', () => {
 
   describe('empty expressions', () => {
     it('throws error for empty string', () => {
-      expect(() => tokenize('', logger)).toThrow(
-        new TokenizerError('Expression cannot be empty')
-      );
+      expect(() => tokenize('', logger)).toThrow(new TokenizerError('Expression cannot be empty'));
     });
 
     it('throws error for whitespace-only string', () => {
       expect(() => tokenize('   ', logger)).toThrow(
-        new TokenizerError('Expression cannot be empty')
+        new TokenizerError('Expression cannot be empty'),
       );
     });
   });
@@ -45,28 +43,22 @@ describe('Tokenizer Coverage Improvements', () => {
   describe('string literals with escape sequences', () => {
     it('tokenizes strings with escaped quotes', () => {
       const result = tokenize('"Hello\\"World"', logger);
-      expect(result).toEqual([
-        { type: 'string', value: 'Hello"World', raw: '"Hello\\"World"' }
-      ]);
+      expect(result).toEqual([{ type: 'string', value: 'Hello"World', raw: '"Hello\\"World"' }]);
     });
 
     it('tokenizes strings with escaped backslashes', () => {
       const result = tokenize('"Hello\\\\World"', logger);
-      expect(result).toEqual([
-        { type: 'string', value: 'Hello\\World', raw: '"Hello\\\\World"' }
-      ]);
+      expect(result).toEqual([{ type: 'string', value: 'Hello\\World', raw: '"Hello\\\\World"' }]);
     });
 
     it('handles single backslash in string', () => {
       const result = tokenize('"Hello\\World"', logger);
-      expect(result).toEqual([
-        { type: 'string', value: 'Hello\\World', raw: '"Hello\\World"' }
-      ]);
+      expect(result).toEqual([{ type: 'string', value: 'Hello\\World', raw: '"Hello\\World"' }]);
     });
 
     it('throws error for unterminated string literal', () => {
       expect(() => tokenize('"Hello', logger)).toThrow(
-        new TokenizerError('Unterminated string literal')
+        new TokenizerError('Unterminated string literal'),
       );
     });
   });
@@ -75,21 +67,19 @@ describe('Tokenizer Coverage Improvements', () => {
     it('tokenizes template literals with escaped expressions', () => {
       const result = tokenize('`Hello \\${world}`', logger);
       expect(result).toEqual([
-        { type: 'string', value: 'Hello ${world}', raw: 'Hello \\${world}' }
+        { type: 'string', value: 'Hello ${world}', raw: 'Hello \\${world}' },
       ]);
     });
 
     it('tokenizes template literals with escaped backticks', () => {
       const result = tokenize('`Hello \\` World`', logger);
-      expect(result).toEqual([
-        { type: 'string', value: 'Hello ` World', raw: 'Hello \\` World' }
-      ]);
+      expect(result).toEqual([{ type: 'string', value: 'Hello ` World', raw: 'Hello \\` World' }]);
     });
 
     it('tokenizes template literals with escaped backslashes', () => {
       const result = tokenize('`Hello \\\\ World`', logger);
       expect(result).toEqual([
-        { type: 'string', value: 'Hello \\ World', raw: 'Hello \\\\ World' }
+        { type: 'string', value: 'Hello \\ World', raw: 'Hello \\\\ World' },
       ]);
     });
 
@@ -100,9 +90,7 @@ describe('Tokenizer Coverage Improvements', () => {
 
   describe('reference handling', () => {
     it('throws error for unterminated reference', () => {
-      expect(() => tokenize('${foo', logger)).toThrow(
-        new TokenizerError('Unterminated reference')
-      );
+      expect(() => tokenize('${foo', logger)).toThrow(new TokenizerError('Unterminated reference'));
     });
 
     it('handles nested references correctly', () => {
@@ -253,4 +241,4 @@ describe('Tokenizer Coverage Improvements', () => {
       ]);
     });
   });
-}); 
+});

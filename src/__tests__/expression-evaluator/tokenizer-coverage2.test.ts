@@ -77,15 +77,21 @@ describe('Tokenizer Additional Coverage', () => {
       expect(result[0].type).toBe('object_literal');
       // Check the structure contains the expected elements
       const objectElements = result[0].value as Token[];
-      expect(objectElements.some((el: Token) => el.type === 'string' && el.value === 'key')).toBe(true);
-      expect(objectElements.some((el: Token) => el.type === 'punctuation' && el.value === ':')).toBe(true);
+      expect(objectElements.some((el: Token) => el.type === 'string' && el.value === 'key')).toBe(
+        true,
+      );
+      expect(
+        objectElements.some((el: Token) => el.type === 'punctuation' && el.value === ':'),
+      ).toBe(true);
       expect(objectElements.some((el: Token) => el.type === 'reference')).toBe(true);
     });
 
     it('handles object literals with complex expressions as values', () => {
       const result = tokenize('{ key: ${value1 + value2} }', logger);
       expect(result[0].type).toBe('object_literal');
-      const referenceFound = (result[0].value as Token[]).some((el: Token) => el.type === 'reference');
+      const referenceFound = (result[0].value as Token[]).some(
+        (el: Token) => el.type === 'reference',
+      );
       expect(referenceFound).toBe(true);
     });
 
@@ -149,4 +155,4 @@ describe('Tokenizer Additional Coverage', () => {
       expect(values.some((v: Token) => v.type === 'number' && v.value === 2)).toBe(true);
     });
   });
-}); 
+});

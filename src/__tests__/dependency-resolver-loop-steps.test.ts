@@ -49,8 +49,8 @@ describe('DependencyResolver - Loop Steps with Multiple SubSteps', () => {
                 name: 'validateUser',
                 request: {
                   method: 'user.validate',
-                  params: { 
-                    id: '${user.id}' 
+                  params: {
+                    id: '${user.id}',
                   },
                 },
               },
@@ -58,9 +58,9 @@ describe('DependencyResolver - Loop Steps with Multiple SubSteps', () => {
                 name: 'checkPermissions',
                 request: {
                   method: 'user.checkPermissions',
-                  params: { 
+                  params: {
                     userId: '${user.id}',
-                    permissions: '${getPermissions}'
+                    permissions: '${getPermissions}',
                   },
                 },
               },
@@ -68,15 +68,15 @@ describe('DependencyResolver - Loop Steps with Multiple SubSteps', () => {
                 name: 'logActivity',
                 request: {
                   method: 'log.activity',
-                  params: { 
+                  params: {
                     action: 'user_processed',
                     details: {
                       userId: '${user.id}',
-                      timestamp: Date.now()
-                    }
+                      timestamp: Date.now(),
+                    },
                   },
                 },
-              }
+              },
             ],
           },
         },
@@ -84,22 +84,22 @@ describe('DependencyResolver - Loop Steps with Multiple SubSteps', () => {
     };
 
     const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
-    
+
     // Test getDependencies for the loop step
     const dependencies = resolver.getDependencies('processUsers');
-    
+
     // Verify dependencies from the loop's "over" expression
     expect(dependencies).toContain('getUsers');
-    
+
     // Verify dependencies from the loop's substeps
     expect(dependencies).toContain('getPermissions');
-    
+
     // Make sure we don't include loop variables as dependencies
     expect(dependencies).not.toContain('user');
-    
+
     // Test the dependency graph
     const graph = resolver.getDependencyGraph();
-    
+
     // Verify nodes
     expect(graph.nodes).toHaveLength(3);
     expect(graph.nodes).toEqual(
@@ -124,7 +124,7 @@ describe('DependencyResolver - Loop Steps with Multiple SubSteps', () => {
         },
       ]),
     );
-    
+
     // Verify edges
     expect(graph.edges).toContainEqual({ from: 'getUsers', to: 'processUsers' });
     expect(graph.edges).toContainEqual({ from: 'getPermissions', to: 'processUsers' });
@@ -154,7 +154,7 @@ describe('DependencyResolver - Loop Steps with Multiple SubSteps', () => {
           request: {
             method: 'templates.get',
             params: {
-              configId: '${getConfig.id}'
+              configId: '${getConfig.id}',
             },
           },
         },
@@ -171,10 +171,10 @@ describe('DependencyResolver - Loop Steps with Multiple SubSteps', () => {
                   operations: [
                     {
                       type: 'map',
-                      using: '{ ...${item}, configVersion: ${getConfig.version} }'
-                    }
-                  ]
-                }
+                      using: '{ ...${item}, configVersion: ${getConfig.version} }',
+                    },
+                  ],
+                },
               },
               {
                 name: 'renderTemplate',
@@ -182,37 +182,39 @@ describe('DependencyResolver - Loop Steps with Multiple SubSteps', () => {
                   method: 'template.render',
                   params: {
                     templateId: '${getTemplates[${item.type}].id}',
-                    data: '${item}'
-                  }
-                }
-              }
-            ]
-          }
-        }
-      ]
+                    data: '${item}',
+                  },
+                },
+              },
+            ],
+          },
+        },
+      ],
     };
 
     const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
-    
+
     // Test that all dependencies are correctly identified
     const dependencies = resolver.getDependencies('processItems');
-    
+
     expect(dependencies).toContain('getData');
     expect(dependencies).toContain('getConfig');
     expect(dependencies).toContain('getTemplates');
-    
+
     // Verify the dependency tree is correct
     expect(resolver.getDependencies('getTemplates')).toContain('getConfig');
-    
+
     // The dependency graph should reflect this correctly
     const graph = resolver.getDependencyGraph();
-    
+
     // Verify the ordering in the graph
-    const templateNode = graph.nodes.find(node => node.name === 'getTemplates');
+    const templateNode = graph.nodes.find((node) => node.name === 'getTemplates');
     expect(templateNode?.dependencies).toContain('getConfig');
-    
+
     // Check that processItems depends on all necessary steps
-    const processNode = graph.nodes.find(node => node.name === 'processItems');
-    expect(processNode?.dependencies).toEqual(expect.arrayContaining(['getData', 'getConfig', 'getTemplates']));
+    const processNode = graph.nodes.find((node) => node.name === 'processItems');
+    expect(processNode?.dependencies).toEqual(
+      expect.arrayContaining(['getData', 'getConfig', 'getTemplates']),
+    );
   });
-}); 
+});

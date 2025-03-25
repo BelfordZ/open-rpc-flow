@@ -186,12 +186,12 @@ function flushBufferToArray(
   textBuffer: string,
   tokensArray: Token[],
   inBraces: boolean = false,
-  rawText: string = textBuffer
+  rawText: string = textBuffer,
 ): void {
   if (!textBuffer || textBuffer.trim() === '') {
     return;
   }
-  
+
   tokensArray.push(createTokenFromContent(textBuffer, inBraces, rawText));
 }
 
@@ -200,9 +200,7 @@ function flushBufferToArray(
  */
 function isTemplateExpression(expression: string, index: number): boolean {
   return (
-    expression[index] === '$' &&
-    index + 1 < expression.length &&
-    expression[index + 1] === '{'
+    expression[index] === '$' && index + 1 < expression.length && expression[index + 1] === '{'
   );
 }
 
@@ -866,27 +864,31 @@ function tokenizeExpression(expression: string, logger: Logger): Token[] {
  * Utility function to create a token based on text content
  * Handles common pattern of determining token type from content
  */
-function createTokenFromContent(text: string, inBraces: boolean = false, rawText: string = text): Token {
+function createTokenFromContent(
+  text: string,
+  inBraces: boolean = false,
+  rawText: string = text,
+): Token {
   const trimmedText = text.trim();
-  
+
   // Determine token type based on content
   if (/^-?\d+(\.\d+)?$/.test(trimmedText)) {
     return {
       type: 'number',
       value: Number(trimmedText),
-      raw: rawText
+      raw: rawText,
     };
   } else if (inBraces) {
     return {
       type: 'string',
       value: text,
-      raw: rawText
+      raw: rawText,
     };
   } else {
     return {
       type: 'identifier',
       value: trimmedText,
-      raw: rawText
+      raw: rawText,
     };
   }
 }
@@ -896,7 +898,7 @@ function createOperatorToken(operator: string): Token {
   return {
     type: 'operator',
     value: operator,
-    raw: operator
+    raw: operator,
   };
 }
 
@@ -905,6 +907,6 @@ function createPunctuationToken(value: string): Token {
   return {
     type: 'punctuation',
     value,
-    raw: value
+    raw: value,
   };
 }

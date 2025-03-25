@@ -338,7 +338,7 @@ describe('RequestStepExecutor', () => {
     await expect(executor.execute(step, context)).rejects.toThrow(jsonRpcRequestError);
     // Make sure it doesn't wrap the error in another error message
     await expect(executor.execute(step, context)).rejects.not.toThrow(
-      'Failed to execute request step'
+      'Failed to execute request step',
     );
   });
 });

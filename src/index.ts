@@ -1,5 +1,10 @@
 export { Flow, Step, JsonRpcRequest } from './types';
-export { FlowExecutor } from './flow-executor';
+export {
+  FlowExecutor,
+  FlowExecutorOptions,
+  DEFAULT_RETRY_POLICY,
+  DEFAULT_CIRCUIT_BREAKER_CONFIG,
+} from './flow-executor';
 export { SafeExpressionEvaluator } from './expression-evaluator/safe-evaluator';
 export {
   ReferenceResolver,
@@ -23,5 +28,32 @@ export {
   UnknownDependencyError,
   CircularDependencyError,
 } from './dependency-resolver';
+export {
+  FlowExecutorEvents,
+  FlowEventType,
+  FlowEvent,
+  FlowStartEvent,
+  FlowCompleteEvent,
+  FlowErrorEvent,
+  StepStartEvent,
+  StepCompleteEvent,
+  StepErrorEvent,
+  StepSkipEvent,
+  DependencyResolvedEvent,
+  FlowEventOptions,
+} from './util/flow-executor-events';
+
+// Export error handling related types
+export {
+  FlowError,
+  ExecutionError,
+  ValidationError,
+  TimeoutError,
+  StateError,
+} from './errors/base';
+export { ErrorCode, ErrorCategory } from './errors/codes';
+export { RetryPolicy, RetryableOperation } from './errors/recovery';
+export { CircuitBreaker, CircuitBreakerConfig } from './errors/circuit-breaker';
+
 import metaSchemaContent from '../meta-schema.json';
 export const metaSchema = metaSchemaContent;

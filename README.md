@@ -446,6 +446,211 @@ try {
 }
 ```
 
+### Advanced Error Handling
+
+The flow engine provides comprehensive error handling capabilities, including retry policies, timeouts, and circuit breakers to build resilient workflows.
+
+#### Error Types
+
+The engine uses a hierarchical error model for different error categories:
+
+```typescript
+import { FlowError, ExecutionError, ValidationError, TimeoutError, StateError } from '@open-rpc/flow';
+
+// All errors inherit from FlowError
+if (error instanceof FlowError) {
+  console.log('Flow error code:', error.code);
+  console.log('Error context:', error.context);
+}
+
+// Specific error types
+if (error instanceof ExecutionError) {
+  // Handle execution errors (runtime, network, etc.)
+} else if (error instanceof ValidationError) {
+  // Handle validation errors (schema, input validation)
+} else if (error instanceof TimeoutError) {
+  // Handle timeout errors
+} else if (error instanceof StateError) {
+  // Handle state errors (invalid state, missing dependencies)
+}
+```
+
+#### Configuring Error Handling Features
+
+The FlowExecutor can be configured with retry policies and circuit breakers to automatically handle transient errors:
+
+```typescript
+import { 
+  FlowExecutor, 
+  ErrorCode, 
+  DEFAULT_RETRY_POLICY,
+  DEFAULT_CIRCUIT_BREAKER_CONFIG 
+} from '@open-rpc/flow';
+
+// Create a flow executor with error handling options
+const executor = new FlowExecutor(flow, jsonRpcHandler, {
+  // Enable automatic retries for request steps
+  enableRetries: true,
+  // Use custom retry policy (or use DEFAULT_RETRY_POLICY)
+  retryPolicy: {
+    maxAttempts: 3,
+    backoff: {
+      initial: 100,  // Initial delay in ms
+      multiplier: 2, // Exponential multiplier
+      maxDelay: 5000 // Maximum delay in ms
+    },
+    retryableErrors: [
+      ErrorCode.NETWORK_ERROR,
+      ErrorCode.TIMEOUT_ERROR
+    ]
+  },
+  
+  // Enable circuit breaker for request steps
+  enableCircuitBreaker: true,
+  // Use custom circuit breaker config (or use DEFAULT_CIRCUIT_BREAKER_CONFIG)
+  circuitBreakerConfig: {
+    failureThreshold: 5,   // Number of failures before opening circuit
+    recoveryTime: 30000,   // Time in ms to wait before attempting recovery
+    monitorWindow: 60000   // Time window for failure evaluation
+  }
+});
+```
+
+#### Dynamic Error Handling Updates
+
+You can update error handling options at runtime:
+
+```typescript
+// Update error handling options during execution
+executor.updateErrorHandlingOptions({
+  enableRetries: true,
+  retryPolicy: {
+    maxAttempts: 5,         // Increase max attempts
+    backoff: {
+      initial: 200,         // Change initial delay
+      multiplier: 1.5,      // Change multiplier
+      maxDelay: 10000       // Change max delay
+    },
+    retryableErrors: [
+      ErrorCode.NETWORK_ERROR,
+      ErrorCode.TIMEOUT_ERROR,
+      ErrorCode.RESOURCE_ERROR  // Add additional retryable errors
+    ]
+  },
+  enableCircuitBreaker: false  // Disable circuit breaker if needed
+});
+```
+
+#### Retry Policies
+
+Configure retry behavior for transient errors using retry policies:
+
+```typescript
+import { RetryableOperation, ErrorCode } from '@open-rpc/flow';
+
+// Define a retry policy
+const retryPolicy = {
+  maxAttempts: 3,
+  backoff: {
+    initial: 100,  // Initial delay in ms
+    multiplier: 2, // Exponential multiplier
+    maxDelay: 5000 // Maximum delay in ms
+  },
+  retryableErrors: [
+    ErrorCode.NETWORK_ERROR,
+    ErrorCode.TIMEOUT_ERROR,
+    ErrorCode.OPERATION_TIMEOUT
+  ]
+};
+
+// Create a retryable operation
+const operation = new RetryableOperation(
+  async () => {
+    // Your operation that might fail
+    return await jsonRpcHandler(request);
+  },
+  retryPolicy,
+  logger
+);
+
+// Execute with automatic retries
+try {
+  const result = await operation.execute();
+} catch (error) {
+  // This will only be thrown after all retry attempts fail
+  console.error('All retry attempts failed:', error);
+}
+```
+
+#### Circuit Breakers
+
+Prevent cascading failures in your workflows with circuit breaker patterns:
+
+```typescript
+import { CircuitBreaker } from '@open-rpc/flow';
+
+// Configure a circuit breaker
+const circuitBreaker = new CircuitBreaker({
+  failureThreshold: 5,   // Number of failures before opening circuit
+  recoveryTime: 30000,   // Time in ms to wait before attempting recovery
+  monitorWindow: 60000   // Time window for failure evaluation
+}, logger);
+
+// Execute an operation with circuit breaker protection
+try {
+  const result = await circuitBreaker.execute(async () => {
+    // Your operation that might fail
+    return await jsonRpcHandler(request);
+  });
+} catch (error) {
+  if (error instanceof StateError && error.code === 'INVALID_STATE') {
+    console.error('Circuit breaker is open, failing fast');
+  } else {
+    console.error('Operation failed:', error);
+  }
+}
+```
+
+#### Expression Timeouts
+
+The expression evaluator has built-in timeout protection to prevent long-running expressions:
+
+```typescript
+// Default timeout is 1000ms
+const evaluator = new SafeExpressionEvaluator(logger);
+
+try {
+  // This would timeout if expression is too complex
+  const result = evaluator.evaluate('${complexCalculation(data)}', context);
+} catch (error) {
+  if (error instanceof ExpressionError && error.message.includes('timed out')) {
+    console.error('Expression evaluation timed out');
+  }
+}
+```
+
+#### Error Events
+
+You can listen for error events during flow execution:
+
+```typescript
+import { FlowExecutor, FlowEventType } from '@open-rpc/flow';
+
+const executor = new FlowExecutor(flow, jsonRpcHandler);
+
+// Listen for flow-level errors
+executor.events.on(FlowEventType.FLOW_ERROR, (event) => {
+  console.error(`Flow error in ${event.flowName}:`, event.error);
+  console.log(`Execution time before error: ${event.duration}ms`);
+});
+
+// Listen for step-level errors
+executor.events.on(FlowEventType.STEP_ERROR, (event) => {
+  console.error(`Step error in ${event.stepName}:`, event.error);
+  console.log(`Step execution time before error: ${event.duration}ms`);
+});
+```
+
 ## Event Emitter Interface
 
 The flow executor includes an event emitter that allows you to receive real-time updates during flow execution. This is useful for monitoring progress, logging, and integrating with external systems.

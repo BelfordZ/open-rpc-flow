@@ -13,7 +13,36 @@ import {
   StepType,
 } from './step-executors';
 import { Logger, defaultLogger } from './util/logger';
-import { FlowExecutorEvents, FlowEventOptions } from './util/flow-executor-events';
+import { FlowExecutorEvents, FlowEventOptions, DEFAULT_EVENT_OPTIONS } from './util/flow-executor-events';
+import { RetryPolicy } from './errors/recovery';
+import { CircuitBreakerConfig } from './errors/circuit-breaker';
+import { ErrorCode } from './errors/codes';
+
+/**
+ * Default retry policy
+ */
+export const DEFAULT_RETRY_POLICY: RetryPolicy = {
+  maxAttempts: 3,
+  backoff: {
+    initial: 100,
+    multiplier: 2,
+    maxDelay: 5000
+  },
+  retryableErrors: [
+    ErrorCode.NETWORK_ERROR,
+    ErrorCode.TIMEOUT_ERROR,
+    ErrorCode.OPERATION_TIMEOUT
+  ]
+};
+
+/**
+ * Default circuit breaker configuration
+ */
+export const DEFAULT_CIRCUIT_BREAKER_CONFIG: CircuitBreakerConfig = {
+  failureThreshold: 5,
+  recoveryTime: 30000,
+  monitorWindow: 60000
+};
 
 /**
  * Options for the FlowExecutor
@@ -23,6 +52,14 @@ export interface FlowExecutorOptions {
   logger?: Logger;
   /** Event emitter options */
   eventOptions?: Partial<FlowEventOptions>;
+  /** Retry policy for request steps */
+  retryPolicy?: RetryPolicy;
+  /** Circuit breaker configuration for request steps */
+  circuitBreakerConfig?: CircuitBreakerConfig;
+  /** Whether to enable the circuit breaker */
+  enableCircuitBreaker?: boolean;
+  /** Whether to enable retries */
+  enableRetries?: boolean;
 }
 
 /**
@@ -39,6 +76,10 @@ export class FlowExecutor {
   private executionContext: StepExecutionContext;
   private stepExecutors: StepExecutor[];
   private logger: Logger;
+  private retryPolicy: RetryPolicy | null;
+  private circuitBreakerConfig: CircuitBreakerConfig | null;
+  private enableRetries: boolean;
+  private enableCircuitBreaker: boolean;
 
   constructor(
     private flow: Flow,
@@ -47,7 +88,7 @@ export class FlowExecutor {
   ) {
     // Handle both new options object and legacy logger parameter
     let options: FlowExecutorOptions | undefined;
-
+    
     if (loggerOrOptions instanceof Object && !(loggerOrOptions as Logger).log) {
       // It's an options object
       options = loggerOrOptions as FlowExecutorOptions;
@@ -57,12 +98,26 @@ export class FlowExecutor {
       this.logger = (loggerOrOptions as Logger) || defaultLogger;
       options = { logger: this.logger };
     }
-
+    
     this.context = flow.context || {};
     this.stepResults = new Map();
 
     // Initialize the event emitter
     this.events = new FlowExecutorEvents(options?.eventOptions);
+
+    // Initialize error handling options
+    this.enableRetries = options?.enableRetries ?? false;
+    this.enableCircuitBreaker = options?.enableCircuitBreaker ?? false;
+    
+    // Initialize retry policy if enabled
+    this.retryPolicy = this.enableRetries 
+      ? (options?.retryPolicy || DEFAULT_RETRY_POLICY)
+      : null;
+    
+    // Initialize circuit breaker config if enabled
+    this.circuitBreakerConfig = this.enableCircuitBreaker
+      ? (options?.circuitBreakerConfig || DEFAULT_CIRCUIT_BREAKER_CONFIG)
+      : null;
 
     // Initialize shared execution context
     this.referenceResolver = new ReferenceResolver(this.stepResults, this.context, this.logger);
@@ -83,7 +138,7 @@ export class FlowExecutor {
 
     // Initialize step executors in order of specificity
     this.stepExecutors = [
-      new RequestStepExecutor(this.jsonRpcHandler, this.logger),
+      this.createRequestStepExecutor(),
       new LoopStepExecutor(this.executeStep.bind(this), this.logger),
       new ConditionStepExecutor(this.executeStep.bind(this), this.logger),
       new TransformStepExecutor(
@@ -97,10 +152,67 @@ export class FlowExecutor {
   }
 
   /**
+   * Create a RequestStepExecutor with the current error handling configuration
+   */
+  private createRequestStepExecutor(): RequestStepExecutor {
+    return new RequestStepExecutor(
+      this.jsonRpcHandler,
+      this.logger,
+      this.enableRetries ? this.retryPolicy : null,
+      this.enableCircuitBreaker ? this.circuitBreakerConfig : null
+    );
+  }
+
+  /**
    * Update event emitter options
    */
   updateEventOptions(options: Partial<FlowEventOptions>): void {
     this.events.updateOptions(options);
+  }
+
+  /**
+   * Update error handling options
+   */
+  updateErrorHandlingOptions(options: {
+    retryPolicy?: RetryPolicy;
+    circuitBreakerConfig?: CircuitBreakerConfig;
+    enableRetries?: boolean;
+    enableCircuitBreaker?: boolean;
+  }): void {
+    // Update enable flags if provided
+    if (options.enableRetries !== undefined) {
+      this.enableRetries = options.enableRetries;
+    }
+    
+    if (options.enableCircuitBreaker !== undefined) {
+      this.enableCircuitBreaker = options.enableCircuitBreaker;
+    }
+    
+    // Update retry policy if provided
+    if (options.retryPolicy) {
+      this.retryPolicy = options.retryPolicy;
+    }
+    
+    // Update circuit breaker config if provided
+    if (options.circuitBreakerConfig) {
+      this.circuitBreakerConfig = options.circuitBreakerConfig;
+    }
+
+    // Replace the request step executor with updated options
+    const requestExecutorIndex = this.stepExecutors.findIndex(
+      executor => executor instanceof RequestStepExecutor
+    );
+    
+    if (requestExecutorIndex >= 0) {
+      this.stepExecutors[requestExecutorIndex] = this.createRequestStepExecutor();
+    }
+    
+    this.logger.debug('Updated error handling options', {
+      enableRetries: this.enableRetries,
+      enableCircuitBreaker: this.enableCircuitBreaker,
+      retryPolicy: this.retryPolicy,
+      circuitBreakerConfig: this.circuitBreakerConfig,
+    });
   }
 
   /**

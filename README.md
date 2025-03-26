@@ -430,68 +430,17 @@ The engine supports dynamic expressions using the `${...}` syntax:
 
 ## Error Handling
 
-The engine provides detailed error information and recovery options:
+Flow provides built-in error handling capabilities including automatic retries and circuit breaker patterns for request steps.
+
+##### Retry Configuration
+
+Configure automatic retries for transient errors:
 
 ```typescript
-try {
-  await executor.execute();
-} catch (error) {
-  if (error instanceof JsonRpcRequestError) {
-    // Handle JSON-RPC specific errors
-    console.error('RPC Error:', error.error);
-  } else {
-    // Handle other execution errors
-    console.error('Execution Error:', error.message);
-  }
-}
-```
-
-### Advanced Error Handling
-
-The flow engine provides comprehensive error handling capabilities, including retry policies, timeouts, and circuit breakers to build resilient workflows.
-
-#### Error Types
-
-The engine uses a hierarchical error model for different error categories:
-
-```typescript
-import { FlowError, ExecutionError, ValidationError, TimeoutError, StateError } from '@open-rpc/flow';
-
-// All errors inherit from FlowError
-if (error instanceof FlowError) {
-  console.log('Flow error code:', error.code);
-  console.log('Error context:', error.context);
-}
-
-// Specific error types
-if (error instanceof ExecutionError) {
-  // Handle execution errors (runtime, network, etc.)
-} else if (error instanceof ValidationError) {
-  // Handle validation errors (schema, input validation)
-} else if (error instanceof TimeoutError) {
-  // Handle timeout errors
-} else if (error instanceof StateError) {
-  // Handle state errors (invalid state, missing dependencies)
-}
-```
-
-#### Configuring Error Handling Features
-
-The FlowExecutor can be configured with retry policies and circuit breakers to automatically handle transient errors:
-
-```typescript
-import { 
-  FlowExecutor, 
-  ErrorCode, 
-  DEFAULT_RETRY_POLICY,
-  DEFAULT_CIRCUIT_BREAKER_CONFIG 
-} from '@open-rpc/flow';
-
-// Create a flow executor with error handling options
 const executor = new FlowExecutor(flow, jsonRpcHandler, {
   // Enable automatic retries for request steps
   enableRetries: true,
-  // Use custom retry policy (or use DEFAULT_RETRY_POLICY)
+  // Configure retry behavior (or use DEFAULT_RETRY_POLICY)
   retryPolicy: {
     maxAttempts: 3,
     backoff: {
@@ -503,247 +452,141 @@ const executor = new FlowExecutor(flow, jsonRpcHandler, {
       ErrorCode.NETWORK_ERROR,
       ErrorCode.TIMEOUT_ERROR
     ]
-  },
-  
-  // Enable circuit breaker for request steps
+  }
+});
+```
+
+Retries can be updated at runtime:
+
+```typescript
+// Update retry configuration during execution
+executor.updateErrorHandlingOptions({
+  enableRetries: true,
+  retryPolicy: {
+    maxAttempts: 5,
+    backoff: {
+      initial: 200,
+      multiplier: 1.5,
+      maxDelay: 10000
+    },
+    retryableErrors: [
+      ErrorCode.NETWORK_ERROR,
+      ErrorCode.TIMEOUT_ERROR,
+      ErrorCode.RESOURCE_ERROR
+    ]
+  }
+});
+```
+
+##### Circuit Breaker
+
+Enable circuit breaker protection for request steps:
+
+```typescript
+const executor = new FlowExecutor(flow, jsonRpcHandler, {
+  // Enable circuit breaker
   enableCircuitBreaker: true,
-  // Use custom circuit breaker config (or use DEFAULT_CIRCUIT_BREAKER_CONFIG)
+  // Configure circuit breaker (or use DEFAULT_CIRCUIT_BREAKER_CONFIG)
   circuitBreakerConfig: {
     failureThreshold: 5,   // Number of failures before opening circuit
-    recoveryTime: 30000,   // Time in ms to wait before attempting recovery
+    recoveryTime: 30000,   // Time in ms before attempting recovery
     monitorWindow: 60000   // Time window for failure evaluation
   }
 });
 ```
 
-#### Dynamic Error Handling Updates
+##### Error Events
 
-You can update error handling options at runtime:
-
-```typescript
-// Update error handling options during execution
-executor.updateErrorHandlingOptions({
-  enableRetries: true,
-  retryPolicy: {
-    maxAttempts: 5,         // Increase max attempts
-    backoff: {
-      initial: 200,         // Change initial delay
-      multiplier: 1.5,      // Change multiplier
-      maxDelay: 10000       // Change max delay
-    },
-    retryableErrors: [
-      ErrorCode.NETWORK_ERROR,
-      ErrorCode.TIMEOUT_ERROR,
-      ErrorCode.RESOURCE_ERROR  // Add additional retryable errors
-    ]
-  },
-  enableCircuitBreaker: false  // Disable circuit breaker if needed
-});
-```
-
-#### Retry Policies
-
-Configure retry behavior for transient errors using retry policies:
+Listen for error events during flow execution:
 
 ```typescript
-import { RetryableOperation, ErrorCode } from '@open-rpc/flow';
-
-// Define a retry policy
-const retryPolicy = {
-  maxAttempts: 3,
-  backoff: {
-    initial: 100,  // Initial delay in ms
-    multiplier: 2, // Exponential multiplier
-    maxDelay: 5000 // Maximum delay in ms
-  },
-  retryableErrors: [
-    ErrorCode.NETWORK_ERROR,
-    ErrorCode.TIMEOUT_ERROR,
-    ErrorCode.OPERATION_TIMEOUT
-  ]
-};
-
-// Create a retryable operation
-const operation = new RetryableOperation(
-  async () => {
-    // Your operation that might fail
-    return await jsonRpcHandler(request);
-  },
-  retryPolicy,
-  logger
-);
-
-// Execute with automatic retries
-try {
-  const result = await operation.execute();
-} catch (error) {
-  // This will only be thrown after all retry attempts fail
-  console.error('All retry attempts failed:', error);
-}
-```
-
-#### Circuit Breakers
-
-Prevent cascading failures in your workflows with circuit breaker patterns:
-
-```typescript
-import { CircuitBreaker } from '@open-rpc/flow';
-
-// Configure a circuit breaker
-const circuitBreaker = new CircuitBreaker({
-  failureThreshold: 5,   // Number of failures before opening circuit
-  recoveryTime: 30000,   // Time in ms to wait before attempting recovery
-  monitorWindow: 60000   // Time window for failure evaluation
-}, logger);
-
-// Execute an operation with circuit breaker protection
-try {
-  const result = await circuitBreaker.execute(async () => {
-    // Your operation that might fail
-    return await jsonRpcHandler(request);
-  });
-} catch (error) {
-  if (error instanceof StateError && error.code === 'INVALID_STATE') {
-    console.error('Circuit breaker is open, failing fast');
-  } else {
-    console.error('Operation failed:', error);
-  }
-}
-```
-
-#### Expression Timeouts
-
-The flow engine has built-in protection against expressions that could hang your application, such as infinite recursion or extremely complex operations:
-
-```typescript
-// Flow with a potentially problematic expression
-const flow: Flow = {
-  name: 'Expression Timeout Example',
-  steps: [
-    {
-      name: 'transformData',
-      transform: {
-        input: '[1, 2, 3, 4, 5]',
-        operations: [
-          {
-            type: 'map',
-            // This expression contains recursion without a proper base case,
-            // which would cause a stack overflow if not for the timeout protection
-            using: `
-              (function recursiveCalc(item) {
-                return recursiveCalc(item + 1); // Infinite recursion!
-              })(item)
-            `
-          }
-        ]
-      }
-    }
-  ]
-};
-
-// The engine automatically protects against such problematic expressions
-// If an expression takes longer than the internal timeout (default: 1000ms)
-// an error will be thrown with a timeout message
-try {
-  const executor = new FlowExecutor(flow, jsonRpcHandler);
-  await executor.execute();
-} catch (error) {
-  console.error('Expression evaluation failed:', error.message);
-  // You would see: "Expression evaluation timed out"
-}
-```
-
-**Note:** This timeout protection is built into the flow engine automatically - you don't need to enable or configure it explicitly. It prevents issues like infinite loops, excessive recursion, or highly complex expressions from hanging your application.
-
-Common scenarios that can trigger expression timeouts:
-- Recursive functions without proper termination conditions
-- Excessively deep object traversal
-- Extremely large data structures in expressions
-- Complex regular expressions that can cause catastrophic backtracking
-
-### Multi-Level Timeout Configuration
-
-In the ideal implementation, the flow engine should support timeout configuration at multiple levels:
-
-```typescript
-// Flow with comprehensive timeout configuration
-const flow: Flow = {
-  name: "Data Processing Flow",
-  description: "Process data with custom timeouts",
-  
-  // Flow-level timeouts
-  timeouts: {
-    global: 60000,        // 60s default for all steps in this flow
-    request: 120000,      // 120s for request steps
-    transform: 30000      // 30s for transform steps
-  },
-  
-  steps: [
-    {
-      name: "fetchData",
-      timeout: 180000,    // 180s specific timeout for this step
-      request: {
-        method: "data.fetch",
-        params: { source: "api" }
-      }
-    },
-    {
-      name: "processData",
-      // Uses the flow-level transform timeout (30s)
-      transform: {
-        input: "${fetchData.result}",
-        operations: [
-          // Complex operations...
-        ]
-      }
-    }
-  ]
-};
-
-// Initialize executor with global defaults
 const executor = new FlowExecutor(flow, jsonRpcHandler, {
-  timeouts: {
-    global: 30000,        // 30s global default
-    expression: 2000      // 2s for expression evaluation
+  eventOptions: {
+    emitFlowEvents: true,
+    emitStepEvents: true
   }
 });
-```
-
-The timeout resolution should follow this precedence order:
-1. Step-level timeout (`step.timeout`)
-2. Flow-level type-specific timeout (`flow.timeouts[stepType]`)
-3. Flow-level global timeout (`flow.timeouts.global`) 
-4. Global type-specific timeout from executor options
-5. Global default timeout from executor options
-6. System-level built-in defaults
-
-This multi-level timeout architecture would allow for precise control over execution times, preventing:
-- Runaway processes
-- Excessive resource consumption
-- Deadlocks from unresponsive services
-- Performance degradation from slow operations
-
-#### Error Events
-
-You can listen for error events during flow execution:
-
-```typescript
-import { FlowExecutor, FlowEventType } from '@open-rpc/flow';
-
-const executor = new FlowExecutor(flow, jsonRpcHandler);
 
 // Listen for flow-level errors
-executor.events.on(FlowEventType.FLOW_ERROR, (event) => {
+executor.events.on('flow:error', (event) => {
   console.error(`Flow error in ${event.flowName}:`, event.error);
   console.log(`Execution time before error: ${event.duration}ms`);
 });
 
 // Listen for step-level errors
-executor.events.on(FlowEventType.STEP_ERROR, (event) => {
+executor.events.on('step:error', (event) => {
   console.error(`Step error in ${event.stepName}:`, event.error);
-  console.log(`Step execution time before error: ${event.duration}ms`);
 });
 ```
+
+### Timeout Configuration
+
+Flow provides multi-level timeout configuration to control execution time at various scopes:
+
+#### Step-Level Timeout
+
+Set a timeout for a specific step:
+
+```typescript
+const flow = {
+  name: "MyFlow",
+  steps: [
+    {
+      name: "longRunningStep",
+      timeout: 5000,  // 5 second timeout for this step
+      request: {
+        method: "slowOperation",
+        params: {}
+      }
+    }
+  ]
+};
+```
+
+#### Flow-Level Timeouts
+
+Configure timeouts for all steps of a certain type within a flow:
+
+```typescript
+const flow = {
+  name: "MyFlow",
+  timeouts: {
+    global: 30000,     // 30s default for all steps
+    request: 10000,    // 10s for request steps
+    transform: 5000,   // 5s for transform steps
+    condition: 2000,   // 2s for condition steps
+    loop: 60000,       // 60s for loop steps
+    expression: 1000   // 1s for expression evaluation
+  },
+  steps: [/* ... */]
+};
+```
+
+#### Executor-Level Timeouts
+
+Set default timeouts when creating the executor:
+
+```typescript
+const executor = new FlowExecutor(flow, jsonRpcHandler, {
+  timeouts: {
+    global: 30000,    // 30s default
+    request: 10000,   // 10s for requests
+    transform: 5000   // 5s for transformations
+  }
+});
+```
+
+Timeout resolution follows this precedence order:
+1. Step-level timeout (`step.timeout`)
+2. Flow-level type-specific timeout (`flow.timeouts[stepType]`)
+3. Flow-level global timeout (`flow.timeouts.global`)
+4. Executor-level type-specific timeout
+5. Default timeout for the step type
+
+All timeouts must be:
+- At least 50ms
+- No more than 1 hour (3,600,000ms)
+- A positive integer
 
 ## Event Emitter Interface
 

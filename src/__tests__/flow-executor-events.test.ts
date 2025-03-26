@@ -1,6 +1,7 @@
-import { FlowExecutor, FlowEventType, FlowEventOptions } from '../index';
+import { FlowExecutor, FlowEventType } from '../index';
 import { TestLogger } from '../util/logger';
 import { Flow, JsonRpcRequest } from '../types';
+import { FlowExecutorEvents } from '../util/flow-executor-events';
 
 describe('FlowExecutor Events', () => {
   const simpleFlow: Flow = {
@@ -28,8 +29,8 @@ describe('FlowExecutor Events', () => {
       },
     ],
     context: {
-      items: [{ id: 1 }, { id: 2 }, { id: 3 }]
-    }
+      items: [{ id: 1 }, { id: 2 }, { id: 3 }],
+    },
   };
 
   const mockJsonRpcHandler = async (request: JsonRpcRequest) => {
@@ -42,100 +43,100 @@ describe('FlowExecutor Events', () => {
   test('should emit flow and step events', async () => {
     const logger = new TestLogger();
     const executor = new FlowExecutor(simpleFlow, mockJsonRpcHandler, { logger });
-    
+
     // Event collection
     const events: any[] = [];
-    
+
     // Register event listeners
-    Object.values(FlowEventType).forEach(eventType => {
+    Object.values(FlowEventType).forEach((eventType) => {
       executor.events.on(eventType, (data) => {
         events.push({ type: eventType, data });
       });
     });
-    
+
     // Execute the flow
     await executor.execute();
-    
+
     // Verify that events were emitted
     expect(events.length).toBeGreaterThan(0);
-    
+
     // Verify flow events
-    expect(events.some(e => e.type === FlowEventType.FLOW_START)).toBe(true);
-    expect(events.some(e => e.type === FlowEventType.FLOW_COMPLETE)).toBe(true);
-    
+    expect(events.some((e) => e.type === FlowEventType.FLOW_START)).toBe(true);
+    expect(events.some((e) => e.type === FlowEventType.FLOW_COMPLETE)).toBe(true);
+
     // Verify step events
-    expect(events.filter(e => e.type === FlowEventType.STEP_START).length).toBe(2);
-    expect(events.filter(e => e.type === FlowEventType.STEP_COMPLETE).length).toBe(2);
-    
+    expect(events.filter((e) => e.type === FlowEventType.STEP_START).length).toBe(2);
+    expect(events.filter((e) => e.type === FlowEventType.STEP_COMPLETE).length).toBe(2);
+
     // Verify dependency events (disabled by default)
-    expect(events.some(e => e.type === FlowEventType.DEPENDENCY_RESOLVED)).toBe(false);
+    expect(events.some((e) => e.type === FlowEventType.DEPENDENCY_RESOLVED)).toBe(false);
   });
-  
+
   test('should respect event configuration options', async () => {
     const logger = new TestLogger();
-    const executor = new FlowExecutor(simpleFlow, mockJsonRpcHandler, { 
+    const executor = new FlowExecutor(simpleFlow, mockJsonRpcHandler, {
       logger,
       eventOptions: {
         emitFlowEvents: true,
         emitStepEvents: false,
-      }
+      },
     });
-    
+
     // Event collection
     const events: any[] = [];
-    
+
     // Register event listeners
-    Object.values(FlowEventType).forEach(eventType => {
+    Object.values(FlowEventType).forEach((eventType) => {
       executor.events.on(eventType, (data) => {
         events.push({ type: eventType, data });
       });
     });
-    
+
     // Execute the flow
     await executor.execute();
-    
+
     // Verify that only flow events were emitted
-    expect(events.some(e => e.type === FlowEventType.FLOW_START)).toBe(true);
-    expect(events.some(e => e.type === FlowEventType.FLOW_COMPLETE)).toBe(true);
-    
+    expect(events.some((e) => e.type === FlowEventType.FLOW_START)).toBe(true);
+    expect(events.some((e) => e.type === FlowEventType.FLOW_COMPLETE)).toBe(true);
+
     // Verify no step events were emitted
-    expect(events.some(e => e.type === FlowEventType.STEP_START)).toBe(false);
-    expect(events.some(e => e.type === FlowEventType.STEP_COMPLETE)).toBe(false);
+    expect(events.some((e) => e.type === FlowEventType.STEP_START)).toBe(false);
+    expect(events.some((e) => e.type === FlowEventType.STEP_COMPLETE)).toBe(false);
   });
-  
+
   test('should be able to update event options after initialization', async () => {
     const logger = new TestLogger();
-    const executor = new FlowExecutor(simpleFlow, mockJsonRpcHandler, { 
+    const executor = new FlowExecutor(simpleFlow, mockJsonRpcHandler, {
       logger,
       eventOptions: {
         emitFlowEvents: true,
         emitStepEvents: false,
         emitDependencyEvents: false,
-      }
+      },
     });
-    
+
     // Update options to enable dependency events
     executor.updateEventOptions({
       emitDependencyEvents: true,
     });
-    
+
     // Event collection
     const events: any[] = [];
-    
+
     // Register event listeners
-    Object.values(FlowEventType).forEach(eventType => {
+    Object.values(FlowEventType).forEach((eventType) => {
       executor.events.on(eventType, (data) => {
         events.push({ type: eventType, data });
       });
     });
-    
+
     // Execute the flow
     await executor.execute();
-    
+
     // Verify dependency events are now emitted
-    expect(events.some(e => e.type === FlowEventType.DEPENDENCY_RESOLVED)).toBe(true);
+    expect(events.some((e) => e.type === FlowEventType.DEPENDENCY_RESOLVED)).toBe(true);
   });
-  
+
   test('should handle flow errors correctly', async () => {
     const logger = new TestLogger();
     const flowWithError: Flow = {
@@ -151,81 +152,81 @@ describe('FlowExecutor Events', () => {
         },
       ],
     };
-    
+
     const executor = new FlowExecutor(flowWithError, mockJsonRpcHandler, { logger });
-    
+
     // Event collection
     const errorEvents: any[] = [];
-    
+
     // Register event listeners for errors
     executor.events.on(FlowEventType.FLOW_ERROR, (data) => {
       errorEvents.push({ type: FlowEventType.FLOW_ERROR, data });
     });
-    
+
     executor.events.on(FlowEventType.STEP_ERROR, (data) => {
       errorEvents.push({ type: FlowEventType.STEP_ERROR, data });
     });
-    
+
     // Execute the flow (expect it to throw)
     await expect(executor.execute()).rejects.toThrow();
-    
+
     // Verify error events were emitted
-    expect(errorEvents.some(e => e.type === FlowEventType.FLOW_ERROR)).toBe(true);
-    expect(errorEvents.some(e => e.type === FlowEventType.STEP_ERROR)).toBe(true);
+    expect(errorEvents.some((e) => e.type === FlowEventType.FLOW_ERROR)).toBe(true);
+    expect(errorEvents.some((e) => e.type === FlowEventType.STEP_ERROR)).toBe(true);
   });
 
   test('should support disabling all events', async () => {
     const logger = new TestLogger();
-    const executor = new FlowExecutor(simpleFlow, mockJsonRpcHandler, { 
+    const executor = new FlowExecutor(simpleFlow, mockJsonRpcHandler, {
       logger,
       eventOptions: {
         emitFlowEvents: false,
         emitStepEvents: false,
         emitDependencyEvents: false,
-      }
+      },
     });
-    
+
     // Event collection
     const events: any[] = [];
-    
+
     // Register event listeners
-    Object.values(FlowEventType).forEach(eventType => {
+    Object.values(FlowEventType).forEach((eventType) => {
       executor.events.on(eventType, (data) => {
         events.push({ type: eventType, data });
       });
     });
-    
+
     // Execute the flow
     await executor.execute();
-    
+
     // Verify no events were emitted
     expect(events.length).toBe(0);
   });
 
   test('should emit dependency resolved events when enabled', async () => {
     const logger = new TestLogger();
-    const executor = new FlowExecutor(simpleFlow, mockJsonRpcHandler, { 
+    const executor = new FlowExecutor(simpleFlow, mockJsonRpcHandler, {
       logger,
       eventOptions: {
         emitFlowEvents: false,
         emitStepEvents: false,
         emitDependencyEvents: true,
-      }
+      },
     });
-    
+
     // Event collection
     const events: any[] = [];
-    
+
     // Register event listeners
-    Object.values(FlowEventType).forEach(eventType => {
+    Object.values(FlowEventType).forEach((eventType) => {
       executor.events.on(eventType, (data) => {
         events.push({ type: eventType, data });
       });
     });
-    
+
     // Execute the flow
     await executor.execute();
-    
+
     // Verify only dependency events were emitted
     expect(events.length).toBe(1);
     expect(events[0].type).toBe(FlowEventType.DEPENDENCY_RESOLVED);
@@ -233,25 +234,25 @@ describe('FlowExecutor Events', () => {
 
   test('should include context details when configured', async () => {
     const logger = new TestLogger();
-    const executor = new FlowExecutor(simpleFlow, mockJsonRpcHandler, { 
+    const executor = new FlowExecutor(simpleFlow, mockJsonRpcHandler, {
       logger,
       eventOptions: {
         emitStepEvents: true,
         includeContext: true,
-      }
+      },
     });
-    
+
     // Event collection
     const stepStartEvents: any[] = [];
-    
+
     // Register event listeners
     executor.events.on(FlowEventType.STEP_START, (data) => {
       stepStartEvents.push(data);
     });
-    
+
     // Execute the flow
     await executor.execute();
-    
+
     // Verify context was included in the events
     expect(stepStartEvents.length).toBeGreaterThan(0);
     expect(stepStartEvents[0].context).toBeDefined();
@@ -260,28 +261,28 @@ describe('FlowExecutor Events', () => {
 
   test('should not include result details when configured', async () => {
     const logger = new TestLogger();
-    const executor = new FlowExecutor(simpleFlow, mockJsonRpcHandler, { 
+    const executor = new FlowExecutor(simpleFlow, mockJsonRpcHandler, {
       logger,
       eventOptions: {
         emitStepEvents: true,
         includeResults: false,
-      }
+      },
     });
-    
+
     // Event collection
     const stepCompleteEvents: any[] = [];
-    
+
     // Register event listeners
     executor.events.on(FlowEventType.STEP_COMPLETE, (data) => {
       stepCompleteEvents.push(data);
     });
-    
+
     // Execute the flow
     await executor.execute();
-    
+
     // Verify result details were omitted
     expect(stepCompleteEvents.length).toBeGreaterThan(0);
-    
+
     // Should only include type, not the actual result data
     const firstResult = stepCompleteEvents[0].result;
     expect(firstResult).toBeDefined();
@@ -310,20 +311,20 @@ describe('FlowExecutor Events', () => {
         },
       ],
     };
-    
+
     const executor = new FlowExecutor(flowWithStop, mockJsonRpcHandler, { logger });
-    
+
     // Event collection
     const skipEvents: any[] = [];
-    
+
     // Register event listeners
     executor.events.on(FlowEventType.STEP_SKIP, (data) => {
       skipEvents.push(data);
     });
-    
+
     // Execute the flow
     await executor.execute();
-    
+
     // Verify skip events were emitted
     expect(skipEvents.length).toBe(1);
     expect(skipEvents[0].stepName).toBe('step1');
@@ -332,7 +333,7 @@ describe('FlowExecutor Events', () => {
 
   test('should emit step events for nested steps', async () => {
     const logger = new TestLogger();
-    
+
     // Flow with a condition step that contains nested steps
     const nestedStepsFlow: Flow = {
       name: 'NestedStepsFlow',
@@ -353,22 +354,22 @@ describe('FlowExecutor Events', () => {
         },
       ],
     };
-    
+
     const executor = new FlowExecutor(nestedStepsFlow, mockJsonRpcHandler, { logger });
-    
+
     // Event collection
     const nestedStepEvents: any[] = [];
-    
+
     // Register event listeners
     executor.events.on(FlowEventType.STEP_START, (data) => {
       if (data.stepName === 'thenStep') {
         nestedStepEvents.push(data);
       }
     });
-    
+
     // Execute the flow
     await executor.execute();
-    
+
     // Verify nested step events were emitted
     expect(nestedStepEvents.length).toBe(1);
   });
@@ -385,23 +386,19 @@ describe('FlowExecutor Events', () => {
         },
       ],
     };
-    
+
     const mockJsonRpcHandler = jest.fn().mockResolvedValue({});
     const logger = new TestLogger();
-    const executor = new FlowExecutor(
-      unknownStepFlow as any,
-      mockJsonRpcHandler,
-      { 
-        logger,
-        eventOptions: {
-          includeContext: true,
-        }
-      }
-    );
-    
+    const executor = new FlowExecutor(unknownStepFlow as any, mockJsonRpcHandler, {
+      logger,
+      eventOptions: {
+        includeContext: true,
+      },
+    });
+
     // Event collection
     const events: any[] = [];
-    
+
     // Register event listeners
     executor.events.on(FlowEventType.STEP_START, (data) => {
       events.push({
@@ -409,10 +406,10 @@ describe('FlowExecutor Events', () => {
         data,
       });
     });
-    
+
     // Execute flow - we expect this to fail
     await expect(executor.execute()).rejects.toThrow();
-    
+
     // Verify the step type was considered "unknown"
     expect(events.length).toBeGreaterThan(0);
     expect(events[0].data.stepType).toBe('unknown');
@@ -438,24 +435,24 @@ describe('FlowExecutor Events', () => {
         },
       ],
     };
-    
+
     const mockJsonRpcHandler = jest.fn().mockResolvedValue({});
     const logger = new TestLogger();
     const executor = new FlowExecutor(nestedErrorFlow as any, mockJsonRpcHandler, { logger });
-    
+
     // Event collection
     const nestedErrorEvents: any[] = [];
-    
+
     // Register event listeners
     executor.events.on(FlowEventType.STEP_ERROR, (data) => {
       if (data.stepName === 'errorStep') {
         nestedErrorEvents.push(data);
       }
     });
-    
+
     // Execute the flow - will fail but we'll catch the error
     await expect(executor.execute()).rejects.toThrow();
-    
+
     // Verify nested step error events were emitted
     expect(nestedErrorEvents.length).toBe(1);
   });
@@ -493,7 +490,7 @@ describe('FlowExecutor Events', () => {
         },
       ],
     };
-    
+
     // Create a proper mock for the JSON-RPC handler
     const mockJsonRpcHandler = jest.fn().mockImplementation((request) => {
       if (request && request.method === 'test.method') {
@@ -504,10 +501,10 @@ describe('FlowExecutor Events', () => {
 
     const logger = new TestLogger();
     const executor = new FlowExecutor(nestedStopFlow as any, mockJsonRpcHandler, { logger });
-    
+
     // Event collection
     const events: any[] = [];
-    
+
     // Register event listeners for both STEP_SKIP events and FLOW_COMPLETE events
     executor.events.on(FlowEventType.STEP_SKIP, (data) => {
       events.push({
@@ -515,10 +512,10 @@ describe('FlowExecutor Events', () => {
         data,
       });
     });
-    
+
     // Execute the flow
     await executor.execute();
-    
+
     // Verify that a step was skipped due to the nested stop
     expect(events.length).toBe(1);
     // In this implementation, it looks like the condition step itself is marked as skipped
@@ -539,7 +536,7 @@ describe('FlowExecutor Events', () => {
         },
       ],
     };
-    
+
     // Create a proper mock for the JSON-RPC handler
     const mockJsonRpcHandler = jest.fn().mockImplementation((request) => {
       if (request && request.method === 'test.method') {
@@ -549,22 +546,22 @@ describe('FlowExecutor Events', () => {
     });
 
     const logger = new TestLogger();
-    
+
     // Configure event options to disable dependency events but enable other types
-    const executor = new FlowExecutor(testFlow as any, mockJsonRpcHandler, { 
+    const executor = new FlowExecutor(testFlow as any, mockJsonRpcHandler, {
       logger,
       eventOptions: {
         emitFlowEvents: true,
         emitStepEvents: true,
         emitDependencyEvents: false,
-      }
+      },
     });
-    
+
     // Event collection
     const events: any[] = [];
-    
+
     // Register all event listeners
-    Object.values(FlowEventType).forEach(eventType => {
+    Object.values(FlowEventType).forEach((eventType) => {
       executor.events.on(eventType, (data) => {
         events.push({
           type: eventType,
@@ -572,18 +569,18 @@ describe('FlowExecutor Events', () => {
         });
       });
     });
-    
+
     // Execute the flow
     await executor.execute();
-    
+
     // Verify that dependency events weren't emitted but other events were
-    expect(events.some(e => e.type === FlowEventType.DEPENDENCY_RESOLVED)).toBe(false);
-    expect(events.some(e => e.type === FlowEventType.FLOW_START)).toBe(true);
-    expect(events.some(e => e.type === FlowEventType.STEP_START)).toBe(true);
+    expect(events.some((e) => e.type === FlowEventType.DEPENDENCY_RESOLVED)).toBe(false);
+    expect(events.some((e) => e.type === FlowEventType.FLOW_START)).toBe(true);
+    expect(events.some((e) => e.type === FlowEventType.STEP_START)).toBe(true);
   });
 
   it('should handle flow level errors at various points', async () => {
-    // Create a flow with an invalid dependency that will cause an error 
+    // Create a flow with an invalid dependency that will cause an error
     // during dependency resolution
     const errorFlow = {
       name: 'ErrorFlow',
@@ -594,13 +591,13 @@ describe('FlowExecutor Events', () => {
             method: 'test.method',
             params: {
               // Invalid reference that will cause dependency resolution to fail
-              data: '${nonExistentStep.result}'
+              data: '${nonExistentStep.result}',
             },
           },
         },
       ],
     };
-    
+
     const mockJsonRpcHandler = jest.fn().mockImplementation((request) => {
       if (request && request.method === 'test.method') {
         return Promise.resolve({ result: 'test-result' });
@@ -609,24 +606,24 @@ describe('FlowExecutor Events', () => {
     });
 
     const logger = new TestLogger();
-    const executor = new FlowExecutor(errorFlow as any, mockJsonRpcHandler, { 
+    const executor = new FlowExecutor(errorFlow as any, mockJsonRpcHandler, {
       logger,
       eventOptions: {
-        includeContext: true
-      }
+        includeContext: true,
+      },
     });
-    
+
     // Event collection for flow error
     const errorEvents: any[] = [];
-    
+
     // Register error event listener
     executor.events.on(FlowEventType.FLOW_ERROR, (data) => {
       errorEvents.push(data);
     });
-    
+
     // Execute the flow - should fail during dependency resolution
     await expect(executor.execute()).rejects.toThrow();
-    
+
     // Verify error event was emitted
     expect(errorEvents.length).toBe(1);
     expect(errorEvents[0].flowName).toBe('ErrorFlow');
@@ -642,28 +639,28 @@ describe('FlowExecutor Events', () => {
         params: {},
       },
     };
-    
+
     const logger = new TestLogger();
-    const executor = new FlowExecutor(simpleFlow, mockJsonRpcHandler, { 
+    const executor = new FlowExecutor(simpleFlow, mockJsonRpcHandler, {
       logger,
       eventOptions: {
         emitStepEvents: true,
-      }
+      },
     });
-    
+
     // Event collection
     const errorEvents: any[] = [];
-    
+
     // Register error event listener
     executor.events.on(FlowEventType.STEP_ERROR, (data) => {
       errorEvents.push(data);
     });
-    
+
     // Directly call the emitStepError method
     const testError = new Error('Test error');
     const startTime = Date.now() - 100; // Mock a start time 100ms ago
     executor.events.emitStepError(testStep as any, testError, startTime);
-    
+
     // Verify error event was emitted
     expect(errorEvents.length).toBe(1);
     expect(errorEvents[0].stepName).toBe('errorStep');
@@ -681,28 +678,28 @@ describe('FlowExecutor Events', () => {
         params: {},
       },
     };
-    
+
     const logger = new TestLogger();
-    const executor = new FlowExecutor(simpleFlow, mockJsonRpcHandler, { 
+    const executor = new FlowExecutor(simpleFlow, mockJsonRpcHandler, {
       logger,
       eventOptions: {
         emitStepEvents: false, // Explicitly disable step events
-      }
+      },
     });
-    
+
     // Event collection
     const errorEvents: any[] = [];
-    
+
     // Register error event listener
     executor.events.on(FlowEventType.STEP_ERROR, (data) => {
       errorEvents.push(data);
     });
-    
+
     // Directly call the emitStepError method
     const testError = new Error('Test error');
     const startTime = Date.now();
     executor.events.emitStepError(testStep as any, testError, startTime);
-    
+
     // Verify no error event was emitted (because step events are disabled)
     expect(errorEvents.length).toBe(0);
   });
@@ -713,55 +710,57 @@ describe('FlowExecutor Events', () => {
       name: 'loopStep',
       loop: {
         items: [1, 2, 3],
-        steps: [{
-          name: 'innerStep',
-          request: { method: 'test.method', params: {} }
-        }]
-      }
+        steps: [
+          {
+            name: 'innerStep',
+            request: { method: 'test.method', params: {} },
+          },
+        ],
+      },
     };
 
     const requestStep = {
       name: 'requestStep',
-      request: { method: 'test.method', params: {} }
+      request: { method: 'test.method', params: {} },
     };
 
     const conditionStep = {
       name: 'conditionStep',
       condition: {
         if: 'true',
-        then: { name: 'thenStep', request: { method: 'test.method', params: {} }}
-      }
+        then: { name: 'thenStep', request: { method: 'test.method', params: {} } },
+      },
     };
 
     const transformStep = {
       name: 'transformStep',
       transform: {
         input: '${context.items}',
-        operations: [{ type: 'map', using: '{ ...${item}, test: true }' }]
-      }
+        operations: [{ type: 'map', using: '{ ...${item}, test: true }' }],
+      },
     };
 
     const stopStep = {
       name: 'stopStep',
-      stop: { endWorkflow: true }
+      stop: { endWorkflow: true },
     };
 
     const unknownStep = {
       name: 'unknownStep',
-      someProperty: true
+      someProperty: true,
     };
-    
+
     const logger = new TestLogger();
     const executor = new FlowExecutor(simpleFlow, mockJsonRpcHandler, { logger });
-    
+
     // Collect step start events to verify the stepType
     const events: any[] = [];
-    
+
     // Register event listener
     executor.events.on(FlowEventType.STEP_START, (data) => {
       events.push(data);
     });
-    
+
     // Directly emit events for each step type
     executor.events.emitStepStart(loopStep as any, { context: {} } as any);
     executor.events.emitStepStart(requestStep as any, { context: {} } as any);
@@ -769,7 +768,7 @@ describe('FlowExecutor Events', () => {
     executor.events.emitStepStart(transformStep as any, { context: {} } as any);
     executor.events.emitStepStart(stopStep as any, { context: {} } as any);
     executor.events.emitStepStart(unknownStep as any, { context: {} } as any);
-    
+
     // Verify all step types were correctly identified
     expect(events.length).toBe(6);
     expect(events[0].stepType).toBe('loop');
@@ -782,25 +781,25 @@ describe('FlowExecutor Events', () => {
 
   it('should emit dependency resolved events with ordered steps', async () => {
     const logger = new TestLogger();
-    const executor = new FlowExecutor(simpleFlow, mockJsonRpcHandler, { 
+    const executor = new FlowExecutor(simpleFlow, mockJsonRpcHandler, {
       logger,
       eventOptions: {
         emitDependencyEvents: true,
-      }
+      },
     });
-    
+
     // Event collection
     const events: any[] = [];
-    
+
     // Register event listener
     executor.events.on(FlowEventType.DEPENDENCY_RESOLVED, (data) => {
       events.push(data);
     });
-    
+
     // Directly call the emitDependencyResolved method
     const orderedSteps = ['step1', 'step2', 'step3'];
     executor.events.emitDependencyResolved(orderedSteps);
-    
+
     // Verify dependency resolved event was emitted with ordered steps
     expect(events.length).toBe(1);
     expect(events[0].orderedSteps).toEqual(orderedSteps);
@@ -808,39 +807,39 @@ describe('FlowExecutor Events', () => {
 
   it('should not emit dependency resolved events when disabled', async () => {
     const logger = new TestLogger();
-    const executor = new FlowExecutor(simpleFlow, mockJsonRpcHandler, { 
+    const executor = new FlowExecutor(simpleFlow, mockJsonRpcHandler, {
       logger,
       eventOptions: {
         emitDependencyEvents: false,
-      }
+      },
     });
-    
+
     // Event collection
     const events: any[] = [];
-    
+
     // Register event listener
     executor.events.on(FlowEventType.DEPENDENCY_RESOLVED, (data) => {
       events.push(data);
     });
-    
+
     // Directly call the emitDependencyResolved method
     const orderedSteps = ['step1', 'step2', 'step3'];
     executor.events.emitDependencyResolved(orderedSteps);
-    
+
     // Verify no event was emitted because dependency events are disabled
     expect(events.length).toBe(0);
   });
 
   it('should handle extraContext in step start events', async () => {
     const logger = new TestLogger();
-    const executor = new FlowExecutor(simpleFlow, mockJsonRpcHandler, { 
+    const executor = new FlowExecutor(simpleFlow, mockJsonRpcHandler, {
       logger,
       eventOptions: {
         emitStepEvents: true,
         includeContext: true, // Enable context inclusion
-      }
+      },
     });
-    
+
     // Create a simple step
     const testStep = {
       name: 'testStep',
@@ -849,78 +848,75 @@ describe('FlowExecutor Events', () => {
         params: {},
       },
     };
-    
+
     // Create execution context and extra context
     const executionContext = {
       context: { baseValue: 'base' },
       logger,
     } as any;
-    
+
     const extraContext = { extraValue: 'extra' };
-    
+
     // Event collection
     const events: any[] = [];
-    
+
     // Register event listener
     executor.events.on(FlowEventType.STEP_START, (data) => {
       events.push(data);
     });
-    
+
     // Emit a step start event with extra context
     executor.events.emitStepStart(testStep as any, executionContext, extraContext);
-    
+
     // Verify context merging happened correctly
     expect(events.length).toBe(1);
     expect(events[0].context).toBeDefined();
     expect(events[0].context.baseValue).toBe('base');
     expect(events[0].context.extraValue).toBe('extra');
-    
+
     // Now test with includeContext disabled
     executor.updateEventOptions({ includeContext: false });
     events.length = 0; // Clear events array
-    
+
     // Emit another step start event
     executor.events.emitStepStart(testStep as any, executionContext, extraContext);
-    
+
     // Verify context is not included
     expect(events.length).toBe(1);
     expect(events[0].context).toBeUndefined();
   });
 
   it('should test problematic lines directly using FlowExecutorEvents', () => {
-    // Import FlowExecutorEvents directly to access its methods
-    const { FlowExecutorEvents } = require('../util/flow-executor-events');
-    
     // Create a direct instance of FlowExecutorEvents
     const events = new FlowExecutorEvents({
       emitStepEvents: true,
       emitFlowEvents: true,
       emitDependencyEvents: true,
       includeContext: true,
-      includeResults: true
+      includeResults: true,
     });
-    
+
     // Add listeners to verify events
     const receivedEvents: any[] = [];
-    
-    Object.values(FlowEventType).forEach(eventType => {
+
+    Object.values(FlowEventType).forEach((eventType) => {
       events.on(eventType, (data: any) => {
         receivedEvents.push({ type: eventType, data });
       });
     });
-    
+
     // Create test entities
     const testStep = {
       name: 'testStep',
-      request: { method: 'test.method', params: {} }
+      request: { method: 'test.method', params: {} },
     };
-    
+
     const executionContext = {
-      context: { baseValue: 'base' }
+      context: { baseValue: 'base' },
     } as any;
-    
+
     const extraContext = { extraValue: 'extra' };
-    
+
     // Test line 188: Context ternary in emitStepStart
     events.emitStepStart(testStep as any, executionContext, extraContext);
 
@@ -929,60 +925,59 @@ describe('FlowExecutor Events', () => {
     expect(receivedEvents[0].data.context).toBeDefined();
     expect(receivedEvents[0].data.context.baseValue).toBe('base');
     expect(receivedEvents[0].data.context.extraValue).toBe('extra');
-    
+
     // Test line 261: Directly call emitDependencyResolved
     receivedEvents.length = 0; // Clear events
-    
+
     const orderedSteps = ['step1', 'step2'];
     events.emitDependencyResolved(orderedSteps);
-    
+
     // Verify the dependency resolved event was emitted with the correct data
     expect(receivedEvents.length).toBe(1);
     expect(receivedEvents[0].type).toBe(FlowEventType.DEPENDENCY_RESOLVED);
     expect(receivedEvents[0].data.orderedSteps).toEqual(orderedSteps);
-    
+
     // Now test both methods with options disabled
     receivedEvents.length = 0; // Clear events
-    
+
     events.updateOptions({
       emitStepEvents: false,
-      emitDependencyEvents: false, 
-      includeContext: false
+      emitDependencyEvents: false,
+      includeContext: false,
     });
-    
+
     // These should not emit anything now
     events.emitStepStart(testStep as any, executionContext, extraContext);
     events.emitDependencyResolved(orderedSteps);
-    
+
     expect(receivedEvents.length).toBe(0);
   });
 
   it('should test flow complete event with includeResults=false - handling stepCount', async () => {
     // Testing specifically the line that creates the resultsObj with stepCount instead of full results
-    const { FlowExecutorEvents } = require('../util/flow-executor-events');
-    
+
     // Create an instance with includeResults set to false explicitly
     const events = new FlowExecutorEvents();
-    
+
     // Override the options directly to ensure includeResults is false
-    events.updateOptions({ 
+    events.updateOptions({
       emitFlowEvents: true,
-      includeResults: false 
+      includeResults: false,
     });
-    
+
     const captureEvents: any[] = [];
     events.on(FlowEventType.FLOW_COMPLETE, (data: any) => {
       captureEvents.push(data);
     });
-    
+
     // Create a results map with multiple entries
     const resultsMap = new Map<string, any>();
     resultsMap.set('step1', { value: 'test1' });
     resultsMap.set('step2', { value: 'test2' });
-    
+
     // Call emitFlowComplete
     events.emitFlowComplete('TestFlow', resultsMap, Date.now() - 100);
-    
+
     // Verify that the event contains stepCount property instead of actual results
     expect(captureEvents.length).toBe(1);
     expect(captureEvents[0].results).toEqual({ stepCount: 2 });
@@ -992,94 +987,88 @@ describe('FlowExecutor Events', () => {
   });
 
   it('should emit and not emit step skip events based on options', async () => {
-    const { FlowExecutorEvents } = require('../util/flow-executor-events');
-    
     // Create instances with step events enabled and disabled
     const eventsEnabled = new FlowExecutorEvents({ emitStepEvents: true });
     const eventsDisabled = new FlowExecutorEvents({ emitStepEvents: false });
-    
+
     // Add listeners to verify events
     const enabledEvents: any[] = [];
     const disabledEvents: any[] = [];
-    
+
     eventsEnabled.on(FlowEventType.STEP_SKIP, (data: any) => {
       enabledEvents.push(data);
     });
-    
+
     eventsDisabled.on(FlowEventType.STEP_SKIP, (data: any) => {
       disabledEvents.push(data);
     });
-    
+
     // Create a test step
     const testStep = {
       name: 'skippedStep',
       request: {
         method: 'test.method',
-        params: {}
-      }
+        params: {},
+      },
     };
-    
+
     // Call emitStepSkip on both instances
     const skipReason = 'Condition evaluated to false';
     eventsEnabled.emitStepSkip(testStep as any, skipReason);
     eventsDisabled.emitStepSkip(testStep as any, skipReason); // This should hit line 261 with the early return
-    
+
     // Verify events were emitted correctly
     expect(enabledEvents.length).toBe(1);
     expect(enabledEvents[0].stepName).toBe('skippedStep');
     expect(enabledEvents[0].reason).toBe(skipReason);
-    
+
     // Verify no events were emitted when disabled
     expect(disabledEvents.length).toBe(0);
   });
 
   it('should not emit flow complete event when emitFlowEvents is false', async () => {
     // Testing specifically the early return in emitFlowComplete when emitFlowEvents is false
-    const { FlowExecutorEvents } = require('../util/flow-executor-events');
-    
+
     // Create an instance with emitFlowEvents set to false explicitly
     const events = new FlowExecutorEvents();
-    
+
     // Override the options directly to ensure emitFlowEvents is false
-    events.updateOptions({ 
-      emitFlowEvents: false
+    events.updateOptions({
+      emitFlowEvents: false,
     });
-    
+
     // Add listeners to verify events are not emitted
     const captureEvents: any[] = [];
     events.on(FlowEventType.FLOW_COMPLETE, (data: any) => {
       captureEvents.push(data);
     });
-    
+
     // Create a results map
     const resultsMap = new Map<string, any>();
     resultsMap.set('step1', { value: 'test1' });
-    
+
     // Call emitFlowComplete - should return early due to emitFlowEvents = false
     events.emitFlowComplete('TestFlow', resultsMap, Date.now());
-    
+
     // Verify that no event was emitted
     expect(captureEvents.length).toBe(0);
   });
 
   it('should not emit flow error event when emitFlowEvents is disabled', async () => {
-    // Import FlowExecutorEvents directly
-    const { FlowExecutorEvents } = require('../util/flow-executor-events');
-    
     // Create an instance with events disabled
     const events = new FlowExecutorEvents({ emitFlowEvents: false });
-    
+
     // Add listener
     const receivedEvents: any[] = [];
     events.on(FlowEventType.FLOW_ERROR, (data: any) => {
       receivedEvents.push(data);
     });
-    
+
     // Call emitFlowError (should early return due to emitFlowEvents being false)
     const testError = new Error('Test error');
     events.emitFlowError('TestFlow', testError, Date.now());
-    
+
     // Verify no events were emitted
     expect(receivedEvents.length).toBe(0);
   });
-}); 
+});

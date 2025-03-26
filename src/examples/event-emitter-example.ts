@@ -42,8 +42,8 @@ const flow: Flow = {
 // Setup a mock JSON-RPC handler
 const jsonRpcHandler = async (request: JsonRpcRequest) => {
   // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
+  await new Promise((resolve) => setTimeout(resolve, 500));
+
   if (request.method === 'echo') {
     // Safely access the message property with type checking
     const params = request.params as Record<string, any>;
@@ -114,12 +114,12 @@ async function runFlow() {
   try {
     console.log('Starting flow execution...');
     console.log('---');
-    
+
     const results = await executor.execute();
-    
+
     console.log('Flow execution complete!');
     console.log('---');
-    
+
     return results;
   } catch (error) {
     console.error('Flow execution failed:', error);
@@ -136,10 +136,10 @@ async function runWithMinimalEvents() {
     emitDependencyEvents: false,
     includeResults: false,
   });
-  
+
   console.log('Running with minimal events...');
   console.log('---');
-  
+
   return await executor.execute();
 }
 
@@ -151,4 +151,4 @@ if (require.main === module) {
 }
 
 // Export for use in other examples
-export { flow, executor, runFlow, runWithMinimalEvents }; 
+export { flow, executor, runFlow, runWithMinimalEvents };

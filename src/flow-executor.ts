@@ -13,11 +13,7 @@ import {
   StepType,
 } from './step-executors';
 import { Logger, defaultLogger } from './util/logger';
-import { 
-  FlowExecutorEvents, 
-  FlowEventOptions, 
-  DEFAULT_EVENT_OPTIONS 
-} from './util/flow-executor-events';
+import { FlowExecutorEvents, FlowEventOptions } from './util/flow-executor-events';
 
 /**
  * Options for the FlowExecutor
@@ -51,7 +47,7 @@ export class FlowExecutor {
   ) {
     // Handle both new options object and legacy logger parameter
     let options: FlowExecutorOptions | undefined;
-    
+
     if (loggerOrOptions instanceof Object && !(loggerOrOptions as Logger).log) {
       // It's an options object
       options = loggerOrOptions as FlowExecutorOptions;
@@ -61,7 +57,7 @@ export class FlowExecutor {
       this.logger = (loggerOrOptions as Logger) || defaultLogger;
       options = { logger: this.logger };
     }
-    
+
     this.context = flow.context || {};
     this.stepResults = new Map();
 
@@ -112,29 +108,26 @@ export class FlowExecutor {
    */
   async execute(): Promise<Map<string, any>> {
     const startTime = Date.now();
-    
+
     try {
       // Get steps in dependency order
       const orderedSteps = this.dependencyResolver.getExecutionOrder();
-      const orderedStepNames = orderedSteps.map(s => s.name);
-      
+      const orderedStepNames = orderedSteps.map((s) => s.name);
+
       this.events.emitDependencyResolved(orderedStepNames);
       this.events.emitFlowStart(this.flow.name, orderedStepNames);
 
-      this.logger.log(
-        'Executing steps in order:',
-        orderedStepNames,
-      );
+      this.logger.log('Executing steps in order:', orderedStepNames);
 
       for (const step of orderedSteps) {
         const stepStartTime = Date.now();
-        
+
         try {
           this.events.emitStepStart(step, this.executionContext);
-          
+
           const result = await this.executeStep(step);
           this.stepResults.set(step.name, result);
-          
+
           this.events.emitStepComplete(step, result, stepStartTime);
 
           // Check if the step or any nested step resulted in a stop
@@ -167,7 +160,7 @@ export class FlowExecutor {
     extraContext: Record<string, any> = {},
   ): Promise<StepExecutionResult> {
     const stepStartTime = Date.now();
-    
+
     try {
       this.logger.debug('Executing step:', {
         stepName: step.name,
@@ -191,22 +184,22 @@ export class FlowExecutor {
       });
 
       const result = await executor.execute(step, this.executionContext, extraContext);
-      
+
       // Only emit step complete for nested steps
       if (Object.keys(extraContext).length > 0) {
         this.events.emitStepComplete(step, result, stepStartTime);
       }
-      
+
       return result;
     } catch (error: any) {
       const errorMessage = error.message || String(error);
       this.logger.error(`Step execution failed: ${step.name}`, { error: errorMessage });
-      
+
       // Only emit step error for nested steps
       if (Object.keys(extraContext).length > 0) {
         this.events.emitStepError(step, error, stepStartTime);
       }
-      
+
       throw new Error(`Failed to execute step ${step.name}: ${errorMessage}`);
     }
   }

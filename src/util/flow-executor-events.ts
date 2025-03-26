@@ -135,7 +135,7 @@ export const DEFAULT_EVENT_OPTIONS: FlowEventOptions = {
  */
 export class FlowExecutorEvents extends EventEmitter {
   private options: FlowEventOptions;
-  
+
   constructor(options: Partial<FlowEventOptions> = {}) {
     super();
     this.options = { ...DEFAULT_EVENT_OPTIONS, ...options };
@@ -153,7 +153,7 @@ export class FlowExecutorEvents extends EventEmitter {
    */
   emitFlowStart(flowName: string, orderedSteps: string[]): void {
     if (!this.options.emitFlowEvents) return;
-    
+
     this.emit(FlowEventType.FLOW_START, {
       timestamp: Date.now(),
       type: FlowEventType.FLOW_START,
@@ -167,11 +167,11 @@ export class FlowExecutorEvents extends EventEmitter {
    */
   emitFlowComplete(flowName: string, results: Map<string, any>, startTime: number): void {
     if (!this.options.emitFlowEvents) return;
-    
-    const resultsObj = this.options.includeResults 
+
+    const resultsObj = this.options.includeResults
       ? Object.fromEntries(results.entries())
       : { stepCount: results.size };
-      
+
     this.emit(FlowEventType.FLOW_COMPLETE, {
       timestamp: Date.now(),
       type: FlowEventType.FLOW_COMPLETE,
@@ -186,7 +186,7 @@ export class FlowExecutorEvents extends EventEmitter {
    */
   emitFlowError(flowName: string, error: Error, startTime: number): void {
     if (!this.options.emitFlowEvents) return;
-    
+
     this.emit(FlowEventType.FLOW_ERROR, {
       timestamp: Date.now(),
       type: FlowEventType.FLOW_ERROR,
@@ -199,15 +199,19 @@ export class FlowExecutorEvents extends EventEmitter {
   /**
    * Emit step start event
    */
-  emitStepStart(step: Step, executionContext: StepExecutionContext, extraContext: Record<string, any> = {}): void {
+  emitStepStart(
+    step: Step,
+    executionContext: StepExecutionContext,
+    extraContext: Record<string, any> = {},
+  ): void {
     if (!this.options.emitStepEvents) return;
-    
-    const context = this.options.includeContext 
+
+    const context = this.options.includeContext
       ? { ...executionContext.context, ...extraContext }
       : undefined;
-    
+
     const stepType = this.getStepType(step);
-    
+
     this.emit(FlowEventType.STEP_START, {
       timestamp: Date.now(),
       type: FlowEventType.STEP_START,
@@ -222,10 +226,10 @@ export class FlowExecutorEvents extends EventEmitter {
    */
   emitStepComplete(step: Step, result: StepExecutionResult, startTime: number): void {
     if (!this.options.emitStepEvents) return;
-    
+
     const stepType = this.getStepType(step);
     const resultData = this.options.includeResults ? result : { type: result.type };
-    
+
     this.emit(FlowEventType.STEP_COMPLETE, {
       timestamp: Date.now(),
       type: FlowEventType.STEP_COMPLETE,
@@ -241,9 +245,9 @@ export class FlowExecutorEvents extends EventEmitter {
    */
   emitStepError(step: Step, error: Error, startTime: number): void {
     if (!this.options.emitStepEvents) return;
-    
+
     const stepType = this.getStepType(step);
-    
+
     this.emit(FlowEventType.STEP_ERROR, {
       timestamp: Date.now(),
       type: FlowEventType.STEP_ERROR,
@@ -259,7 +263,7 @@ export class FlowExecutorEvents extends EventEmitter {
    */
   emitStepSkip(step: Step, reason: string): void {
     if (!this.options.emitStepEvents) return;
-    
+
     this.emit(FlowEventType.STEP_SKIP, {
       timestamp: Date.now(),
       type: FlowEventType.STEP_SKIP,
@@ -273,7 +277,7 @@ export class FlowExecutorEvents extends EventEmitter {
    */
   emitDependencyResolved(orderedSteps: string[]): void {
     if (!this.options.emitDependencyEvents) return;
-    
+
     this.emit(FlowEventType.DEPENDENCY_RESOLVED, {
       timestamp: Date.now(),
       type: FlowEventType.DEPENDENCY_RESOLVED,
@@ -292,4 +296,4 @@ export class FlowExecutorEvents extends EventEmitter {
     if (step.stop) return 'stop';
     return 'unknown';
   }
-} 
+}

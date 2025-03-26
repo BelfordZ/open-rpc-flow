@@ -446,6 +446,83 @@ try {
 }
 ```
 
+## Event Emitter Interface
+
+The flow executor includes an event emitter that allows you to receive real-time updates during flow execution. This is useful for monitoring progress, logging, and integrating with external systems.
+
+### Using the Event Emitter
+
+```typescript
+import { FlowExecutor, FlowEventType } from '@open-rpc/flow';
+
+// Create a flow executor with event options
+const executor = new FlowExecutor(flow, jsonRpcHandler, {
+  eventOptions: {
+    emitFlowEvents: true,
+    emitStepEvents: true,
+    includeResults: true,
+  },
+});
+
+// Listen for flow start events
+executor.events.on(FlowEventType.FLOW_START, (event) => {
+  console.log(`Flow started: ${event.flowName}`);
+  console.log(`Steps to execute: ${event.orderedSteps.join(', ')}`);
+});
+
+// Listen for step completion events
+executor.events.on(FlowEventType.STEP_COMPLETE, (event) => {
+  console.log(`Step completed: ${event.stepName} in ${event.duration}ms`);
+  console.log('Result:', event.result);
+});
+
+// Execute the flow and receive streamed updates
+const results = await executor.execute();
+```
+
+### Available Events
+
+| Event Type            | Description                                        |
+| --------------------- | -------------------------------------------------- |
+| `flow:start`          | Emitted when flow execution begins                 |
+| `flow:complete`       | Emitted when flow execution completes successfully |
+| `flow:error`          | Emitted when flow execution fails                  |
+| `step:start`          | Emitted when a step execution begins               |
+| `step:complete`       | Emitted when a step execution completes            |
+| `step:error`          | Emitted when a step execution fails                |
+| `step:skip`           | Emitted when a step is skipped                     |
+| `dependency:resolved` | Emitted when dependencies are resolved             |
+
+### Configuration Options
+
+You can configure the event emitter behavior when creating the flow executor:
+
+```typescript
+const executor = new FlowExecutor(flow, jsonRpcHandler, {
+  eventOptions: {
+    // Whether to emit flow-level events
+    emitFlowEvents: true,
+    // Whether to emit step-level events
+    emitStepEvents: true,
+    // Whether to emit dependency resolution events
+    emitDependencyEvents: false,
+    // Whether to include result details in events
+    includeResults: true,
+    // Whether to include context details in events
+    includeContext: false,
+  },
+});
+```
+
+You can also update the event options after creation:
+
+```typescript
+executor.updateEventOptions({
+  emitStepEvents: false,
+  includeResults: false,
+});
+```
+
 ## Type Safety
 
 The engine is written in TypeScript and provides comprehensive type definitions:

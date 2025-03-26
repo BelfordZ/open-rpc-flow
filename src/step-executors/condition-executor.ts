@@ -51,19 +51,19 @@ export class ConditionStepExecutor implements StepExecutor {
 
       if (conditionValue) {
         this.logger.debug('Executing then branch', { stepName: step.name });
-        const nestedContext = { 
-          ...extraContext, 
+        const nestedContext = {
+          ...extraContext,
           _nestedStep: true,
-          _parentStep: step.name 
+          _parentStep: step.name,
         };
         value = await this.executeStep(conditionStep.condition.then, nestedContext);
         branchTaken = 'then';
       } else if (conditionStep.condition.else) {
         this.logger.debug('Executing else branch', { stepName: step.name });
-        const nestedContext = { 
-          ...extraContext, 
+        const nestedContext = {
+          ...extraContext,
           _nestedStep: true,
-          _parentStep: step.name 
+          _parentStep: step.name,
         };
         value = await this.executeStep(conditionStep.condition.else, nestedContext);
         branchTaken = 'else';

@@ -35,7 +35,7 @@ export {
   StepErrorEvent,
   StepSkipEvent,
   DependencyResolvedEvent,
-  FlowEventOptions
+  FlowEventOptions,
 } from './util/flow-executor-events';
 import metaSchemaContent from '../meta-schema.json';
 export const metaSchema = metaSchemaContent;

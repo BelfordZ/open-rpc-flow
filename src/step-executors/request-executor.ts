@@ -19,7 +19,7 @@ export class RequestStepExecutor implements StepExecutor {
     private circuitBreakerConfig: CircuitBreakerConfig | null = null,
   ) {
     this.logger = logger.createNested('RequestStepExecutor');
-    
+
     // Initialize circuit breaker if configured
     if (this.circuitBreakerConfig) {
       this.circuitBreaker = new CircuitBreaker(this.circuitBreakerConfig, this.logger);
@@ -104,7 +104,12 @@ export class RequestStepExecutor implements StepExecutor {
           },
         };
       } catch (error: any) {
-        // Wrap error as ExecutionError with NETWORK_ERROR code for retries
+        // Special case: Pass through JsonRpcRequestError without wrapping
+        if (error instanceof JsonRpcRequestError) {
+          throw error;
+        }
+
+        // Wrap other errors as ExecutionError with NETWORK_ERROR code for retries
         if (!(error instanceof ExecutionError)) {
           const errorMessage = `Failed to execute request step "${step.name}": ${error?.message || 'Unknown error'}`;
           throw new ExecutionError(
@@ -115,7 +120,7 @@ export class RequestStepExecutor implements StepExecutor {
               requestId,
               originalError: error,
             },
-            error
+            error,
           );
         }
         throw error;
@@ -131,7 +136,7 @@ export class RequestStepExecutor implements StepExecutor {
           stepName: step.name,
           requestId,
         });
-        
+
         // Execute with circuit breaker
         result = await this.circuitBreaker.execute(async () => {
           // Apply retry policy if configured
@@ -141,16 +146,12 @@ export class RequestStepExecutor implements StepExecutor {
               requestId,
               maxAttempts: this.retryPolicy.maxAttempts,
             });
-            
+
             // Execute with retry
-            const operation = new RetryableOperation(
-              executeRequest,
-              this.retryPolicy,
-              this.logger
-            );
+            const operation = new RetryableOperation(executeRequest, this.retryPolicy, this.logger);
             return await operation.execute();
           }
-          
+
           // Execute without retry
           return await executeRequest();
         });
@@ -161,23 +162,19 @@ export class RequestStepExecutor implements StepExecutor {
           requestId,
           maxAttempts: this.retryPolicy.maxAttempts,
         });
-        
+
         // Execute with retry
-        const operation = new RetryableOperation(
-          executeRequest,
-          this.retryPolicy,
-          this.logger
-        );
+        const operation = new RetryableOperation(executeRequest, this.retryPolicy, this.logger);
         result = await operation.execute();
       } else {
         // No circuit breaker or retry policy, execute directly
         result = await executeRequest();
       }
-      
+
       return result;
     } catch (error: any) {
       const errorMessage = error.message || String(error);
-      
+
       this.logger.error('Request failed', {
         stepName: step.name,
         requestId,
@@ -188,7 +185,7 @@ export class RequestStepExecutor implements StepExecutor {
       if (error instanceof JsonRpcRequestError) {
         throw error;
       }
-      
+
       throw error;
     }
   }

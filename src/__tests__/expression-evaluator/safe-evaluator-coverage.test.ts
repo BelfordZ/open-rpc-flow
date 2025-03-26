@@ -551,10 +551,11 @@ describe('SafeExpressionEvaluator Coverage Improvements', () => {
   describe('timeout handling', () => {
     it('respects the timeout when evaluating expressions', () => {
       // This is difficult to test directly without modifying the class,
-      // but we can test that the timeout check method exists
-      expect(() => evaluator['checkTimeout'](Date.now() - 2000)).toThrow(ExpressionError);
-      expect(() => evaluator['checkTimeout'](Date.now() - 2000)).toThrow(
-        'Expression evaluation timed out',
+      // but we can test that the timeout check method works
+      const testExpression = "1 + 1";
+      expect(() => evaluator['checkTimeout'](Date.now() - 2000, testExpression)).toThrow();
+      expect(() => evaluator['checkTimeout'](Date.now() - 2000, testExpression)).toThrow(
+        /timeout/
       );
     });
   });

@@ -613,21 +613,115 @@ try {
 
 #### Expression Timeouts
 
-The expression evaluator has built-in timeout protection to prevent long-running expressions:
+The flow engine has built-in protection against expressions that could hang your application, such as infinite recursion or extremely complex operations:
 
 ```typescript
-// Default timeout is 1000ms
-const evaluator = new SafeExpressionEvaluator(logger);
+// Flow with a potentially problematic expression
+const flow: Flow = {
+  name: 'Expression Timeout Example',
+  steps: [
+    {
+      name: 'transformData',
+      transform: {
+        input: '[1, 2, 3, 4, 5]',
+        operations: [
+          {
+            type: 'map',
+            // This expression contains recursion without a proper base case,
+            // which would cause a stack overflow if not for the timeout protection
+            using: `
+              (function recursiveCalc(item) {
+                return recursiveCalc(item + 1); // Infinite recursion!
+              })(item)
+            `
+          }
+        ]
+      }
+    }
+  ]
+};
 
+// The engine automatically protects against such problematic expressions
+// If an expression takes longer than the internal timeout (default: 1000ms)
+// an error will be thrown with a timeout message
 try {
-  // This would timeout if expression is too complex
-  const result = evaluator.evaluate('${complexCalculation(data)}', context);
+  const executor = new FlowExecutor(flow, jsonRpcHandler);
+  await executor.execute();
 } catch (error) {
-  if (error instanceof ExpressionError && error.message.includes('timed out')) {
-    console.error('Expression evaluation timed out');
-  }
+  console.error('Expression evaluation failed:', error.message);
+  // You would see: "Expression evaluation timed out"
 }
 ```
+
+**Note:** This timeout protection is built into the flow engine automatically - you don't need to enable or configure it explicitly. It prevents issues like infinite loops, excessive recursion, or highly complex expressions from hanging your application.
+
+Common scenarios that can trigger expression timeouts:
+- Recursive functions without proper termination conditions
+- Excessively deep object traversal
+- Extremely large data structures in expressions
+- Complex regular expressions that can cause catastrophic backtracking
+
+### Multi-Level Timeout Configuration
+
+In the ideal implementation, the flow engine should support timeout configuration at multiple levels:
+
+```typescript
+// Flow with comprehensive timeout configuration
+const flow: Flow = {
+  name: "Data Processing Flow",
+  description: "Process data with custom timeouts",
+  
+  // Flow-level timeouts
+  timeouts: {
+    global: 60000,        // 60s default for all steps in this flow
+    request: 120000,      // 120s for request steps
+    transform: 30000      // 30s for transform steps
+  },
+  
+  steps: [
+    {
+      name: "fetchData",
+      timeout: 180000,    // 180s specific timeout for this step
+      request: {
+        method: "data.fetch",
+        params: { source: "api" }
+      }
+    },
+    {
+      name: "processData",
+      // Uses the flow-level transform timeout (30s)
+      transform: {
+        input: "${fetchData.result}",
+        operations: [
+          // Complex operations...
+        ]
+      }
+    }
+  ]
+};
+
+// Initialize executor with global defaults
+const executor = new FlowExecutor(flow, jsonRpcHandler, {
+  timeouts: {
+    global: 30000,        // 30s global default
+    expression: 2000      // 2s for expression evaluation
+  }
+});
+```
+
+The timeout resolution should follow this precedence order:
+1. Step-level timeout (`step.timeout`)
+2. Flow-level type-specific timeout (`flow.timeouts[stepType]`)
+3. Flow-level global timeout (`flow.timeouts.global`) 
+4. Global type-specific timeout from executor options
+5. Global default timeout from executor options
+6. System-level built-in defaults
+
+This multi-level timeout architecture would allow for precise control over execution times, preventing:
+- Runaway processes
+- Excessive resource consumption
+- Deadlocks from unresponsive services
+- Performance degradation from slow operations
 
 #### Error Events
 

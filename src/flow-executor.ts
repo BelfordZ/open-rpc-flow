@@ -13,6 +13,21 @@ import {
   StepType,
 } from './step-executors';
 import { Logger, defaultLogger } from './util/logger';
+import { 
+  FlowExecutorEvents, 
+  FlowEventOptions, 
+  DEFAULT_EVENT_OPTIONS 
+} from './util/flow-executor-events';
+
+/**
+ * Options for the FlowExecutor
+ */
+export interface FlowExecutorOptions {
+  /** Logger instance to use */
+  logger?: Logger;
+  /** Event emitter options */
+  eventOptions?: Partial<FlowEventOptions>;
+}
 
 /**
  * Main executor for JSON-RPC flows
@@ -21,6 +36,7 @@ export class FlowExecutor {
   public dependencyResolver: DependencyResolver;
   public referenceResolver: ReferenceResolver;
   public expressionEvaluator: SafeExpressionEvaluator;
+  public events: FlowExecutorEvents;
 
   private context: Record<string, any>;
   private stepResults: Map<string, any>;
@@ -31,11 +47,26 @@ export class FlowExecutor {
   constructor(
     private flow: Flow,
     private jsonRpcHandler: (request: JsonRpcRequest) => Promise<any>,
-    logger?: Logger,
+    loggerOrOptions?: Logger | FlowExecutorOptions,
   ) {
-    this.logger = logger || defaultLogger;
+    // Handle both new options object and legacy logger parameter
+    let options: FlowExecutorOptions | undefined;
+    
+    if (loggerOrOptions instanceof Object && !(loggerOrOptions as Logger).log) {
+      // It's an options object
+      options = loggerOrOptions as FlowExecutorOptions;
+      this.logger = options?.logger || defaultLogger;
+    } else {
+      // It's a logger instance (or undefined)
+      this.logger = (loggerOrOptions as Logger) || defaultLogger;
+      options = { logger: this.logger };
+    }
+    
     this.context = flow.context || {};
     this.stepResults = new Map();
+
+    // Initialize the event emitter
+    this.events = new FlowExecutorEvents(options?.eventOptions);
 
     // Initialize shared execution context
     this.referenceResolver = new ReferenceResolver(this.stepResults, this.context, this.logger);
@@ -70,30 +101,62 @@ export class FlowExecutor {
   }
 
   /**
+   * Update event emitter options
+   */
+  updateEventOptions(options: Partial<FlowEventOptions>): void {
+    this.events.updateOptions(options);
+  }
+
+  /**
    * Execute the flow and return all step results
    */
   async execute(): Promise<Map<string, any>> {
-    // Get steps in dependency order
-    const orderedSteps = this.dependencyResolver.getExecutionOrder();
+    const startTime = Date.now();
+    
+    try {
+      // Get steps in dependency order
+      const orderedSteps = this.dependencyResolver.getExecutionOrder();
+      const orderedStepNames = orderedSteps.map(s => s.name);
+      
+      this.events.emitDependencyResolved(orderedStepNames);
+      this.events.emitFlowStart(this.flow.name, orderedStepNames);
 
-    this.logger.log(
-      'Executing steps in order:',
-      orderedSteps.map((s) => s.name),
-    );
+      this.logger.log(
+        'Executing steps in order:',
+        orderedStepNames,
+      );
 
-    for (const step of orderedSteps) {
-      const result = await this.executeStep(step);
-      this.stepResults.set(step.name, result);
+      for (const step of orderedSteps) {
+        const stepStartTime = Date.now();
+        
+        try {
+          this.events.emitStepStart(step, this.executionContext);
+          
+          const result = await this.executeStep(step);
+          this.stepResults.set(step.name, result);
+          
+          this.events.emitStepComplete(step, result, stepStartTime);
 
-      // Check if the step or any nested step resulted in a stop
-      const shouldStop = this.checkForStopResult(result);
+          // Check if the step or any nested step resulted in a stop
+          const shouldStop = this.checkForStopResult(result);
 
-      if (shouldStop) {
-        this.logger.log('Workflow stopped by step:', step.name);
-        break;
+          if (shouldStop) {
+            this.logger.log('Workflow stopped by step:', step.name);
+            this.events.emitStepSkip(step, 'Workflow stopped by previous step');
+            break;
+          }
+        } catch (error: any) {
+          this.events.emitStepError(step, error, stepStartTime);
+          throw error; // Re-throw to be caught by the outer try/catch
+        }
       }
+
+      this.events.emitFlowComplete(this.flow.name, this.stepResults, startTime);
+      return this.stepResults;
+    } catch (error: any) {
+      this.events.emitFlowError(this.flow.name, error, startTime);
+      throw error;
     }
-    return this.stepResults;
   }
 
   /**
@@ -103,12 +166,19 @@ export class FlowExecutor {
     step: Step,
     extraContext: Record<string, any> = {},
   ): Promise<StepExecutionResult> {
+    const stepStartTime = Date.now();
+    
     try {
       this.logger.debug('Executing step:', {
         stepName: step.name,
         stepType: Object.keys(step).find((k) => k !== 'name'),
         availableExecutors: this.stepExecutors.map((e) => e.constructor.name),
       });
+
+      // Only emit step events for nested steps
+      if (Object.keys(extraContext).length > 0) {
+        this.events.emitStepStart(step, this.executionContext, extraContext);
+      }
 
       const executor = this.findExecutor(step);
       if (!executor) {
@@ -121,10 +191,22 @@ export class FlowExecutor {
       });
 
       const result = await executor.execute(step, this.executionContext, extraContext);
+      
+      // Only emit step complete for nested steps
+      if (Object.keys(extraContext).length > 0) {
+        this.events.emitStepComplete(step, result, stepStartTime);
+      }
+      
       return result;
     } catch (error: any) {
       const errorMessage = error.message || String(error);
       this.logger.error(`Step execution failed: ${step.name}`, { error: errorMessage });
+      
+      // Only emit step error for nested steps
+      if (Object.keys(extraContext).length > 0) {
+        this.events.emitStepError(step, error, stepStartTime);
+      }
+      
       throw new Error(`Failed to execute step ${step.name}: ${errorMessage}`);
     }
   }

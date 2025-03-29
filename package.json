@@ -1,6 +1,6 @@
 {
   "name": "open-rpc-flow",
-  "version": "1.3.6",
+  "version": "1.3.7",
   "description": "A standard way to define JSON-RPC flows with goal-oriented steps",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",

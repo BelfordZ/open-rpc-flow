@@ -207,10 +207,21 @@ describe('SafeExpressionEvaluator', () => {
     it('throws on expression timeout', async () => {
       // Create a complex expression that will timeout
       const complexExpression = Array(100).fill('1 + ').join('') + '1';
-      (evaluator as any).TIMEOUT_MS = 1; // Set timeout to 1ms
-      expect(() => evaluator.evaluate(complexExpression, {})).toThrow(
-        'Expression evaluation timed out',
-      );
+      
+      // Mock Date.now to simulate timeout
+      const originalDateNow = Date.now;
+      let callCount = 0;
+      Date.now = jest.fn(() => {
+        callCount++;
+        return callCount === 1 ? 1000 : 1000 + 10000; // Jump 10 seconds on second call
+      });
+      
+      try {
+        expect(() => evaluator.evaluate(complexExpression, {})).toThrow(/timeout/);
+      } finally {
+        // Restore original Date.now
+        Date.now = originalDateNow;
+      }
     });
 
     it('throws on expression length limit', () => {

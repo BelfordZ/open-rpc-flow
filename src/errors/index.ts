@@ -4,6 +4,7 @@ export * from './codes';
 export * from './recovery';
 export * from './circuit-breaker';
 export * from './context';
+export * from './timeout-error'; // Enhanced timeout error with additional context
 
 // Note: All error classes are now defined only in './base.ts' to avoid duplication
 // This includes: FlowError, ValidationError, ExecutionError, TimeoutError, StateError

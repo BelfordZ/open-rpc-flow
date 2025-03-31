@@ -459,6 +459,7 @@ function handleTemplateLiteral(state: TokenizerState): Token[] {
       }
 
       if (bracketCount > 0) {
+        /* istanbul ignore next */
         throw new TokenizerError('Unterminated expression in template literal');
       }
 

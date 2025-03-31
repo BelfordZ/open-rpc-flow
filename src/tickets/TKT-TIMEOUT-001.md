@@ -1,13 +1,15 @@
 # TKT-TIMEOUT-001: Define Timeout Configuration Interfaces
 
 ## Description
+
 Create the core TypeScript interfaces for timeout configuration.
 
 ## Acceptance Criteria
+
 - Define `TimeoutOptions` interface with properties for global, request, transform, condition, loop and expression timeouts
 - Add timeout property to `Step` interface
 - Add timeouts property to `Flow` interface
-- Add timeoutFallback configuration to `Step` interface 
+- Add timeoutFallback configuration to `Step` interface
 - Add typings for fallback values and expressions
 
 ## Proposed Interface
@@ -54,7 +56,21 @@ export interface Flow {
 ```
 
 ## Dependencies
+
 None
 
 ## Estimation
-1 story point (1-2 hours) 
+
+1 story point (1-2 hours)
+
+## Status
+
+**COMPLETED**
+
+The interfaces have been implemented as proposed:
+- `TimeoutOptions` interface is defined in `src/types.ts`
+- `timeout` property has been added to the `Step` interface
+- `timeouts` property has been added to the `Flow` interface
+- `timeoutFallback` configuration has been added to the `Step` interface
+
+All acceptance criteria have been met.

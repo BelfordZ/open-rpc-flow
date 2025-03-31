@@ -75,6 +75,29 @@ export interface JsonRpcRequest {
 }
 
 /**
+ * Options for JsonRpcHandler requests
+ */
+export interface JsonRpcHandlerOptions {
+  /**
+   * AbortSignal that can be used to cancel the request
+   */
+  signal?: AbortSignal;
+  
+  /**
+   * Additional options specific to the JsonRpcHandler implementation
+   */
+  [key: string]: any;
+}
+
+/**
+ * Function signature for the JsonRpcHandler
+ */
+export type JsonRpcHandler = (
+  request: JsonRpcRequest,
+  options?: JsonRpcHandlerOptions
+) => Promise<any>;
+
+/**
  * Represents the execution context available to all step executors
  */
 export interface StepExecutionContext {
@@ -83,6 +106,10 @@ export interface StepExecutionContext {
   stepResults: Map<string, any>;
   context: Record<string, any>;
   logger: Logger;
+  /**
+   * AbortSignal that can be used to cancel operations
+   */
+  signal?: AbortSignal;
 }
 
 /**
@@ -110,42 +137,42 @@ export interface DependencyGraph {
  * Timeout configuration options for different step types
  */
 export interface TimeoutOptions {
-  /** 
+  /**
    * Global timeout for all steps (ms)
    * @minimum 50 - Must be at least 50ms
    * @maximum 3600000 - Cannot exceed 1 hour (3600000ms)
    */
   global?: number;
-  
-  /** 
+
+  /**
    * Timeout for all request steps (ms)
    * @minimum 50 - Must be at least 50ms
    * @maximum 3600000 - Cannot exceed 1 hour (3600000ms)
    */
   request?: number;
-  
-  /** 
+
+  /**
    * Timeout for all transform steps (ms)
    * @minimum 50 - Must be at least 50ms
    * @maximum 3600000 - Cannot exceed 1 hour (3600000ms)
    */
   transform?: number;
-  
-  /** 
+
+  /**
    * Timeout for all condition steps (ms)
    * @minimum 50 - Must be at least 50ms
    * @maximum 3600000 - Cannot exceed 1 hour (3600000ms)
    */
   condition?: number;
-  
-  /** 
+
+  /**
    * Timeout for all loop steps (ms)
    * @minimum 50 - Must be at least 50ms
    * @maximum 3600000 - Cannot exceed 1 hour (3600000ms)
    */
   loop?: number;
-  
-  /** 
+
+  /**
    * Timeout for expression evaluation (ms)
    * @minimum 50 - Must be at least 50ms
    * @maximum 3600000 - Cannot exceed 1 hour (3600000ms)

@@ -1,144 +1,196 @@
-# TKT-TIMEOUT-009: Implement Parallel Step Timeout Support
+# TKT-TIMEOUT-009: Implement Flow-level Execution Timeout Support
 
 ## Description
-Add timeout support to the ParallelStepExecutor, ensuring that steps executed in parallel respect configured timeout limits. This is particularly important for preventing scenarios where one or more slow parallel operations cause the entire flow to hang.
+
+Add comprehensive timeout support to the FlowExecutor, ensuring that the flow execution respects configured timeout limits. This is particularly important for preventing scenarios where a flow with multiple steps takes too long to complete.
 
 ## Acceptance Criteria
-- Update ParallelStepExecutor to utilize configurable timeouts
-- Implement a mechanism to abort all parallel executions when a timeout occurs
-- Ensure timeout applies to the entire parallel execution, not individual steps
-- Add tests for parallel step timeout scenarios
-- Handle partial results/errors appropriately when a timeout occurs
+
+- Implement flow-level timeout that applies to the entire flow execution
+- Ensure proper timeout propagation to individual steps based on the time already spent in the flow
+- Add ability to abort all in-progress operations when the flow timeout is reached
+- Add tests for flow-level timeout scenarios
+- Handle partial results appropriately when a timeout occurs
 
 ## Proposed Implementation
 
 ```typescript
-export class ParallelStepExecutor implements StepExecutor {
+export class FlowExecutor {
+  // Existing properties...
+  private flowTimeoutMs: number | null = null;
+  private flowStartTime: number | null = null;
+  private abortController: AbortController | null = null;
+
   constructor(
-    private executors: Map<StepType, StepExecutor>,
-  ) {}
-  
-  canExecute(step: Step): boolean {
-    return step.type === StepType.Parallel;
+    private flow: Flow,
+    private jsonRpcHandler: (request: JsonRpcRequest, options?: { signal?: AbortSignal }) => Promise<any>,
+    options?: FlowExecutorOptions,
+  ) {
+    // Existing initialization...
+    
+    // Initialize flow timeout if provided
+    this.flowTimeoutMs = flow.timeouts?.global || null;
+    this.abortController = new AbortController();
+    
+    // Update jsonRpcHandler reference to support abort signals
+    const originalHandler = this.jsonRpcHandler;
+    this.jsonRpcHandler = async (request, options) => {
+      return originalHandler(request, {
+        ...options,
+        signal: this.abortController?.signal,
+      });
+    };
   }
-  
-  async execute(
-    step: Step,
-    context: StepExecutionContext,
-    extraContext: Record<string, any> = {},
-  ): Promise<StepExecutionResult> {
-    if (!this.canExecute(step)) {
-      throw new Error('Invalid step type for ParallelStepExecutor');
-    }
-    
-    const parallelStep = step as ParallelStep;
-    
-    // Get timeout from context (set by TimeoutResolver)
-    const timeout = (context as any).timeout;
-    
+
+  /**
+   * Execute the flow with timeout support
+   */
+  async execute(): Promise<Map<string, any>> {
     // Start tracking execution time
-    const startTime = Date.now();
+    this.flowStartTime = Date.now();
     
-    // Prepare execution with timeout
-    const executeWithTimeout = async () => {
-      // Set up AbortController for parallel execution
-      const controller = new AbortController();
-      const signal = controller.signal;
-      
-      // Set up timeout if configured
-      const timeoutId = timeout 
-        ? setTimeout(() => controller.abort(), timeout) 
-        : null;
-      
-      try {
-        // Execute all steps in parallel
-        const executeSteps = parallelStep.steps.map(async (step, index) => {
-          // Find the appropriate executor
-          const executor = this.executors.get(step.type);
-          if (!executor) {
-            throw new Error(`No executor found for step type: ${step.type}`);
-          }
-          
-          // Create child context with signal
-          const stepContext = {
-            ...context,
-            signal, // Pass abort signal to child steps
-          };
-          
-          try {
-            // Execute the step
-            return await executor.execute(step, stepContext, extraContext);
-          } catch (error) {
-            // Check if aborted (timeout)
-            if (signal.aborted) {
-              const elapsedTime = Date.now() - startTime;
-              throw new TimeoutError(
-                `Parallel step "${parallelStep.name}" timed out after ${elapsedTime}ms during execution of child step "${step.name}"`,
-                {
-                  code: ErrorCode.TIMEOUT_ERROR,
-                  stepName: parallelStep.name,
-                  childStepName: step.name,
-                  childStepIndex: index,
-                  timeout,
-                  elapsed: elapsedTime,
-                  retryable: true,
-                }
-              );
-            }
-            
-            // Re-throw other errors
-            throw error;
-          }
-        });
+    // Set up flow-level timeout if configured
+    let timeoutId: NodeJS.Timeout | null = null;
+    if (this.flowTimeoutMs !== null) {
+      timeoutId = setTimeout(() => {
+        this.abortController?.abort();
+      }, this.flowTimeoutMs);
+    }
+
+    try {
+      // Get steps in dependency order
+      const orderedSteps = this.dependencyResolver.getExecutionOrder();
+      const orderedStepNames = orderedSteps.map((s) => s.name);
+
+      this.events.emitDependencyResolved(orderedStepNames);
+      this.events.emitFlowStart(this.flow.name, orderedStepNames);
+
+      this.logger.log('Executing steps in order:', orderedStepNames);
+
+      for (const step of orderedSteps) {
+        // Check if we've exceeded the flow timeout
+        this.checkFlowTimeout();
         
-        // Wait for all steps to complete or timeout
-        const results = await Promise.all(executeSteps);
+        // Calculate remaining time for the step
+        const remainingTime = this.calculateRemainingTime();
         
-        // Extract results from each execution
-        const parallelResults = results.map(result => result.result);
-        
-        return {
-          result: parallelResults,
-          type: StepType.Parallel,
-          metadata: {
-            count: parallelStep.steps.length,
-            timestamp: new Date().toISOString(),
-          },
+        // Add remaining time to the execution context
+        const stepContext = {
+          ...this.executionContext,
+          timeout: remainingTime,
+          signal: this.abortController?.signal,
         };
-      } catch (error: any) {
-        // Handle AbortError (from timeout) 
-        if (error.name === 'AbortError') {
-          const elapsedTime = Date.now() - startTime;
-          throw new TimeoutError(
-            `Parallel step "${parallelStep.name}" timed out after ${elapsedTime}ms`,
-            {
-              code: ErrorCode.TIMEOUT_ERROR,
-              stepName: parallelStep.name,
-              timeout,
-              elapsed: elapsedTime,
-              retryable: true,
-            }
-          );
-        }
-        
-        // Re-throw other errors (including TimeoutError from child steps)
-        throw error;
-      } finally {
-        // Clean up timeout
-        if (timeoutId !== null) {
-          clearTimeout(timeoutId);
+
+        const stepStartTime = Date.now();
+
+        try {
+          this.events.emitStepStart(step, stepContext);
+
+          // Execute the step with the updated context
+          const result = await this.executeStep(step, {}, stepContext);
+          this.stepResults.set(step.name, result);
+
+          this.events.emitStepComplete(step, result, stepStartTime);
+
+          // Check if the step or any nested step resulted in a stop
+          const shouldStop = this.checkForStopResult(result);
+
+          if (shouldStop) {
+            this.logger.log('Workflow stopped by step:', step.name);
+            this.events.emitStepSkip(step, 'Workflow stopped by previous step');
+            break;
+          }
+        } catch (error: any) {
+          // Check if timeout occurred
+          if (error.name === 'AbortError' || error.code === ErrorCode.TIMEOUT_ERROR) {
+            const elapsed = Date.now() - this.flowStartTime!;
+            throw new TimeoutError(
+              `Flow execution timed out after ${elapsed}ms during execution of step "${step.name}"`,
+              {
+                code: ErrorCode.TIMEOUT_ERROR,
+                flowName: this.flow.name,
+                stepName: step.name,
+                timeout: this.flowTimeoutMs,
+                elapsed,
+              }
+            );
+          }
+          
+          this.events.emitStepError(step, error, stepStartTime);
+          throw error;
         }
       }
-    };
-    
-    return await executeWithTimeout();
+
+      this.events.emitFlowComplete(this.flow.name, this.stepResults, this.flowStartTime);
+      return this.stepResults;
+    } catch (error: any) {
+      this.events.emitFlowError(this.flow.name, error, this.flowStartTime);
+      throw error;
+    } finally {
+      // Clean up timeout
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+      }
+    }
   }
+
+  /**
+   * Check if the flow execution has exceeded the timeout
+   */
+  private checkFlowTimeout(): void {
+    if (this.flowTimeoutMs === null || this.flowStartTime === null) {
+      return;
+    }
+    
+    const elapsed = Date.now() - this.flowStartTime;
+    if (elapsed >= this.flowTimeoutMs) {
+      throw new TimeoutError(`Flow execution timed out after ${elapsed}ms`, {
+        code: ErrorCode.TIMEOUT_ERROR,
+        flowName: this.flow.name,
+        timeout: this.flowTimeoutMs,
+        elapsed,
+      });
+    }
+  }
+
+  /**
+   * Calculate the remaining time for step execution
+   */
+  private calculateRemainingTime(): number | null {
+    if (this.flowTimeoutMs === null || this.flowStartTime === null) {
+      return null;
+    }
+    
+    const elapsed = Date.now() - this.flowStartTime;
+    const remaining = Math.max(0, this.flowTimeoutMs - elapsed);
+    
+    return remaining;
+  }
+
+  // Existing methods...
 }
 ```
 
 ## Dependencies
+
 - TKT-TIMEOUT-001: Define Timeout Configuration Interfaces
 - TKT-TIMEOUT-004: Implement Timeout Resolution Logic
 
 ## Estimation
-4 story points (8-12 hours) 
+
+3 story points (5-8 hours)
+
+## Status
+
+**NOT IMPLEMENTED**
+
+The current FlowExecutor has basic timeout support through the TimeoutResolver system for individual steps, but lacks comprehensive flow-level timeout management. This ticket proposes adding:
+
+1. Flow-level timeout tracking with AbortController support
+2. Dynamic calculation of remaining time for steps based on flow execution progress
+3. Proper propagation of timeout signals to all step executors
+4. Comprehensive error handling for flow-level timeouts
+
+These enhancements would make the timeout system more robust and prevent long-running flows from consuming excessive resources.
+
+**Recommendation:** Implement the proposed flow-level timeout management to complement the existing step-level timeout capabilities.

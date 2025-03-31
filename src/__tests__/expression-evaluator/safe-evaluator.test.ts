@@ -207,7 +207,7 @@ describe('SafeExpressionEvaluator', () => {
     it('throws on expression timeout', async () => {
       // Create a complex expression that will timeout
       const complexExpression = Array(100).fill('1 + ').join('') + '1';
-      
+
       // Mock Date.now to simulate timeout
       const originalDateNow = Date.now;
       let callCount = 0;
@@ -215,7 +215,7 @@ describe('SafeExpressionEvaluator', () => {
         callCount++;
         return callCount === 1 ? 1000 : 1000 + 10000; // Jump 10 seconds on second call
       });
-      
+
       try {
         expect(() => evaluator.evaluate(complexExpression, {})).toThrow(/timeout/);
       } finally {

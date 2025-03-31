@@ -1,4 +1,4 @@
-import { Step, StepExecutionContext, JsonRpcRequest } from '../types';
+import { Step, StepExecutionContext, JsonRpcRequest, JsonRpcHandler } from '../types';
 import { StepExecutor, StepExecutionResult, JsonRpcRequestError, StepType } from './types';
 import { Logger } from '../util/logger';
 import { RequestStep } from './types';
@@ -13,7 +13,7 @@ export class RequestStepExecutor implements StepExecutor {
   private circuitBreaker: CircuitBreaker | null = null;
 
   constructor(
-    private jsonRpcHandler: (request: JsonRpcRequest) => Promise<any>,
+    private jsonRpcHandler: JsonRpcHandler,
     logger: Logger,
     private retryPolicy: RetryPolicy | null = null,
     private circuitBreakerConfig: CircuitBreakerConfig | null = null,
@@ -81,16 +81,22 @@ export class RequestStepExecutor implements StepExecutor {
           requestId,
         });
 
-        const result = await this.jsonRpcHandler({
-          jsonrpc: '2.0',
-          method: requestStep.request.method,
-          params: resolvedParams,
-          id: requestId,
-        });
+        // Pass AbortSignal from context if available
+        const result = await this.jsonRpcHandler(
+          {
+            jsonrpc: '2.0',
+            method: requestStep.request.method,
+            params: resolvedParams,
+            id: requestId,
+          },
+          // Pass signal from context if available
+          context.signal ? { signal: context.signal } : undefined
+        );
 
         this.logger.debug('Request completed successfully', {
           stepName: step.name,
           requestId,
+          result,
         });
 
         return {
@@ -103,27 +109,41 @@ export class RequestStepExecutor implements StepExecutor {
             timestamp: new Date().toISOString(),
           },
         };
-      } catch (error: any) {
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          // Handle AbortError separately
+          if (error.name === 'AbortError') {
+          throw new ExecutionError(
+            `Request step "${step.name}" was aborted`,
+            {
+              code: ErrorCode.TIMEOUT_ERROR,
+              stepName: step.name,
+              requestId,
+              originalError: error,
+              retryable: true,
+            },
+            error
+          );
+        }
+        
         // Special case: Pass through JsonRpcRequestError without wrapping
         if (error instanceof JsonRpcRequestError) {
           throw error;
         }
-
-        // Wrap other errors as ExecutionError with NETWORK_ERROR code for retries
-        if (!(error instanceof ExecutionError)) {
-          const errorMessage = `Failed to execute request step "${step.name}": ${error?.message || 'Unknown error'}`;
-          throw new ExecutionError(
-            errorMessage,
-            {
-              code: ErrorCode.NETWORK_ERROR,
-              stepName: step.name,
-              requestId,
-              originalError: error,
-            },
-            error,
-          );
-        }
-        throw error;
+      }
+      const err = error as any;
+      // Wrap other errors as ExecutionError with NETWORK_ERROR code for retries
+      const errorMessage = `Failed to execute request step "${step.name}": ${err?.message || 'Unknown error'}`;
+      throw new ExecutionError(
+        errorMessage,
+        {
+          code: ErrorCode.NETWORK_ERROR,
+          stepName: step.name,
+          requestId,
+          originalError: error,
+        },
+        err,
+      );
       }
     };
 

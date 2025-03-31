@@ -368,6 +368,7 @@ describe('Transform Executors', () => {
         ],
         inputType: 'array',
         resultType: 'array',
+        timeout: 10000,
         timestamp: expect.any(String),
       });
     });
@@ -410,6 +411,7 @@ describe('Transform Executors', () => {
         ],
         inputType: 'array',
         resultType: 'array',
+        timeout: 10000,
         timestamp: expect.any(String),
       });
     });
@@ -450,6 +452,7 @@ describe('Transform Executors', () => {
         ],
         inputType: 'array',
         resultType: 'number',
+        timeout: 10000,
         timestamp: expect.any(String),
       });
     });
@@ -568,6 +571,7 @@ describe('Transform Executors', () => {
         ],
         inputType: 'array',
         resultType: 'array',
+        timeout: 10000,
         timestamp: expect.any(String),
       });
     });

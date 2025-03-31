@@ -1,9 +1,11 @@
 # TKT-TIMEOUT-004: Implement Timeout Resolution Logic
 
 ## Description
+
 Create a resolver that determines the effective timeout for a step based on the defined precedence order.
 
 ## Acceptance Criteria
+
 - Implement resolution algorithm following the defined precedence order:
   1. Step-level timeout
   2. Flow-level type-specific timeout
@@ -22,10 +24,7 @@ export class TimeoutResolver {
    * @param flow The flow containing timeout configurations
    * @param executorOptions Additional timeout options (optional)
    */
-  constructor(
-    flow: Flow,
-    executorOptions?: TimeoutOptions
-  );
+  constructor(flow: Flow, executorOptions?: TimeoutOptions);
 
   /**
    * Maps StepType enum to TimeoutOptions property key
@@ -55,7 +54,7 @@ export class TimeoutResolver {
    * @returns The resolved timeout value in milliseconds
    */
   resolveExpressionTimeout(step?: Step): number;
-  
+
   /**
    * Get the current timeout configuration
    * @returns The current timeout options
@@ -65,9 +64,25 @@ export class TimeoutResolver {
 ```
 
 ## Dependencies
+
 - TKT-TIMEOUT-001: Define Timeout Configuration Interfaces
 - TKT-TIMEOUT-002: Define Default Timeout Values
 - TKT-TIMEOUT-003: Implement Timeout Validation
 
 ## Estimation
-2 story points (3-4 hours) 
+
+2 story points (3-4 hours)
+
+## Status
+
+**COMPLETED**
+
+The timeout resolution logic has been implemented as proposed:
+- `TimeoutResolver` class has been created in `src/utils/timeout-resolver.ts`
+- Resolution algorithm follows the defined precedence order exactly as specified
+- Resolution works for all step types with appropriate mapping via `getTimeoutKey`
+- Special case for expression evaluation is handled via `resolveExpressionTimeout`
+- Comprehensive tests in `src/utils/__tests__/timeout-resolver.test.ts` cover all precedence combinations
+- Integration with `TimeoutValidator` ensures all resolved timeouts are validated
+
+All acceptance criteria have been met.

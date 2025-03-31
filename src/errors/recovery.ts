@@ -20,11 +20,15 @@ export interface RetryPolicy {
  * Wrapper for operations that can be retried
  */
 export class RetryableOperation<T> {
+  private logger: Logger;
+
   constructor(
     private operation: () => Promise<T>,
     private policy: RetryPolicy,
-    private logger: Logger,
-  ) {}
+    logger: Logger,
+  ) {
+    this.logger = logger.createNested('RetryableOperation');
+  }
 
   /**
    * Execute the operation with retry logic

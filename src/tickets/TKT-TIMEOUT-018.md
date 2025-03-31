@@ -1,9 +1,11 @@
 # TKT-TIMEOUT-018: Implement Comprehensive Timeout Tests
 
 ## Description
+
 Add a comprehensive test suite for the timeout functionality to ensure that timeouts are properly enforced, configured, and handled throughout the flow execution process.
 
 ## Acceptance Criteria
+
 - Create unit tests for timeout configuration validation
 - Add tests for timeout resolution at different levels (step, flow, global)
 - Implement tests for timeout enforcement in each step executor
@@ -27,44 +29,44 @@ describe('Timeout Configuration', () => {
       expect(() => TimeoutValidator.validate(0)).not.toThrow();
       expect(() => TimeoutValidator.validate(null)).not.toThrow();
     });
-    
+
     it('should reject invalid timeout values', () => {
       expect(() => TimeoutValidator.validate(-1)).toThrow();
       expect(() => TimeoutValidator.validate('1000' as any)).toThrow();
       expect(() => TimeoutValidator.validate(1.5)).toThrow();
     });
   });
-  
+
   describe('Flow API', () => {
     it('should set global timeout', () => {
       const flow = new Flow().setTimeout(5000);
       expect(flow.toJSON().timeouts.global).toBe(5000);
     });
-    
+
     it('should set step-type timeouts', () => {
       const flow = new Flow().setTimeouts({
         [StepType.Request]: 10000,
         [StepType.Transform]: 5000,
       });
-      
+
       expect(flow.toJSON().timeouts[StepType.Request]).toBe(10000);
       expect(flow.toJSON().timeouts[StepType.Transform]).toBe(5000);
     });
-    
+
     it('should set timeout for specific step by name', () => {
       const flow = new Flow()
         .addStep(
           new Step()
             .name('testStep')
             .type(StepType.Request)
-            .request({ method: 'test', params: [] })
+            .request({ method: 'test', params: [] }),
         )
         .setStepTimeout('testStep', 3000);
-      
+
       const stepWithTimeout = flow.steps[0];
       expect(stepWithTimeout.timeout).toBe(3000);
     });
-    
+
     it('should throw when setting timeout for non-existent step', () => {
       const flow = new Flow();
       expect(() => flow.setStepTimeout('nonExistentStep', 1000)).toThrow();
@@ -89,62 +91,62 @@ describe('TimeoutResolver', () => {
     sequence: 30000,
     parallel: 30000,
   };
-  
+
   let resolver: TimeoutResolver;
-  
+
   beforeEach(() => {
     resolver = new TimeoutResolver(defaultTimeouts);
   });
-  
+
   it('should use step timeout as highest priority', () => {
     const step = { type: StepType.Request, timeout: 2000 } as Step;
     const flow = { timeouts: { [StepType.Request]: 5000, global: 10000 } } as Flow;
-    
+
     const timeout = resolver.resolveTimeout(step, flow);
     expect(timeout).toBe(2000);
   });
-  
+
   it('should use flow step-type timeout when no step timeout', () => {
     const step = { type: StepType.Request } as Step;
     const flow = { timeouts: { [StepType.Request]: 5000, global: 10000 } } as Flow;
-    
+
     const timeout = resolver.resolveTimeout(step, flow);
     expect(timeout).toBe(5000);
   });
-  
+
   it('should use flow global timeout when no step-type timeout', () => {
     const step = { type: StepType.Request } as Step;
     const flow = { timeouts: { global: 10000 } } as Flow;
-    
+
     const timeout = resolver.resolveTimeout(step, flow);
     expect(timeout).toBe(10000);
   });
-  
+
   it('should use default step-type timeout when no flow timeouts', () => {
     const step = { type: StepType.Request } as Step;
-    const flow = { } as Flow;
-    
+    const flow = {} as Flow;
+
     const timeout = resolver.resolveTimeout(step, flow);
     expect(timeout).toBe(30000); // Default for Request type
   });
-  
+
   it('should use default global timeout as last resort', () => {
     const step = { type: StepType.Branch } as Step;
-    const flow = { } as Flow;
-    
+    const flow = {} as Flow;
+
     // Simulate case where there's no default for this step type
     resolver = new TimeoutResolver({ global: 60000 });
-    
+
     const timeout = resolver.resolveTimeout(step, flow);
     expect(timeout).toBe(60000);
   });
-  
+
   it('should return null if all timeouts are disabled', () => {
     const step = { type: StepType.Request } as Step;
     const flow = { timeouts: { [StepType.Request]: null, global: null } } as Flow;
-    
+
     resolver = new TimeoutResolver({ global: null, request: null });
-    
+
     const timeout = resolver.resolveTimeout(step, flow);
     expect(timeout).toBeNull();
   });
@@ -159,65 +161,64 @@ import { RequestStepExecutor, Step, StepType, TimeoutError } from '../../../inde
 
 describe('RequestStepExecutor Timeout', () => {
   let executor: RequestStepExecutor;
-  
+
   beforeEach(() => {
     // Create mocked JSON-RPC handler that can be delayed
     const mockHandler = jest.fn().mockImplementation(async (request, options) => {
       // Check if we should delay
       const delay = options?.delay || 0;
-      
+
       if (delay > 0) {
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
-      
+
       // Check if aborted during delay
       if (options?.signal?.aborted) {
         throw new DOMException('The operation was aborted', 'AbortError');
       }
-      
+
       return { jsonrpc: '2.0', id: request.id, result: 'success' };
     });
-    
+
     executor = new RequestStepExecutor(mockHandler);
   });
-  
+
   it('should successfully execute within timeout', async () => {
     const step = {
       name: 'testRequest',
       type: StepType.Request,
       request: { method: 'test', params: [] },
     } as Step;
-    
+
     const context = { timeout: 1000 };
-    
+
     const result = await executor.execute(step, context);
     expect(result.result).toEqual('success');
   });
-  
+
   it('should throw TimeoutError when execution exceeds timeout', async () => {
     const step = {
       name: 'slowRequest',
       type: StepType.Request,
       request: { method: 'test', params: [] },
     } as Step;
-    
+
     const context = { timeout: 100 };
     const extraContext = { delay: 500 }; // Delay longer than timeout
-    
-    await expect(executor.execute(step, context, extraContext))
-      .rejects.toThrow(TimeoutError);
+
+    await expect(executor.execute(step, context, extraContext)).rejects.toThrow(TimeoutError);
   });
-  
+
   it('should include correct metadata in timeout errors', async () => {
     const step = {
       name: 'metadataRequest',
       type: StepType.Request,
       request: { method: 'test', params: [] },
     } as Step;
-    
+
     const context = { timeout: 50 };
     const extraContext = { delay: 200 };
-    
+
     try {
       await executor.execute(step, context, extraContext);
       fail('Should have thrown TimeoutError');
@@ -230,17 +231,17 @@ describe('RequestStepExecutor Timeout', () => {
       expect(error.metadata.code).toBe('TIMEOUT_ERROR');
     }
   });
-  
+
   it('should respect null timeout (no timeout enforced)', async () => {
     const step = {
       name: 'noTimeoutRequest',
       type: StepType.Request,
       request: { method: 'test', params: [] },
     } as Step;
-    
+
     const context = { timeout: null };
     const extraContext = { delay: 200 };
-    
+
     const result = await executor.execute(step, context, extraContext);
     expect(result.result).toEqual('success');
   });
@@ -264,25 +265,22 @@ describe('Timeout Integration Tests', () => {
         [StepType.Transform]: 1000,
       })
       .addStep(
-        new Step()
-          .name('request1')
-          .type(StepType.Request)
-          .request({ method: 'test', params: [] })
+        new Step().name('request1').type(StepType.Request).request({ method: 'test', params: [] }),
       )
       .addStep(
         new Step()
           .name('transform')
           .type(StepType.Transform)
-          .expression('context.flowResults.request1.result')
+          .expression('context.flowResults.request1.result'),
       )
       .addStep(
         new Step()
           .name('slowRequest')
           .type(StepType.Request)
-          .request({ method: 'slow', params: [] })
+          .request({ method: 'slow', params: [] }),
       )
       .setStepTimeout('slowRequest', 100); // Very short timeout
-    
+
     // Create executor with mock handlers
     const executor = new FlowExecutor({
       transport: {
@@ -290,19 +288,18 @@ describe('Timeout Integration Tests', () => {
         handler: async (request) => {
           if (request.method === 'slow') {
             // Simulate slow request
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise((resolve) => setTimeout(resolve, 500));
           }
           return { jsonrpc: '2.0', id: request.id, result: 'success' };
         },
       },
       logging: true,
     });
-    
+
     // Execute flow, expect timeout error
-    await expect(executor.execute(flow))
-      .rejects.toThrow(TimeoutError);
+    await expect(executor.execute(flow)).rejects.toThrow(TimeoutError);
   });
-  
+
   it('should apply timeouts hierarchically in nested steps', async () => {
     // Create flow with nested steps and timeouts
     const flow = new Flow()
@@ -313,20 +310,19 @@ describe('Timeout Integration Tests', () => {
           .name('sequence')
           .type(StepType.Sequence)
           .steps([
-            new Step()
-              .name('fast')
-              .type(StepType.Transform)
-              .expression('"fast"'),
+            new Step().name('fast').type(StepType.Transform).expression('"fast"'),
             new Step()
               .name('slow')
               .type(StepType.Transform)
-              .expression('() => { let x = 0; for (let i = 0; i < 10000000; i++) { x += i; } return x; }()')
+              .expression(
+                '() => { let x = 0; for (let i = 0; i < 10000000; i++) { x += i; } return x; }()',
+              )
               .timeout(50), // Very short timeout
-          ])
+          ]),
       );
-    
+
     const executor = new FlowExecutor();
-    
+
     // Execute flow, expect timeout error
     try {
       await executor.execute(flow);
@@ -337,25 +333,19 @@ describe('Timeout Integration Tests', () => {
       expect(error.timeout).toBe(50);
     }
   });
-  
+
   it('should collect timeout metrics during execution', async () => {
     // Create a flow with steps that execute within timeout
     const flow = new Flow()
       .id('metrics-test-flow')
       .setTimeout(5000)
       .addStep(
-        new Step()
-          .name('request1')
-          .type(StepType.Request)
-          .request({ method: 'test', params: [] })
+        new Step().name('request1').type(StepType.Request).request({ method: 'test', params: [] }),
       )
       .addStep(
-        new Step()
-          .name('request2')
-          .type(StepType.Request)
-          .request({ method: 'test2', params: [] })
+        new Step().name('request2').type(StepType.Request).request({ method: 'test2', params: [] }),
       );
-    
+
     // Create executor with monitoring enabled
     const nearTimeoutCallback = jest.fn();
     const executor = new FlowExecutor({
@@ -363,8 +353,8 @@ describe('Timeout Integration Tests', () => {
         type: 'custom',
         handler: async (request) => {
           // Simulate varying response times
-          await new Promise(resolve => 
-            setTimeout(resolve, request.method === 'test' ? 100 : 200)
+          await new Promise((resolve) =>
+            setTimeout(resolve, request.method === 'test' ? 100 : 200),
           );
           return { jsonrpc: '2.0', id: request.id, result: 'success' };
         },
@@ -375,20 +365,20 @@ describe('Timeout Integration Tests', () => {
         collectMetrics: true,
       },
     });
-    
+
     // Execute flow
     const result = await executor.execute(flow);
-    
+
     // Check metrics
     expect(result.metadata.timeoutMetrics).toBeDefined();
     expect(result.metadata.timeoutMetrics.executionTimes[StepType.Request].length).toBe(2);
     expect(result.metadata.timeoutMetrics.totalExecutionTime).toBeGreaterThan(300);
     expect(result.metadata.timeoutMetrics.slowestExecution.stepName).toBe('request2');
-    
+
     // Near-timeout callback should not have been called (steps well under timeout)
     expect(nearTimeoutCallback).not.toHaveBeenCalled();
   });
-  
+
   it('should retry on timeout with appropriate policy', async () => {
     // Create a flow with a potentially slow step
     const flow = new Flow()
@@ -398,18 +388,18 @@ describe('Timeout Integration Tests', () => {
           .name('retriableRequest')
           .type(StepType.Request)
           .request({ method: 'slow', params: [] })
-          .timeout(150)
+          .timeout(150),
       );
-    
+
     // Mock function to track retries
     const handlerMock = jest.fn().mockImplementation(async (request) => {
       // First two calls are slow (timeout), third is fast
       if (handlerMock.mock.calls.length <= 2) {
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await new Promise((resolve) => setTimeout(resolve, 300));
       }
       return { jsonrpc: '2.0', id: request.id, result: 'success' };
     });
-    
+
     // Create executor with retry policy
     const executor = new FlowExecutor({
       transport: {
@@ -425,10 +415,10 @@ describe('Timeout Integration Tests', () => {
       },
       logging: true,
     });
-    
+
     // Execute flow, should succeed after retries
     const result = await executor.execute(flow);
-    
+
     // Check that it was retried
     expect(handlerMock).toHaveBeenCalledTimes(3);
     expect(result.result).toBe('success');
@@ -437,6 +427,7 @@ describe('Timeout Integration Tests', () => {
 ```
 
 ## Dependencies
+
 - TKT-TIMEOUT-001: Define Timeout Configuration Interfaces
 - TKT-TIMEOUT-004: Implement Timeout Resolution Logic
 - TKT-TIMEOUT-012: Implement TimeoutError Class
@@ -444,4 +435,5 @@ describe('Timeout Integration Tests', () => {
 - TKT-TIMEOUT-015: Implement Timeout Retry Policies
 
 ## Estimation
-5 story points (10-15 hours) 
+
+5 story points (10-15 hours)

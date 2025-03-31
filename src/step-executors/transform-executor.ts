@@ -9,6 +9,8 @@ import {
 import { Logger } from '../util/logger';
 import { SafeExpressionEvaluator } from '../expression-evaluator/safe-evaluator';
 import { ReferenceResolver } from '../reference-resolver';
+import { DEFAULT_TIMEOUTS } from '../constants/timeouts';
+import { EnhancedTimeoutError } from '../errors/timeout-error';
 
 /**
  * Core transform executor that handles all transformation operations
@@ -25,12 +27,13 @@ export class TransformExecutor {
     this.logger = logger.createNested('TransformExecutor');
   }
 
-  execute(operations: TransformOperation[], input: any): any {
+  execute(operations: TransformOperation[], input: any, step?: Step): any {
     this.logger.debug('Starting transform execution', {
       operationCount: operations.length,
       operations: operations.map((op) => ({ type: op.type, as: op.as })),
       inputType: typeof input,
       isArray: Array.isArray(input),
+      hasStep: !!step,
     });
 
     let data = input;
@@ -44,7 +47,7 @@ export class TransformExecutor {
         isArray: Array.isArray(data),
       });
 
-      data = this.executeOperation(op, data);
+      data = this.executeOperation(op, data, step);
 
       if (op.as) {
         this.logger.debug('Storing operation result in context', {
@@ -65,31 +68,32 @@ export class TransformExecutor {
     return data;
   }
 
-  private executeOperation(op: TransformOperation, data: any): any {
+  private executeOperation(op: TransformOperation, data: any, step?: Step): any {
     this.logger.debug('Executing operation', {
       type: op.type,
       using: op.using,
       as: op.as,
       dataType: typeof data,
       isArray: Array.isArray(data),
+      hasStep: !!step,
     });
 
     try {
       switch (op.type) {
         case 'map':
-          return this.executeMap(op, data);
+          return this.executeMap(op, data, step);
         case 'filter':
-          return this.executeFilter(op, data);
+          return this.executeFilter(op, data, step);
         case 'reduce':
-          return this.executeReduce(op, data);
+          return this.executeReduce(op, data, step);
         case 'flatten':
           return this.executeFlatten(op, data);
         case 'sort':
-          return this.executeSort(op, data);
+          return this.executeSort(op, data, step);
         case 'unique':
           return this.executeUnique(op, data);
         case 'group':
-          return this.executeGroup(op, data);
+          return this.executeGroup(op, data, step);
         case 'join':
           return this.executeJoin(op, data);
         default:
@@ -101,16 +105,17 @@ export class TransformExecutor {
     }
   }
 
-  private executeMap(op: TransformOperation, data: any[]): any[] {
+  private executeMap(op: TransformOperation, data: any[], step?: Step): any[] {
     this.validateArray(data, 'map');
     this.logger.debug('Executing map operation', {
       inputLength: data.length,
       expression: op.using,
+      hasStep: !!step,
     });
 
     const result = data.map((item, index) => {
       const context = { item, index };
-      const mapped = this.expressionEvaluator.evaluate(op.using, context);
+      const mapped = this.expressionEvaluator.evaluate(op.using, context, step);
       this.logger.debug('Mapped item', {
         index,
         originalType: typeof item,
@@ -126,16 +131,17 @@ export class TransformExecutor {
     return result;
   }
 
-  private executeFilter(op: TransformOperation, data: any[]): any[] {
+  private executeFilter(op: TransformOperation, data: any[], step?: Step): any[] {
     this.validateArray(data, 'filter');
     this.logger.debug('Executing filter operation', {
       inputLength: data.length,
       expression: op.using,
+      hasStep: !!step,
     });
 
     const result = data.filter((item, index) => {
       const context = { item, index };
-      const keep = this.expressionEvaluator.evaluate(op.using, context);
+      const keep = this.expressionEvaluator.evaluate(op.using, context, step);
       this.logger.debug('Filter evaluation', { index, keep });
       return keep;
     });
@@ -148,17 +154,18 @@ export class TransformExecutor {
     return result;
   }
 
-  private executeReduce(op: TransformOperation, data: any[]): any {
+  private executeReduce(op: TransformOperation, data: any[], step?: Step): any {
     this.validateArray(data, 'reduce');
     this.logger.debug('Executing reduce operation', {
       inputLength: data.length,
       expression: op.using,
       hasInitialValue: 'initial' in op,
+      hasStep: !!step,
     });
 
     const result = data.reduce((acc, item, index) => {
       const context = { acc, item, index };
-      const reduced = this.expressionEvaluator.evaluate(op.using, context);
+      const reduced = this.expressionEvaluator.evaluate(op.using, context, step);
       this.logger.debug('Reduced item', {
         index,
         accType: typeof acc,
@@ -190,16 +197,17 @@ export class TransformExecutor {
     return result;
   }
 
-  private executeSort(op: TransformOperation, data: any[]): any[] {
+  private executeSort(op: TransformOperation, data: any[], step?: Step): any[] {
     this.validateArray(data, 'sort');
     this.logger.debug('Executing sort operation', {
       inputLength: data.length,
       expression: op.using,
+      hasStep: !!step,
     });
 
     const result = [...data].sort((a, b) => {
       const context = { a, b };
-      return this.expressionEvaluator.evaluate(op.using, context);
+      return this.expressionEvaluator.evaluate(op.using, context, step);
     });
 
     this.logger.debug('Sort operation completed', {
@@ -224,16 +232,17 @@ export class TransformExecutor {
     return result;
   }
 
-  private executeGroup(op: TransformOperation, data: any[]): any[] {
+  private executeGroup(op: TransformOperation, data: any[], step?: Step): any[] {
     this.validateArray(data, 'group');
     this.logger.debug('Executing group operation', {
       inputLength: data.length,
       expression: op.using,
+      hasStep: !!step,
     });
 
     const groupedObj = data.reduce((acc, item, index) => {
       const context = { item, index };
-      const key = this.expressionEvaluator.evaluate(op.using, context);
+      const key = this.expressionEvaluator.evaluate(op.using, context, step);
       if (!acc[key]) {
         acc[key] = [];
       }
@@ -319,6 +328,22 @@ export class TransformStepExecutor implements StepExecutor {
     });
 
     try {
+      // Get timeout from context or use step-level timeout or default
+      const timeout = step.timeout ?? (context as any).timeout ?? DEFAULT_TIMEOUTS.transform;
+
+      this.logger.debug('Using timeout for transform step', {
+        stepName: step.name,
+        timeout,
+        hasStepTimeout: step.timeout !== undefined,
+        hasContextTimeout: (context as any).timeout !== undefined,
+      });
+
+      // Create a step context for expression evaluation
+      const stepContext: Step = {
+        name: step.name,
+        timeout,
+      };
+
       // Resolve input references
       const resolvedInput = context.referenceResolver.resolveReferences(
         transformStep.transform.input,
@@ -334,6 +359,7 @@ export class TransformStepExecutor implements StepExecutor {
       const result = await this.transformExecutor.execute(
         transformStep.transform.operations,
         resolvedInput,
+        stepContext,
       );
 
       this.logger.debug('Transform completed successfully', {
@@ -354,6 +380,7 @@ export class TransformStepExecutor implements StepExecutor {
           inputType: 'array',
           resultType: Array.isArray(result) ? 'array' : typeof result,
           timestamp: new Date().toISOString(),
+          timeout,
         },
       };
     } catch (error: any) {
@@ -361,6 +388,19 @@ export class TransformStepExecutor implements StepExecutor {
         stepName: step.name,
         error: error.toString(),
       });
+
+      // Enhance timeout errors with step context
+      if (error instanceof EnhancedTimeoutError) {
+        throw new EnhancedTimeoutError(
+          `Transform step "${step.name}" timed out: ${error.message}`,
+          error.timeout,
+          error.executionTime,
+          step,
+          StepType.Transform,
+          error.isExpressionTimeout,
+        );
+      }
+
       throw error;
     }
   }

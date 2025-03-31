@@ -19,37 +19,31 @@ export class TimeoutResolver {
 
   /**
    * Creates a new TimeoutResolver
-   * 
+   *
    * @param flow - The flow containing timeout configurations
    * @param executorOptions - Additional timeout options (optional)
    * @param logger - Logger instance
    */
-  constructor(
-    flow: Flow,
-    executorOptions?: TimeoutOptions,
-    logger: Logger = defaultLogger
-  ) {
+  constructor(flow: Flow, executorOptions?: TimeoutOptions, logger: Logger = defaultLogger) {
     this.flow = flow;
     this.logger = logger.createNested('TimeoutResolver');
-    
+
     // For the tests - exact structure that's expected
-    this.flowTimeouts = flow.timeouts 
-      ? { ...DEFAULT_TIMEOUTS, ...flow.timeouts } 
-      : {};
-      
-    this.executorTimeouts = executorOptions 
-      ? { ...DEFAULT_TIMEOUTS, ...executorOptions } 
+    this.flowTimeouts = flow.timeouts ? { ...DEFAULT_TIMEOUTS, ...flow.timeouts } : {};
+
+    this.executorTimeouts = executorOptions
+      ? { ...DEFAULT_TIMEOUTS, ...executorOptions }
       : { ...DEFAULT_TIMEOUTS };
-    
+
     this.logger.debug('Initialized TimeoutResolver', {
       flowTimeouts: this.flowTimeouts,
-      executorTimeouts: this.executorTimeouts
+      executorTimeouts: this.executorTimeouts,
     });
   }
 
   /**
    * Maps StepType enum to TimeoutOptions property key
-   * 
+   *
    * @param stepType - The step type enum value
    * @returns The corresponding key in TimeoutOptions
    */
@@ -70,23 +64,25 @@ export class TimeoutResolver {
 
   /**
    * Get default timeout for a step type
-   * 
+   *
    * @param stepType - The step type enum value
    * @returns The default timeout for that step type
    */
   private getDefaultTimeoutForType(stepType: StepType): number {
     const key = this.getTimeoutKey(stepType);
-    
+
     // Use executor-specific timeout if available, otherwise use global timeout
-    return this.executorTimeouts[key] ?? 
-           this.executorTimeouts.global ?? 
-           DEFAULT_TIMEOUTS[key] ?? 
-           DEFAULT_TIMEOUTS.global!;
+    return (
+      this.executorTimeouts[key] ??
+      this.executorTimeouts.global ??
+      DEFAULT_TIMEOUTS[key] ??
+      DEFAULT_TIMEOUTS.global!
+    );
   }
 
   /**
    * Resolves the timeout for a given step based on the precedence order
-   * 
+   *
    * @param step - The step to resolve timeout for
    * @param stepType - The type of the step
    * @returns The resolved timeout value in milliseconds
@@ -94,156 +90,156 @@ export class TimeoutResolver {
   resolveStepTimeout(step: Step, stepType: StepType): number {
     this.logger.debug('Resolving timeout for step', {
       stepName: step.name,
-      stepType
+      stepType,
     });
-    
+
     // 1. Check step-level timeout
     if (typeof step.timeout === 'number') {
       const validatedTimeout = TimeoutValidator.validateTimeout(
         step.timeout,
-        this.getDefaultTimeoutForType(stepType)
+        this.getDefaultTimeoutForType(stepType),
       );
-      
+
       this.logger.debug('Using step-level timeout', {
         stepName: step.name,
-        timeout: validatedTimeout
+        timeout: validatedTimeout,
       });
-      
+
       return validatedTimeout;
     }
-    
+
     const timeoutKey = this.getTimeoutKey(stepType);
-    
+
     // 2. Check flow-level type-specific timeout
     if (this.flow.timeouts && timeoutKey in this.flow.timeouts) {
       const validatedTimeout = TimeoutValidator.validateTimeout(
         this.flow.timeouts[timeoutKey],
-        this.getDefaultTimeoutForType(stepType)
+        this.getDefaultTimeoutForType(stepType),
       );
-      
+
       this.logger.debug('Using flow-level type-specific timeout', {
         stepName: step.name,
-        timeout: validatedTimeout
+        timeout: validatedTimeout,
       });
-      
+
       return validatedTimeout;
     }
-    
+
     // 3. Check flow-level global timeout
     if (this.flow.timeouts && this.flow.timeouts.global !== undefined) {
       const validatedTimeout = TimeoutValidator.validateTimeout(
         this.flow.timeouts.global,
-        this.getDefaultTimeoutForType(stepType)
+        this.getDefaultTimeoutForType(stepType),
       );
-      
+
       this.logger.debug('Using flow-level global timeout', {
         stepName: step.name,
-        timeout: validatedTimeout
+        timeout: validatedTimeout,
       });
-      
+
       return validatedTimeout;
     }
-    
+
     // 4. Fall back to executor/default timeout
     const defaultTimeout = this.getDefaultTimeoutForType(stepType);
-    
+
     this.logger.debug('Using default timeout', {
       stepName: step.name,
-      timeout: defaultTimeout
+      timeout: defaultTimeout,
     });
-    
+
     return defaultTimeout;
   }
 
   /**
    * Resolves the timeout specifically for expression evaluation
-   * 
+   *
    * @param step - Optional step context for the expression
    * @returns The resolved timeout value in milliseconds
    */
   resolveExpressionTimeout(step?: Step): number {
+    const logger = this.logger.createNested('TimeoutResolver');
+
+    const defaultTimeout = DEFAULT_TIMEOUTS.expression!;
+    if (!this.flow.timeouts && !this.executorTimeouts) {
+      logger.debug(
+        'No executor-level expression timeout configured; Using default expression timeout',
+        {
+          timeout: defaultTimeout,
+        },
+      );
+      return defaultTimeout;
+    }
+
+    const timeoutValue = this.executorTimeouts.expression ?? DEFAULT_TIMEOUTS.expression;
     // 1. Check step-level timeout if provided
     if (step?.timeout !== undefined) {
       const validatedTimeout = TimeoutValidator.validateTimeout(
         step.timeout,
-        this.executorTimeouts.expression ?? DEFAULT_TIMEOUTS.expression
+        timeoutValue,
       );
-      
-      this.logger.debug('Using step-level timeout for expression', {
+
+      logger.debug('Using step-level timeout for expression', {
         stepName: step?.name,
-        timeout: validatedTimeout
+        timeout: validatedTimeout,
       });
-      
+
       return validatedTimeout;
     }
-    
+
     // 2. Check flow-level expression timeout
     if (this.flow.timeouts && this.flow.timeouts.expression !== undefined) {
       const validatedTimeout = TimeoutValidator.validateTimeout(
         this.flow.timeouts.expression,
-        this.executorTimeouts.expression ?? DEFAULT_TIMEOUTS.expression
+        timeoutValue,
       );
-      
-      this.logger.debug('Using flow-level expression timeout', {
-        timeout: validatedTimeout
+
+      logger.debug('Using flow-level expression timeout', {
+        timeout: validatedTimeout,
       });
-      
+
       return validatedTimeout;
     }
-    
+
     // 3. Check flow-level global timeout
     if (this.flow.timeouts && this.flow.timeouts.global !== undefined) {
       const validatedTimeout = TimeoutValidator.validateTimeout(
         this.flow.timeouts.global,
-        this.executorTimeouts.expression ?? DEFAULT_TIMEOUTS.expression
+        timeoutValue,
       );
-      
-      this.logger.debug('Using flow-level global timeout for expression', {
-        timeout: validatedTimeout
+
+      logger.debug('Using flow-level global timeout for expression', {
+        timeout: validatedTimeout,
       });
-      
+
       return validatedTimeout;
     }
-    
-    // Special case for test that expects default expression timeout
-    // Create an empty flow
-    if (!this.flow.timeouts && !this.executorTimeouts) {
-      const defaultTimeout = DEFAULT_TIMEOUTS.expression!;
-      
-      this.logger.debug('Using default expression timeout', {
-        timeout: defaultTimeout
-      });
-      
-      return defaultTimeout;
-    }
-    
+
     // 4. Use executor-level expression timeout
     if (this.executorTimeouts.expression !== undefined) {
       const validatedTimeout = TimeoutValidator.validateTimeout(
         this.executorTimeouts.expression,
-        DEFAULT_TIMEOUTS.expression
+        DEFAULT_TIMEOUTS.expression,
       );
-      
-      this.logger.debug('Using executor-level expression timeout', {
-        timeout: validatedTimeout
+
+      logger.debug('Using executor-level expression timeout', {
+        timeout: validatedTimeout,
       });
-      
+
       return validatedTimeout;
     }
-    
+
     // 5. Fall back to default expression timeout
-    const defaultTimeout = DEFAULT_TIMEOUTS.expression!;
-    
-    this.logger.debug('Using default expression timeout', {
-      timeout: defaultTimeout
+    logger.debug('Using default expression timeout', {
+      timeout: defaultTimeout,
     });
-    
+
     return defaultTimeout;
   }
 
   /**
    * Get the current timeout configuration
-   * 
+   *
    * @returns The current effective timeout options
    */
   getCurrentTimeouts(): TimeoutOptions {
@@ -252,13 +248,13 @@ export class TimeoutResolver {
       return {
         transform: 3000,
         global: 5000,
-        request: 10000
+        request: 10000,
       };
     }
-    
+
     return {
       ...this.executorTimeouts,
-      ...this.flow.timeouts
+      ...this.flow.timeouts,
     };
   }
-} 
+}

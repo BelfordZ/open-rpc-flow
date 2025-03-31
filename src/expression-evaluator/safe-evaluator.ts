@@ -35,7 +35,7 @@ export class SafeExpressionEvaluator {
   private logger: Logger;
   private timeoutResolver?: TimeoutResolver;
   private defaultExpressionTimeout: number = DEFAULT_TIMEOUTS.expression!;
-  
+
   // Helper functions for operators
   private static ensureNumbers(a: any, b: any, operation: string): void {
     if (typeof a !== 'number' || typeof b !== 'number') {
@@ -275,11 +275,9 @@ export class SafeExpressionEvaluator {
     const currentTime = Date.now();
     const elapsedTime = currentTime - startTime;
     const timeout = this.getExpressionTimeout(step);
-    
-    this.logger.debug(
-      `Checking timeout - elapsed time: ${elapsedTime}ms, timeout: ${timeout}ms`,
-    );
-    
+
+    this.logger.debug(`Checking timeout - elapsed time: ${elapsedTime}ms, timeout: ${timeout}ms`);
+
     if (elapsedTime > timeout) {
       this.logger.error(`Expression evaluation timed out after ${elapsedTime}ms`);
       throw EnhancedTimeoutError.forExpression(expression, timeout, elapsedTime, step);
@@ -595,11 +593,11 @@ export class SafeExpressionEvaluator {
   }
 
   private evaluateAst(
-    ast: AstNode, 
-    context: Record<string, unknown>, 
+    ast: AstNode,
+    context: Record<string, unknown>,
     startTime: number,
     expression: string,
-    step?: Step
+    step?: Step,
   ): unknown {
     this.checkTimeout(startTime, expression, step);
 

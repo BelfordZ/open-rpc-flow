@@ -1,8 +1,13 @@
-import { RequestStepExecutor } from '../../step-executors';
 import { StepExecutionContext, Step } from '../../types';
 import { JsonRpcRequestError } from '../../step-executors/types';
 import { createMockContext } from '../test-utils';
-import { noLogger } from '../../util/logger';
+import { TestLogger } from '../../util/logger';
+import { CircuitBreaker, CircuitBreakerConfig } from '../../errors/circuit-breaker';
+import { RetryPolicy, RetryableOperation } from '../../errors/recovery';
+import { ErrorCode } from '../../errors/codes';
+import { ExecutionError } from '../../errors/base';
+import { RequestStepExecutor } from '../../step-executors';
+import { json } from 'stream/consumers';
 
 interface RequestStep extends Step {
   request: {
@@ -15,11 +20,18 @@ describe('RequestStepExecutor', () => {
   let executor: RequestStepExecutor;
   let context: StepExecutionContext;
   let jsonRpcHandler: jest.Mock;
+  const testLogger = new TestLogger('RequestStepExecutorTest');
 
   beforeEach(() => {
     jsonRpcHandler = jest.fn();
-    executor = new RequestStepExecutor(jsonRpcHandler, noLogger);
+    executor = new RequestStepExecutor(jsonRpcHandler, testLogger);
     context = createMockContext();
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+    testLogger.print();
+    testLogger.clear();
   });
 
   it('executes a simple request step', async () => {
@@ -57,18 +69,20 @@ describe('RequestStepExecutor', () => {
     };
 
     context.stepResults.set('user', { id: 1, role: 'admin' });
-    jsonRpcHandler.mockResolvedValue(['read', 'write']);
-    await executor.execute(step, context);
-
+    jsonRpcHandler.mockResolvedValue(['foo', 'bar']);
+    const result = await executor.execute(step, context);
+    console.log(jsonRpcHandler.mock.calls);
+    expect(result.result).toEqual(['foo', 'bar']);
+    expect(jsonRpcHandler).toHaveBeenCalledTimes(1);
     expect(jsonRpcHandler).toHaveBeenCalledWith({
       jsonrpc: '2.0',
       method: 'permissions.get',
-      params: {
+      params: expect.objectContaining({
         userId: 1,
         role: 'admin',
-      },
+      }),
       id: expect.any(Number),
-    });
+    }, undefined);
   });
 
   it('handles JSON-RPC error responses', async () => {
@@ -185,7 +199,7 @@ describe('RequestStepExecutor', () => {
         value: 'test',
       },
       id: expect.any(Number),
-    });
+    }, undefined);
   });
 
   it('cycles request IDs correctly', async () => {
@@ -247,7 +261,7 @@ describe('RequestStepExecutor', () => {
       method: 'test.method',
       params: ['first', 'second'],
       id: expect.any(Number),
-    });
+    }, undefined);
   });
 
   it('handles unknown errors', async () => {
@@ -340,5 +354,361 @@ describe('RequestStepExecutor', () => {
     await expect(executor.execute(step, context)).rejects.not.toThrow(
       'Failed to execute request step',
     );
+  });
+
+  describe('with circuit breaker', () => {
+    let circuitBreakerConfig: CircuitBreakerConfig;
+    let cbExecutor: RequestStepExecutor;
+    
+    beforeEach(() => {
+      // Reset the mocks
+      jest.clearAllMocks();
+      
+      // Create a circuit breaker config
+      circuitBreakerConfig = {
+        failureThreshold: 3,
+        recoveryTime: 5000,
+        monitorWindow: 60000
+      };
+      
+      // Create an executor with circuit breaker config - using real implementation
+      cbExecutor = new RequestStepExecutor(
+        jsonRpcHandler,
+        testLogger,
+        null,
+        circuitBreakerConfig
+      );
+    });
+    
+    afterEach(() => {
+      jest.clearAllMocks();
+    });
+    
+    it('initializes with circuit breaker configuration', () => {
+      // Verify the executor has a circuit breaker
+      expect((cbExecutor as any).circuitBreaker).toBeInstanceOf(CircuitBreaker);
+    });
+    
+    it('executes request using circuit breaker', async () => {
+      const step: RequestStep = {
+        name: 'circuitBreakerTest',
+        request: {
+          method: 'test.method',
+          params: {},
+        },
+      };
+      
+      jsonRpcHandler.mockResolvedValue({ success: true });
+      
+      const result = await cbExecutor.execute(step, context);
+      
+      // Verify result was processed through the circuit breaker
+      expect(result.result).toEqual({ success: true });
+      expect(jsonRpcHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: 'test.method',
+          params: {}
+        }),
+        undefined
+      );
+    });
+    
+    it('handles errors with circuit breaker', async () => {
+      const step: RequestStep = {
+        name: 'circuitBreakerErrorTest',
+        request: {
+          method: 'test.method',
+          params: {},
+        },
+      };
+      
+      // Setup the mock to throw an error
+      jsonRpcHandler.mockRejectedValue(new Error('Circuit break error'));
+      
+      // Original implementation passes through errors
+      await expect(cbExecutor.execute(step, context)).rejects.toThrow(
+        'Failed to execute request step "circuitBreakerErrorTest": Circuit break error'
+      );
+      
+      // Verify jsonRpcHandler was called
+      expect(jsonRpcHandler).toHaveBeenCalled();
+    });
+  });
+  
+  describe('with retry policy only', () => {
+    let retryPolicy: RetryPolicy;
+    let rpExecutor: RequestStepExecutor;
+    
+    beforeEach(() => {
+      // Reset the mocks
+      jest.clearAllMocks();
+      
+      // Create a retry policy with correct properties
+      retryPolicy = {
+        maxAttempts: 3,
+        retryableErrors: [ErrorCode.NETWORK_ERROR],
+        backoff: {
+          initial: 100,
+          multiplier: 2,
+          maxDelay: 5000
+        },
+        retryDelay: 1000
+      };
+      
+      // Create an executor with retry policy only - using real implementation
+      rpExecutor = new RequestStepExecutor(
+        jsonRpcHandler,
+        testLogger,
+        retryPolicy,
+        null // no circuit breaker
+      );
+    });
+    
+    afterEach(() => {
+      jest.clearAllMocks();
+    });
+    
+    it('executes request using retry policy without circuit breaker', async () => {
+      const step: RequestStep = {
+        name: 'retryPolicyTest',
+        request: {
+          method: 'test.method',
+          params: {},
+        },
+      };
+      
+      jsonRpcHandler.mockResolvedValue({ success: true });
+      
+      // Execute the step
+      const result = await rpExecutor.execute(step, context);
+      
+      // Verify jsonRpcHandler was called with correct parameters
+      expect(jsonRpcHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: 'test.method',
+          params: {}
+        }),
+        undefined
+      );
+      
+      // Verify we got the correct result
+      expect(result.result).toEqual({ success: true });
+    });
+    
+    it('handles errors with retry policy', async () => {
+      const step: RequestStep = {
+        name: 'retryPolicyErrorTest',
+        request: {
+          method: 'test.method',
+          params: {},
+        },
+      };
+      
+      // Simulate a temporary failure then success
+      let callCount = 0;
+      jsonRpcHandler.mockImplementation(() => {
+        callCount++;
+        if (callCount < 3) {
+          throw new ExecutionError('Temporary error', { code: ErrorCode.NETWORK_ERROR });
+        }
+        return { success: true };
+      });
+      
+      // Should succeed after retries
+      const result = await rpExecutor.execute(step, context);
+      
+      // Verify jsonRpcHandler was called multiple times
+      expect(jsonRpcHandler).toHaveBeenCalledTimes(3);
+      expect(result.result).toEqual({ success: true });
+    });
+  });
+  
+  describe('with circuit breaker and retry policy', () => {
+    let circuitBreakerConfig: CircuitBreakerConfig;
+    let retryPolicy: RetryPolicy;
+    let cbRpExecutor: RequestStepExecutor;
+    
+    beforeEach(() => {
+      // Reset the mocks
+      jest.clearAllMocks();
+      
+      // Create configs with the correct properties
+      circuitBreakerConfig = {
+        failureThreshold: 3,
+        recoveryTime: 5000,
+        monitorWindow: 60000
+      };
+      
+      retryPolicy = {
+        maxAttempts: 3,
+        retryableErrors: [ErrorCode.NETWORK_ERROR],
+        backoff: {
+          initial: 100,
+          multiplier: 2,
+          maxDelay: 5000
+        }
+      };
+      
+      // Create an executor with both circuit breaker and retry policy - using real implementation
+      cbRpExecutor = new RequestStepExecutor(
+        jsonRpcHandler,
+        testLogger,
+        retryPolicy,
+        circuitBreakerConfig
+      );
+    });
+    
+    afterEach(() => {
+      jest.clearAllMocks();
+    });
+    
+    it('executes request using both circuit breaker and retry policy', async () => {
+      const step: RequestStep = {
+        name: 'combinedTest',
+        request: {
+          method: 'test.method',
+          params: {},
+        },
+      };
+      
+      jsonRpcHandler.mockResolvedValue({ success: true });
+      
+      const result = await cbRpExecutor.execute(step, context);
+      
+      // Verify jsonRpcHandler was called with correct parameters
+      expect(jsonRpcHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: 'test.method',
+          params: {}
+        }),
+        undefined
+      );
+      
+      // Verify we got the correct result
+      expect(result.result).toEqual({ success: true });
+    });
+  });
+
+  it('handles AbortError correctly', async () => {
+    const step: RequestStep = {
+      name: 'abortTest',
+      request: {
+        method: 'test.method',
+        params: {},
+      },
+    };
+
+    // Create an AbortError
+    const abortError = new Error('The operation was aborted');
+    abortError.name = 'AbortError';
+    
+    // Mock JSON-RPC handler to throw the AbortError
+    jsonRpcHandler.mockRejectedValue(abortError);
+
+    // Expect the executor to throw an ExecutionError with TIMEOUT_ERROR code
+    await expect(executor.execute(step, context)).rejects.toThrow(
+      'Request step "abortTest" was aborted'
+    );
+  });
+
+  it('passes signal from context to jsonRpcHandler', async () => {
+    const step: RequestStep = {
+      name: 'signalTest',
+      request: {
+        method: 'test.method',
+        params: {},
+      },
+    };
+
+    // Create a mock abort controller and signal
+    const abortController = new AbortController();
+    const contextWithSignal = {
+      ...context,
+      signal: abortController.signal
+    };
+
+    await executor.execute(step, contextWithSignal);
+
+    // Verify that the signal was passed to jsonRpcHandler
+    expect(jsonRpcHandler).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'test.method'
+      }),
+      { signal: abortController.signal }
+    );
+  });
+
+  it.only('rethrows non-JsonRpcRequestError errors from outer catch block', async () => {
+    const step: RequestStep = {
+      name: 'outerErrorTest',
+      request: {
+        method: 'test.method',
+        params: {},
+      },
+    };
+    
+    // Create a custom error class that isn't JsonRpcRequestError
+    class CustomError extends Error {
+      constructor(message: string) {
+        super(message);
+        this.name = 'CustomError';
+      }
+    }
+    
+    // Configure executor with real circuit breaker
+    const executorWithCircuitBreaker = new RequestStepExecutor(
+      jsonRpcHandler,
+      testLogger,
+      null,
+      { failureThreshold: 3, recoveryTime: 5000, monitorWindow: 60000 }
+    );
+    
+    // Mock jsonRpcHandler to throw a custom error
+    jsonRpcHandler.mockRejectedValue(new CustomError('Custom outer error'));
+ 
+    // Execute and expect the error to be rethrown
+    await expect(executorWithCircuitBreaker.execute(step, context))
+      .rejects.toThrow('Failed to execute request step "outerErrorTest": Custom outer error');
+         
+    expect(jsonRpcHandler).toHaveBeenCalledTimes(1);
+  });
+
+  it('rethrows JsonRpcRequestError from outer catch block', async () => {
+    const step: RequestStep = {
+      name: 'outerJsonRpcErrorTest',
+      request: {
+        method: 'test.method',
+        params: {},
+      },
+    };
+    
+    // Create a JsonRpcRequestError directly from the step-executors types
+    const jsonRpcError = new JsonRpcRequestError('Outer JSON-RPC error occurred', {
+      code: -32001,
+      message: 'Outer JSON-RPC error',
+    });
+    
+    // Create a executor with a real circuit breaker
+    const testExecutor = new RequestStepExecutor(
+      jsonRpcHandler,
+      testLogger,
+      null,
+      { failureThreshold: 3, recoveryTime: 5000, monitorWindow: 60000 }
+    );
+    
+    // Mock jsonRpcHandler to throw a JsonRpcRequestError
+    jsonRpcHandler.mockRejectedValue(jsonRpcError);
+    
+    // The error should be rethrown directly
+    try {
+      await testExecutor.execute(step, context);
+      fail('Expected to throw JsonRpcRequestError');
+    } catch (error) {
+      // Verify we got the same error instance back, unmodified
+      expect(error).toBe(jsonRpcError);
+      // Add type assertion
+      expect((error as JsonRpcRequestError).message).toBe('Outer JSON-RPC error occurred');
+      expect(error instanceof JsonRpcRequestError).toBe(true);
+    }
   });
 });

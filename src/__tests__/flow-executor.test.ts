@@ -2,6 +2,8 @@ import { FlowExecutor } from '../flow-executor';
 import { Flow } from '../types';
 import { TestLogger } from '../util/logger';
 import { TransformStepExecutor } from '../step-executors/transform-executor';
+import { RequestStepExecutor } from '../step-executors/request-executor';
+import { ErrorCode } from '../errors/codes';
 
 describe('FlowExecutor', () => {
   let executor: FlowExecutor;
@@ -297,5 +299,74 @@ describe('FlowExecutor', () => {
     expect(conditionResult.metadata.branchTaken).toBe('else');
     expect(conditionResult.result).toBeUndefined();
     expect(jsonRpcHandler).toHaveBeenCalledTimes(0);
+  });
+
+  it('updates error handling options correctly', () => {
+    // Use reflection to access private properties for validation
+    const getPrivateProperty = (prop: string): any => {
+      return (executor as any)[prop];
+    };
+
+    // Get reference to the original request executor
+    const originalExecutor = getPrivateProperty('stepExecutors').find(
+      (e: any) => e instanceof RequestStepExecutor
+    );
+
+    // Update error handling options
+    executor.updateErrorHandlingOptions({
+      enableRetries: true,
+      enableCircuitBreaker: true,
+      retryPolicy: {
+        maxAttempts: 5,
+        backoff: {
+          initial: 200,
+          multiplier: 1.5,
+          maxDelay: 2000,
+        },
+        retryableErrors: [
+          ErrorCode.NETWORK_ERROR,
+          ErrorCode.TIMEOUT_ERROR,
+        ],
+      },
+      circuitBreakerConfig: {
+        failureThreshold: 5,
+        recoveryTime: 30000,
+        monitorWindow: 60000,
+      },
+    });
+
+    // Verify all options were updated
+    expect(getPrivateProperty('enableRetries')).toBe(true);
+    expect(getPrivateProperty('enableCircuitBreaker')).toBe(true);
+    expect(getPrivateProperty('retryPolicy')).toEqual({
+      maxAttempts: 5,
+      backoff: {
+        initial: 200,
+        multiplier: 1.5,
+        maxDelay: 2000,
+      },
+      retryableErrors: [
+        ErrorCode.NETWORK_ERROR,
+        ErrorCode.TIMEOUT_ERROR,
+      ],
+    });
+    expect(getPrivateProperty('circuitBreakerConfig')).toEqual({
+      failureThreshold: 5,
+      recoveryTime: 30000,
+      monitorWindow: 60000,
+    });
+
+    // Verify the request executor was replaced
+    const newExecutor = getPrivateProperty('stepExecutors').find(
+      (e: any) => e instanceof RequestStepExecutor
+    );
+    expect(newExecutor).not.toBe(originalExecutor);
+
+    // Test partial updates
+    executor.updateErrorHandlingOptions({
+      enableRetries: false,
+    });
+    expect(getPrivateProperty('enableRetries')).toBe(false);
+    expect(getPrivateProperty('enableCircuitBreaker')).toBe(true); // Unchanged
   });
 });

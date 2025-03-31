@@ -1,11 +1,4 @@
-import {
-  FlowExecutor,
-  Flow,
-  JsonRpcRequest,
-  ErrorCode,
-  RetryPolicy,
-  CircuitBreakerConfig,
-} from '../index';
+import { FlowExecutor, Flow, JsonRpcRequest, ErrorCode } from '../index';
 
 /**
  * This example demonstrates how to use the error handling features

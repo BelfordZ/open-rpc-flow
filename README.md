@@ -1,16 +1,15 @@
 # Flow Execution Engine
 
-A flexible and type-safe execution engine for JSON-RPC based workflows. This engine allows you to define complex flows of operations including requests, transformations, conditions, and loops, with full support for data dependencies, parallel execution, and error handling.
+A flexible and type-safe execution engine for JSON-RPC based workflows. This engine allows you to define complex flows of operations including requests, transformations, conditions, and loops, with full support for data dependencies, execution optimization, and error handling.
 
 ## Features
 
 - 🔄 **JSON-RPC Request Handling**: Execute JSON-RPC 2.0 requests with automatic request ID management and error handling
-- 🔀 **Flow Control**: Support for conditional execution, loops, and parallel processing with proper variable scoping
+- 🔀 **Flow Control**: Support for conditional execution and loops with proper variable scoping
 - 🔄 **Data Transformation**: Transform data between steps using map, filter, reduce, and other operations
 - 📊 **Expression Evaluation**: Dynamic expression evaluation with support for template literals and object paths
 - 🔗 **Dependency Resolution**: Automatic handling of data dependencies between steps
 - 🎯 **Type Safety**: Written in TypeScript with comprehensive type definitions
-- ⚡ **Parallel Execution**: Automatic parallel execution of independent steps
 - 🔍 **Error Handling**: Detailed error reporting, validation, and graceful error recovery
 - 🌍 **Context Management**: Global context available to all steps with proper scoping
 - 📦 **Batch Processing**: Support for processing data in configurable batch sizes
@@ -161,7 +160,7 @@ const dataPipelineFlow: Flow = {
 
 ### 3. API Data Aggregation
 
-Aggregate data from multiple API endpoints with parallel processing:
+Aggregate data from multiple API endpoints:
 
 ```typescript
 const apiAggregationFlow: Flow = {
@@ -186,25 +185,6 @@ const apiAggregationFlow: Flow = {
             input: '${user}',
             operations: [
               {
-                type: 'parallel',
-                operations: [
-                  {
-                    name: 'profile',
-                    request: {
-                      method: 'user.profile',
-                      params: { userId: '${user.id}' },
-                    },
-                  },
-                  {
-                    name: 'activity',
-                    request: {
-                      method: 'user.activity',
-                      params: { userId: '${user.id}' },
-                    },
-                  },
-                ],
-              },
-              {
                 type: 'map',
                 using: `{
                   ...user,
@@ -215,26 +195,6 @@ const apiAggregationFlow: Flow = {
             ],
           },
         },
-      },
-    },
-    {
-      name: 'aggregateData',
-      transform: {
-        input: '${fetchUserDetails.result.value}',
-        operations: [
-          {
-            type: 'group',
-            using: 'item.profile.department',
-          },
-          {
-            type: 'map',
-            using: `{
-              department: key,
-              userCount: items.length,
-              activeUsers: items.filter(u => u.recentActivity.length > 0).length
-            }`,
-          },
-        ],
       },
     },
   ],
@@ -444,15 +404,12 @@ const executor = new FlowExecutor(flow, jsonRpcHandler, {
   retryPolicy: {
     maxAttempts: 3,
     backoff: {
-      initial: 100,  // Initial delay in ms
+      initial: 100, // Initial delay in ms
       multiplier: 2, // Exponential multiplier
-      maxDelay: 5000 // Maximum delay in ms
+      maxDelay: 5000, // Maximum delay in ms
     },
-    retryableErrors: [
-      ErrorCode.NETWORK_ERROR,
-      ErrorCode.TIMEOUT_ERROR
-    ]
-  }
+    retryableErrors: [ErrorCode.NETWORK_ERROR, ErrorCode.TIMEOUT_ERROR],
+  },
 });
 ```
 
@@ -467,14 +424,10 @@ executor.updateErrorHandlingOptions({
     backoff: {
       initial: 200,
       multiplier: 1.5,
-      maxDelay: 10000
+      maxDelay: 10000,
     },
-    retryableErrors: [
-      ErrorCode.NETWORK_ERROR,
-      ErrorCode.TIMEOUT_ERROR,
-      ErrorCode.RESOURCE_ERROR
-    ]
-  }
+    retryableErrors: [ErrorCode.NETWORK_ERROR, ErrorCode.TIMEOUT_ERROR, ErrorCode.RESOURCE_ERROR],
+  },
 });
 ```
 
@@ -488,10 +441,10 @@ const executor = new FlowExecutor(flow, jsonRpcHandler, {
   enableCircuitBreaker: true,
   // Configure circuit breaker (or use DEFAULT_CIRCUIT_BREAKER_CONFIG)
   circuitBreakerConfig: {
-    failureThreshold: 5,   // Number of failures before opening circuit
-    recoveryTime: 30000,   // Time in ms before attempting recovery
-    monitorWindow: 60000   // Time window for failure evaluation
-  }
+    failureThreshold: 5, // Number of failures before opening circuit
+    recoveryTime: 30000, // Time in ms before attempting recovery
+    monitorWindow: 60000, // Time window for failure evaluation
+  },
 });
 ```
 
@@ -503,8 +456,8 @@ Listen for error events during flow execution:
 const executor = new FlowExecutor(flow, jsonRpcHandler, {
   eventOptions: {
     emitFlowEvents: true,
-    emitStepEvents: true
-  }
+    emitStepEvents: true,
+  },
 });
 
 // Listen for flow-level errors
@@ -529,17 +482,17 @@ Set a timeout for a specific step:
 
 ```typescript
 const flow = {
-  name: "MyFlow",
+  name: 'MyFlow',
   steps: [
     {
-      name: "longRunningStep",
-      timeout: 5000,  // 5 second timeout for this step
+      name: 'longRunningStep',
+      timeout: 5000, // 5 second timeout for this step
       request: {
-        method: "slowOperation",
-        params: {}
-      }
-    }
-  ]
+        method: 'slowOperation',
+        params: {},
+      },
+    },
+  ],
 };
 ```
 
@@ -549,16 +502,18 @@ Configure timeouts for all steps of a certain type within a flow:
 
 ```typescript
 const flow = {
-  name: "MyFlow",
+  name: 'MyFlow',
   timeouts: {
-    global: 30000,     // 30s default for all steps
-    request: 10000,    // 10s for request steps
-    transform: 5000,   // 5s for transform steps
-    condition: 2000,   // 2s for condition steps
-    loop: 60000,       // 60s for loop steps
-    expression: 1000   // 1s for expression evaluation
+    global: 30000, // 30s default for all steps
+    request: 10000, // 10s for request steps
+    transform: 5000, // 5s for transform steps
+    condition: 2000, // 2s for condition steps
+    loop: 60000, // 60s for loop steps
+    expression: 1000, // 1s for expression evaluation
   },
-  steps: [/* ... */]
+  steps: [
+    /* ... */
+  ],
 };
 ```
 
@@ -569,14 +524,15 @@ Set default timeouts when creating the executor:
 ```typescript
 const executor = new FlowExecutor(flow, jsonRpcHandler, {
   timeouts: {
-    global: 30000,    // 30s default
-    request: 10000,   // 10s for requests
-    transform: 5000   // 5s for transformations
-  }
+    global: 30000, // 30s default
+    request: 10000, // 10s for requests
+    transform: 5000, // 5s for transformations
+  },
 });
 ```
 
 Timeout resolution follows this precedence order:
+
 1. Step-level timeout (`step.timeout`)
 2. Flow-level type-specific timeout (`flow.timeouts[stepType]`)
 3. Flow-level global timeout (`flow.timeouts.global`)
@@ -584,6 +540,7 @@ Timeout resolution follows this precedence order:
 5. Default timeout for the step type
 
 All timeouts must be:
+
 - At least 50ms
 - No more than 1 hour (3,600,000ms)
 - A positive integer

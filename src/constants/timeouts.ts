@@ -10,33 +10,33 @@ export const DEFAULT_TIMEOUTS: TimeoutOptions = {
    * Rationale: A reasonable default for most operations
    */
   global: 30000,
-  
+
   /**
    * Default request timeout (30s)
    * Rationale: Network operations require more time due to external dependencies
    * and potential network latency
    */
   request: 30000,
-  
+
   /**
    * Default transform timeout (10s)
    * Rationale: Data transformations should be relatively quick but may involve
    * complex calculations on large datasets
    */
   transform: 10000,
-  
+
   /**
    * Default condition timeout (5s)
    * Rationale: Condition evaluations are typically simpler than transformations
    */
   condition: 5000,
-  
+
   /**
    * Default loop timeout (60s)
    * Rationale: Loops may process many items and should have longer timeouts
    */
   loop: 60000,
-  
+
   /**
    * Default expression evaluation timeout (1s)
    * Rationale: Single expressions should complete quickly;
@@ -57,4 +57,4 @@ export const MIN_TIMEOUT_MS = 50;
  * Rationale: Operations taking longer than 1 hour should be redesigned or
  * broken into smaller steps
  */
-export const MAX_TIMEOUT_MS = 3600000; 
+export const MAX_TIMEOUT_MS = 3600000;

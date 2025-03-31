@@ -1,9 +1,11 @@
 # TKT-TIMEOUT-011: Implement Loop Step Timeout Support
 
 ## Description
+
 Add timeout support to the LoopStepExecutor, ensuring that loop executions respect configured timeout limits. This is critical for preventing infinite loops or excessively long loop executions from hanging the application.
 
 ## Acceptance Criteria
+
 - Update LoopStepExecutor to utilize configurable timeouts
 - Implement a mechanism to track cumulative execution time across all loop iterations
 - Pass remaining timeout to each loop iteration
@@ -19,11 +21,11 @@ export class LoopStepExecutor implements StepExecutor {
     private expressionEvaluator: SafeExpressionEvaluator,
     private executors: Map<StepType, StepExecutor>,
   ) {}
-  
+
   canExecute(step: Step): boolean {
     return step.type === StepType.Loop;
   }
-  
+
   async execute(
     step: Step,
     context: StepExecutionContext,
@@ -32,46 +34,48 @@ export class LoopStepExecutor implements StepExecutor {
     if (!this.canExecute(step)) {
       throw new Error('Invalid step type for LoopStepExecutor');
     }
-    
+
     const loopStep = step as LoopStep;
-    
+
     // Get timeout from context (set by TimeoutResolver)
     const timeout = (context as any).timeout;
-    
+
     // Start tracking execution time
     const startTime = Date.now();
     let currentIterationIndex = 0;
     const results: any[] = [];
-    
+
     try {
       // Get the items to iterate over
       const itemsToIterate = await this.expressionEvaluator.evaluateExpression(
         loopStep.over,
         { ...context, ...extraContext },
-        timeout
+        timeout,
       );
-      
+
       if (!Array.isArray(itemsToIterate)) {
-        throw new Error(`Loop step requires an array to iterate over, got: ${typeof itemsToIterate}`);
+        throw new Error(
+          `Loop step requires an array to iterate over, got: ${typeof itemsToIterate}`,
+        );
       }
-      
+
       // Set a maximum number of iterations as a safety measure
       // This can be overridden by configuration in the future
       const maxIterations = 1000; // Reasonable default
       const itemCount = Math.min(itemsToIterate.length, maxIterations);
-      
+
       // Execute the loop
       for (currentIterationIndex = 0; currentIterationIndex < itemCount; currentIterationIndex++) {
         // Check if we've already exceeded the timeout
         this.checkTimeout(startTime, timeout, step.name, currentIterationIndex);
-        
+
         // Get the current item
         const currentItem = itemsToIterate[currentIterationIndex];
-        
+
         // Calculate remaining timeout for this iteration
         const elapsedTime = Date.now() - startTime;
         const remainingTimeout = timeout ? Math.max(0, timeout - elapsedTime) : null;
-        
+
         // Create iteration context
         const iterationContext = {
           ...context,
@@ -80,23 +84,19 @@ export class LoopStepExecutor implements StepExecutor {
           currentIndex: currentIterationIndex,
           timeout: remainingTimeout,
         };
-        
+
         // Find the appropriate executor for the do step
         const executor = this.executors.get(loopStep.do.type);
         if (!executor) {
           throw new Error(`No executor found for step type: ${loopStep.do.type}`);
         }
-        
+
         // Execute the step for this iteration
-        const iterationResult = await executor.execute(
-          loopStep.do,
-          iterationContext,
-          extraContext
-        );
-        
+        const iterationResult = await executor.execute(loopStep.do, iterationContext, extraContext);
+
         results.push(iterationResult.result);
       }
-      
+
       return {
         result: results,
         type: StepType.Loop,
@@ -121,21 +121,26 @@ export class LoopStepExecutor implements StepExecutor {
             completedIterations: currentIterationIndex,
             partialResults: results,
             retryable: true,
-          }
+          },
         );
       }
-      
+
       // Re-throw other errors
       throw error;
     }
   }
-  
+
   /**
    * Check if execution has exceeded the configured timeout
    */
-  private checkTimeout(startTime: number, timeout: number | null, stepName: string, iteration: number): void {
+  private checkTimeout(
+    startTime: number,
+    timeout: number | null,
+    stepName: string,
+    iteration: number,
+  ): void {
     if (timeout === null) return;
-    
+
     const elapsedTime = Date.now() - startTime;
     if (elapsedTime >= timeout) {
       throw new TimeoutError(
@@ -147,7 +152,7 @@ export class LoopStepExecutor implements StepExecutor {
           elapsed: elapsedTime,
           currentIteration: iteration,
           retryable: true,
-        }
+        },
       );
     }
   }
@@ -155,9 +160,11 @@ export class LoopStepExecutor implements StepExecutor {
 ```
 
 ## Dependencies
+
 - TKT-TIMEOUT-001: Define Timeout Configuration Interfaces
 - TKT-TIMEOUT-004: Implement Timeout Resolution Logic
 - TKT-TIMEOUT-005: Update Expression Evaluator with Configurable Timeouts
 
 ## Estimation
-4 story points (8-12 hours) 
+
+4 story points (8-12 hours)

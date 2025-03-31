@@ -1,7 +1,7 @@
 import { ReferenceResolver } from './reference-resolver';
 import { SafeExpressionEvaluator } from './expression-evaluator/safe-evaluator';
 import { DependencyResolver } from './dependency-resolver';
-import { Flow, Step, JsonRpcRequest, StepExecutionContext } from './types';
+import { Flow, Step, JsonRpcRequest, StepExecutionContext, JsonRpcHandler } from './types';
 import {
   StepExecutor,
   StepExecutionResult,
@@ -13,11 +13,7 @@ import {
   StepType,
 } from './step-executors';
 import { Logger, defaultLogger } from './util/logger';
-import {
-  FlowExecutorEvents,
-  FlowEventOptions,
-  DEFAULT_EVENT_OPTIONS,
-} from './util/flow-executor-events';
+import { FlowExecutorEvents, FlowEventOptions } from './util/flow-executor-events';
 import { RetryPolicy } from './errors/recovery';
 import { CircuitBreakerConfig } from './errors/circuit-breaker';
 import { ErrorCode } from './errors/codes';
@@ -83,7 +79,7 @@ export class FlowExecutor {
 
   constructor(
     private flow: Flow,
-    private jsonRpcHandler: (request: JsonRpcRequest) => Promise<any>,
+    private jsonRpcHandler: JsonRpcHandler,
     loggerOrOptions?: Logger | FlowExecutorOptions,
   ) {
     // Handle both new options object and legacy logger parameter

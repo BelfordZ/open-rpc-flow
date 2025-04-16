@@ -61,7 +61,10 @@ export class PolicyResolver {
       return (this.flow.policies.step as any)[policyName] as T;
     }
     // 4. Global policy (flow.policies.global[policyName])
-    if (this.flow.policies?.global && (this.flow.policies.global as any)[policyName] !== undefined) {
+    if (
+      this.flow.policies?.global &&
+      (this.flow.policies.global as any)[policyName] !== undefined
+    ) {
       this.logger.debug('Using flow.policies.global[policyName]', { policyName });
       return (this.flow.policies.global as any)[policyName] as T;
     }
@@ -74,17 +77,9 @@ export class PolicyResolver {
    * Helper to resolve timeout policy (returns the timeout number or a sensible default)
    */
   resolveTimeout(step: Step, stepType: StepType): number {
-    const timeoutObj = this.resolvePolicy<{ timeout?: number }>(
-      step,
-      stepType,
-      'timeout',
-    );
+    const timeoutObj = this.resolvePolicy<{ timeout?: number }>(step, stepType, 'timeout');
     // Use the resolved timeout, or the default for the stepType, or the global default
-    return (
-      timeoutObj?.timeout ??
-      (DEFAULT_TIMEOUTS as any)[stepType] ??
-      DEFAULT_TIMEOUTS.global
-    );
+    return timeoutObj?.timeout ?? (DEFAULT_TIMEOUTS as any)[stepType] ?? DEFAULT_TIMEOUTS.global;
   }
 
   /**
@@ -98,11 +93,7 @@ export class PolicyResolver {
    * Helper to resolve expression evaluation timeout (returns the timeout number or a sensible default)
    */
   resolveExpressionTimeout(step: Step, stepType: StepType): number {
-    const timeoutObj = this.resolvePolicy<{ expressionEval?: number }>(
-      step,
-      stepType,
-      'timeout',
-    );
+    const timeoutObj = this.resolvePolicy<{ expressionEval?: number }>(step, stepType, 'timeout');
     return (
       (typeof timeoutObj?.expressionEval === 'number' ? timeoutObj.expressionEval : undefined) ??
       DEFAULT_TIMEOUTS.expression!
@@ -110,4 +101,4 @@ export class PolicyResolver {
   }
 
   // Future: add helpers for other policy types (circuitBreaker, rateLimit, etc)
-} 
+}

@@ -192,11 +192,7 @@ export class FlowExecutor {
    * Create a RequestStepExecutor with the current error handling configuration
    */
   private createRequestStepExecutor(): RequestStepExecutor {
-    return new RequestStepExecutor(
-      this.jsonRpcHandler,
-      this.logger,
-      this.policyResolver,
-    );
+    return new RequestStepExecutor(this.jsonRpcHandler, this.logger, this.policyResolver);
   }
 
   /**
@@ -395,10 +391,7 @@ export class FlowExecutor {
       }
 
       // Do not wrap custom errors
-      if (
-        error instanceof TimeoutError ||
-        error instanceof ExecutionError
-      ) {
+      if (error instanceof TimeoutError || error instanceof ExecutionError) {
         throw error;
       }
 

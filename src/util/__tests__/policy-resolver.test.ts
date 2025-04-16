@@ -1,5 +1,5 @@
 import { PolicyResolver } from '../policy-resolver';
-import { Step, Flow, StepType } from '../../types';
+import { Step, Flow } from '../../types';
 import { Logger } from '../logger';
 import { DEFAULT_TIMEOUTS } from '../../constants/timeouts';
 
@@ -52,7 +52,9 @@ describe('PolicyResolver', () => {
 
   it('returns fallback/default if nothing found', () => {
     const resolver = new PolicyResolver(baseFlow, logger);
-    expect(resolver.resolveTimeout(baseStep, 'transform')).toBe((DEFAULT_TIMEOUTS as any)['transform'] ?? DEFAULT_TIMEOUTS.global);
+    expect(resolver.resolveTimeout(baseStep, 'transform')).toBe(
+      (DEFAULT_TIMEOUTS as any)['transform'] ?? DEFAULT_TIMEOUTS.global,
+    );
   });
 
   it('resolvePolicy respects precedence order', () => {
@@ -88,13 +90,15 @@ describe('PolicyResolver', () => {
     expect(resolver3.resolveTimeout(baseStep, 'transform')).toBe(5);
     // Remove all, fallback
     const resolver4 = new PolicyResolver(baseFlow, logger);
-    expect(resolver4.resolveTimeout(baseStep, 'transform')).toBe((DEFAULT_TIMEOUTS as any)['transform'] ?? DEFAULT_TIMEOUTS.global);
+    expect(resolver4.resolveTimeout(baseStep, 'transform')).toBe(
+      (DEFAULT_TIMEOUTS as any)['transform'] ?? DEFAULT_TIMEOUTS.global,
+    );
   });
 
   it('resolveRetryPolicy works for all levels', () => {
     const retryObj = { maxAttempts: 7 };
     // Step-level
-    let step: Step = { ...baseStep, policies: { retryPolicy: retryObj } };
+    const step: Step = { ...baseStep, policies: { retryPolicy: retryObj } };
     let resolver = new PolicyResolver(baseFlow, logger);
     expect(resolver.resolveRetryPolicy(step, 'transform')).toBe(retryObj);
     // Per-stepType
@@ -125,7 +129,9 @@ describe('PolicyResolver', () => {
 
   it('returns undefined if nothing found and no fallback', () => {
     const resolver = new PolicyResolver(baseFlow, logger);
-    expect(resolver.resolveTimeout(baseStep, 'transform')).toBe((DEFAULT_TIMEOUTS as any)['transform'] ?? DEFAULT_TIMEOUTS.global);
+    expect(resolver.resolveTimeout(baseStep, 'transform')).toBe(
+      (DEFAULT_TIMEOUTS as any)['transform'] ?? DEFAULT_TIMEOUTS.global,
+    );
     expect(resolver.resolveRetryPolicy(baseStep, 'transform')).toBeUndefined();
   });
-}); 
+});

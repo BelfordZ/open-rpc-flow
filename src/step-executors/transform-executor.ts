@@ -9,7 +9,6 @@ import {
 import { Logger } from '../util/logger';
 import { SafeExpressionEvaluator } from '../expression-evaluator/safe-evaluator';
 import { ReferenceResolver } from '../reference-resolver';
-import { DEFAULT_TIMEOUTS } from '../constants/timeouts';
 import { TimeoutError } from '../errors/timeout-error';
 import { PolicyResolver } from '../util/policy-resolver';
 
@@ -28,7 +27,11 @@ export class TransformExecutor {
     this.logger = logger.createNested('TransformExecutor');
   }
 
-  async execute(operations: TransformOperation[], input: string | any[], step?: Step): Promise<any> {
+  async execute(
+    operations: TransformOperation[],
+    input: string | any[],
+    step?: Step,
+  ): Promise<any> {
     this.logger.debug('Starting transform execution', {
       operationCount: operations.length,
       operations: operations.map((op) => ({ type: op.type, as: op.as })),
@@ -132,7 +135,7 @@ export class TransformExecutor {
           Date.now() - start,
           step,
           StepType.Transform,
-          false
+          false,
         );
       }
       const context = { item: data[index], index };

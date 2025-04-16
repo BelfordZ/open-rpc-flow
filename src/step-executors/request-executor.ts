@@ -40,7 +40,7 @@ export class RequestStepExecutor implements StepExecutor {
    * @param context The execution context with flow-level timeouts
    * @returns Timeout in milliseconds or undefined if no timeout is set
    */
-  private getStepTimeout(step: RequestStep, context: StepExecutionContext): number {
+  private getStepTimeout(step: RequestStep, _context: StepExecutionContext): number {
     // Use PolicyResolver for timeout resolution
     return this.policyResolver.resolveTimeout(step, StepType.Request);
   }
@@ -50,14 +50,17 @@ export class RequestStepExecutor implements StepExecutor {
    * @param step The request step to get retry policy for
    * @returns RetryPolicy or null if retries are disabled
    */
-  private getStepRetryPolicy(step: RequestStep, context: StepExecutionContext): RetryPolicy | null {
+  private getStepRetryPolicy(
+    step: RequestStep,
+    _context: StepExecutionContext,
+  ): RetryPolicy | null {
     // Use PolicyResolver for retry policy resolution
     return this.policyResolver.resolveRetryPolicy(step, StepType.Request) ?? null;
   }
 
   async execute(
     step: Step,
-    context: StepExecutionContext,
+    _context: StepExecutionContext,
     extraContext: Record<string, any> = {},
   ): Promise<StepExecutionResult> {
     if (!this.canExecute(step)) {
@@ -66,8 +69,8 @@ export class RequestStepExecutor implements StepExecutor {
 
     const requestStep = step as RequestStep;
     const requestId = this.getNextRequestId();
-    const stepRetryPolicy = this.getStepRetryPolicy(requestStep, context);
-    const timeout = this.getStepTimeout(requestStep, context);
+    const stepRetryPolicy = this.getStepRetryPolicy(requestStep, _context);
+    const timeout = this.getStepTimeout(requestStep, _context);
 
     this.logger.debug('Executing request step', {
       stepName: step.name,
@@ -111,7 +114,7 @@ export class RequestStepExecutor implements StepExecutor {
         }
 
         // Resolve references in params
-        const resolvedParams = context.referenceResolver.resolveReferences(
+        const resolvedParams = _context.referenceResolver.resolveReferences(
           requestStep.request.params,
           extraContext,
         );
@@ -128,8 +131,8 @@ export class RequestStepExecutor implements StepExecutor {
         // Use either our timeout's abort signal or the one from context
         if (abortController?.signal) {
           options.signal = abortController.signal;
-        } else if (context.signal) {
-          options.signal = context.signal;
+        } else if (_context.signal) {
+          options.signal = _context.signal;
         }
 
         // Pass AbortSignal to JSON-RPC handler

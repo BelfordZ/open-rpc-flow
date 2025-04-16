@@ -78,18 +78,16 @@ describe('TransformStepExecutor Timeout Tests', () => {
     };
 
     // Mock only the evaluate method to throw a timeout error immediately
-    jest
-      .spyOn(expressionEvaluator, 'evaluate')
-      .mockImplementation((expression, context, step) => {
-        const timeout = step?.timeout || 10000;
-        throw TimeoutError.forExpression(
-          expression,
-          timeout,
-          timeout + 1000,
-          step,
-          StepType.Transform
-        );
-      });
+    jest.spyOn(expressionEvaluator, 'evaluate').mockImplementation((expression, context, step) => {
+      const timeout = step?.timeout || 10000;
+      throw TimeoutError.forExpression(
+        expression,
+        timeout,
+        timeout + 1000,
+        step,
+        StepType.Transform,
+      );
+    });
 
     // Start the execution
     const executePromise = executor.execute(step, context);
@@ -123,18 +121,16 @@ describe('TransformStepExecutor Timeout Tests', () => {
     };
 
     // Mock only the evaluate method to throw a timeout error immediately
-    jest
-      .spyOn(expressionEvaluator, 'evaluate')
-      .mockImplementation((expression, context, step) => {
-        const timeout = step?.timeout || 10000;
-        throw TimeoutError.forExpression(
-          expression,
-          timeout,
-          timeout + 1000,
-          step,
-          StepType.Transform
-        );
-      });
+    jest.spyOn(expressionEvaluator, 'evaluate').mockImplementation((expression, context, step) => {
+      const timeout = step?.timeout || 10000;
+      throw TimeoutError.forExpression(
+        expression,
+        timeout,
+        timeout + 1000,
+        step,
+        StepType.Transform,
+      );
+    });
 
     // Remove timeout from context
     delete context.timeout;
@@ -174,18 +170,16 @@ describe('TransformStepExecutor Timeout Tests', () => {
     };
 
     // Mock only the evaluate method to throw a timeout error immediately
-    jest
-      .spyOn(expressionEvaluator, 'evaluate')
-      .mockImplementation((expression, context, step) => {
-        const timeout = step?.timeout || 10000;
-        throw TimeoutError.forExpression(
-          expression,
-          timeout,
-          timeout + 1000,
-          step,
-          StepType.Transform
-        );
-      });
+    jest.spyOn(expressionEvaluator, 'evaluate').mockImplementation((expression, context, step) => {
+      const timeout = step?.timeout || 10000;
+      throw TimeoutError.forExpression(
+        expression,
+        timeout,
+        timeout + 1000,
+        step,
+        StepType.Transform,
+      );
+    });
 
     // Start the execution
     const executePromise = executor.execute(step, context);

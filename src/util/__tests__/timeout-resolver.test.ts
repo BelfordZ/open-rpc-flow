@@ -109,9 +109,8 @@ describe('TimeoutResolver', () => {
         steps: [],
         policies: {
           step: {
-            // @ts-ignore: per-stepType policy is allowed by metaschema, but not by the current TS type
             transform: { timeout: { timeout: 2222 } },
-          } as any,
+          },
         },
       };
       const step: Step = { name: 'TestStep' };

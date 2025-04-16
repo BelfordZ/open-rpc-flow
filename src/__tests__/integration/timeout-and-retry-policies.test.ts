@@ -89,12 +89,7 @@ function createMockHandler(options: MockHandlerOptions) {
       // Simulate failure based on configuration
       if (shouldFail && currentAttempt.count <= failUntilAttempt) {
         if (errorType === 'TIMEOUT') {
-          throw TimeoutError.forStep(
-            { name: request.method } as any,
-            StepType.Request,
-            50,
-            100
-          );
+          throw TimeoutError.forStep({ name: request.method } as any, StepType.Request, 50, 100);
         } else if (errorType === 'NETWORK') {
           throw new FlowError('Network error', ImportedErrorCode.NETWORK_ERROR, {});
         } else {
@@ -622,12 +617,7 @@ describe('Timeout and Retry Policies', () => {
         testLogger.debug(`[mockHandler] Attempt: ${attempts.count}`);
         if (attempts.count === 1) {
           // Throw a TimeoutError with the correct error code
-          throw TimeoutError.forStep(
-            { name: request.method } as any,
-            StepType.Request,
-            50,
-            100
-          );
+          throw TimeoutError.forStep({ name: request.method } as any, StepType.Request, 50, 100);
         }
         return {
           jsonrpc: '2.0',
@@ -903,11 +893,15 @@ describe('Timeout and Retry Policies', () => {
       try {
         await executor.execute(flow.steps[0], context);
         // If we reach here, the request was not aborted or timed out as expected
-        throw new Error('Expected the request to be aborted or timed out, but it completed successfully');
+        throw new Error(
+          'Expected the request to be aborted or timed out, but it completed successfully',
+        );
       } catch (error) {
         testLogger.debug(`[test] Caught error: ${String(error)}`);
         if (!/timed out|TimeoutError/.test(String(error))) {
-          throw new Error(`Expected error to match /timed out|TimeoutError/, but got: ${String(error)}`);
+          throw new Error(
+            `Expected error to match /timed out|TimeoutError/, but got: ${String(error)}`,
+          );
         }
       }
     });

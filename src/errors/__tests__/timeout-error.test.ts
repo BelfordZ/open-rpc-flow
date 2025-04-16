@@ -36,13 +36,7 @@ describe('TimeoutError', () => {
     });
 
     it('should set isExpressionTimeout to false by default', () => {
-      const error = new TimeoutError(
-        'Timeout occurred',
-        5000,
-        6000,
-        mockStep,
-        StepType.Request,
-      );
+      const error = new TimeoutError('Timeout occurred', 5000, 6000, mockStep, StepType.Request);
 
       expect(error.isExpressionTimeout).toBe(false);
     });

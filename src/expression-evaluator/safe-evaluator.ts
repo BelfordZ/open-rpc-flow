@@ -220,10 +220,7 @@ export class SafeExpressionEvaluator {
         error instanceof PropertyAccessError ||
         error instanceof ExpressionError
       ) {
-        if (
-          typeof expression === 'string' &&
-          /^[a-zA-Z_][a-zA-Z0-9_ ]*$/.test(expression.trim())
-        ) {
+        if (typeof expression === 'string' && /^[a-zA-Z_][a-zA-Z0-9_ ]*$/.test(expression.trim())) {
           extraHint = ` (Did you mean to use a string literal? Wrap your value in quotes, e.g. "'${expression.trim()}'")`;
         }
         throw new ExpressionError(
@@ -294,7 +291,12 @@ export class SafeExpressionEvaluator {
     }
   }
 
-  private checkTimeout(startTime: number, expression: string, step?: Step, stepType?: string): void {
+  private checkTimeout(
+    startTime: number,
+    expression: string,
+    step?: Step,
+    stepType?: string,
+  ): void {
     const currentTime = Date.now();
     const elapsedTime = currentTime - startTime;
     const timeout = this.getExpressionTimeout(step, stepType);
@@ -303,8 +305,17 @@ export class SafeExpressionEvaluator {
 
     if (elapsedTime > timeout) {
       this.logger.error(`Expression evaluation timed out after ${elapsedTime}ms`);
-      this.logger.debug('TimeoutError debug info:', { step, stepType: step ? getStepType(step) : undefined });
-      throw TimeoutError.forExpression(expression, timeout, elapsedTime, step, step ? getStepType(step) as StepType : undefined);
+      this.logger.debug('TimeoutError debug info:', {
+        step,
+        stepType: step ? getStepType(step) : undefined,
+      });
+      throw TimeoutError.forExpression(
+        expression,
+        timeout,
+        elapsedTime,
+        step,
+        step ? (getStepType(step) as StepType) : undefined,
+      );
     }
   }
 
@@ -707,14 +718,28 @@ export class SafeExpressionEvaluator {
         const obj: Record<string, unknown> = {};
         for (const prop of ast.properties) {
           if (prop.spread) {
-            const spreadValue = this.evaluateAst(prop.value, context, startTime, expression, step, stepType);
+            const spreadValue = this.evaluateAst(
+              prop.value,
+              context,
+              startTime,
+              expression,
+              step,
+              stepType,
+            );
             if (typeof spreadValue === 'object' && spreadValue !== null) {
               Object.assign(obj, spreadValue);
             } else {
               throw new ExpressionError('Invalid spread operator usage: can only spread objects');
             }
           } else {
-            obj[prop.key] = this.evaluateAst(prop.value, context, startTime, expression, step, stepType);
+            obj[prop.key] = this.evaluateAst(
+              prop.value,
+              context,
+              startTime,
+              expression,
+              step,
+              stepType,
+            );
           }
         }
         return obj;
@@ -728,7 +753,14 @@ export class SafeExpressionEvaluator {
         const result: unknown[] = [];
         for (const elem of ast.elements) {
           if (elem.spread) {
-            const spreadValue = this.evaluateAst(elem.value, context, startTime, expression, step, stepType);
+            const spreadValue = this.evaluateAst(
+              elem.value,
+              context,
+              startTime,
+              expression,
+              step,
+              stepType,
+            );
             if (Array.isArray(spreadValue)) {
               result.push(...spreadValue);
             } else if (spreadValue !== null && typeof spreadValue === 'object') {
@@ -739,7 +771,9 @@ export class SafeExpressionEvaluator {
               );
             }
           } else {
-            result.push(this.evaluateAst(elem.value, context, startTime, expression, step, stepType));
+            result.push(
+              this.evaluateAst(elem.value, context, startTime, expression, step, stepType),
+            );
           }
         }
         return result;

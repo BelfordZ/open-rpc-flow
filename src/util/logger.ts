@@ -86,7 +86,10 @@ export class TestLogger implements Logger {
     this.logs = [];
   }
   print() {
-    const logs = this.logs.map((log) => `[${log.level.toUpperCase()}] [${this.name}] ${log.message}${log.data ? ' ' + JSON.stringify(log.data) : ''}`);
+    const logs = this.logs.map(
+      (log) =>
+        `[${log.level.toUpperCase()}] [${this.name}] ${log.message}${log.data ? ' ' + JSON.stringify(log.data) : ''}`,
+    );
     console.log(logs.join('\n'));
   }
   createNested(prefix: string): TestLogger {

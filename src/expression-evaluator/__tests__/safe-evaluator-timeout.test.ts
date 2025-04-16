@@ -1,6 +1,6 @@
 import { SafeExpressionEvaluator } from '../safe-evaluator';
 import { ReferenceResolver } from '../../reference-resolver';
-import { Flow, Step } from '../../types';
+import { Step } from '../../types';
 import { TimeoutError } from '../../errors/timeout-error';
 import { defaultLogger } from '../../util/logger';
 
@@ -43,14 +43,7 @@ describe('SafeExpressionEvaluator with Timeouts', () => {
     mockReferenceResolver.resolvePath = jest.fn().mockReturnValue(10);
 
     // Create mock flow
-    const mockFlow: Flow = {
-      name: 'Test Flow',
-      description: 'Test flow description',
-      steps: [],
-      timeouts: {
-        expression: 2000,
-      },
-    };
+    // const mockFlow = { steps: [] };
 
     evaluator = new SafeExpressionEvaluator(logger, mockReferenceResolver);
   });

@@ -1,9 +1,5 @@
 export { Flow, Step, JsonRpcRequest } from './types';
-export {
-  FlowExecutor,
-  FlowExecutorOptions,
-  DEFAULT_RETRY_POLICY,
-} from './flow-executor';
+export { FlowExecutor, FlowExecutorOptions, DEFAULT_RETRY_POLICY } from './flow-executor';
 export { SafeExpressionEvaluator } from './expression-evaluator/safe-evaluator';
 export {
   ReferenceResolver,

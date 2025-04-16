@@ -5,9 +5,9 @@ import { ErrorCode } from '../errors/codes';
 /**
  * Example implementation of a JsonRpcHandler with AbortSignal support
  */
-export const exampleJsonRpcHandler: JsonRpcHandler = async function(
+export const exampleJsonRpcHandler: JsonRpcHandler = async function (
   request: JsonRpcRequest,
-  options?: JsonRpcHandlerOptions
+  options?: JsonRpcHandlerOptions,
 ): Promise<any> {
   console.log(`Executing JSON-RPC request: ${request.method}`, {
     id: request.id,
@@ -22,7 +22,7 @@ export const exampleJsonRpcHandler: JsonRpcHandler = async function(
 
   // Create a fetch-based request with timeout support
   const apiUrl = 'https://api.example.com/jsonrpc';
-  
+
   try {
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -70,7 +70,7 @@ export const exampleFlow: Flow = {
       request: {
         method: 'example.fastMethod',
         params: { operation: 'quick-query' },
-      }
+      },
       // Uses the default request timeout (5000ms)
     },
     {
@@ -84,15 +84,15 @@ export const exampleFlow: Flow = {
       // Fallback configuration in case of timeout
       timeoutFallback: {
         value: { status: 'timeout', result: null },
-        continueExecution: true // Continue flow execution even if this step times out
-      }
-    }
-  ]
+        continueExecution: true, // Continue flow execution even if this step times out
+      },
+    },
+  ],
 };
 
 /**
  * Usage notes:
- * 
+ *
  * 1. The Flow Executor will create an AbortController internally based on the timeout configuration.
  * 2. For each step execution, the AbortController's signal is passed to the JsonRpcHandler.
  * 3. The RequestStepExecutor handles AbortError exceptions automatically.
@@ -100,7 +100,7 @@ export const exampleFlow: Flow = {
  *    - Configure timeouts at flow and/or step level
  *    - Optionally provide fallback values for timeout cases
  *    - Implement a JsonRpcHandler that respects the AbortSignal
- * 
+ *
  * The FlowExecutor takes care of the rest, including:
  * - Creating and managing AbortController lifecycle
  * - Ensuring signal propagation to handlers

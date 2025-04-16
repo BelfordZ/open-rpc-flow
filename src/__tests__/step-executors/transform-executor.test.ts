@@ -269,7 +269,9 @@ describe('Transform Executors', () => {
             using: '${item}',
           },
         ];
-        await expect(executor.execute(operations, data)).rejects.toThrow('Input to map operation must be an array');
+        await expect(executor.execute(operations, data)).rejects.toThrow(
+          'Input to map operation must be an array',
+        );
       });
 
       test('throws on unknown operation type', async () => {
@@ -280,7 +282,9 @@ describe('Transform Executors', () => {
             using: '${item}',
           },
         ];
-        await expect(executor.execute(operations, data)).rejects.toThrow('Unknown transform operation type');
+        await expect(executor.execute(operations, data)).rejects.toThrow(
+          'Unknown transform operation type',
+        );
       });
     });
 

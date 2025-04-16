@@ -77,11 +77,13 @@ describe('TransformStepExecutor Timeout Tests', () => {
     };
 
     // Mock only the evaluate method to throw a timeout error after the specified time
-    jest.spyOn(expressionEvaluator, 'evaluate').mockImplementation(async (expression, context, step) => {
-      const timeout = step?.timeout || context.timeout || 10000;
-      await new Promise(resolve => setTimeout(resolve, timeout + 1000)); // Wait longer than the timeout
-      throw EnhancedTimeoutError.forExpression(expression, timeout, timeout + 1000, step);
-    });
+    jest
+      .spyOn(expressionEvaluator, 'evaluate')
+      .mockImplementation(async (expression, context, step) => {
+        const timeout = step?.timeout || context.timeout || 10000;
+        await new Promise((resolve) => setTimeout(resolve, timeout + 1000)); // Wait longer than the timeout
+        throw EnhancedTimeoutError.forExpression(expression, timeout, timeout + 1000, step);
+      });
 
     // Start the execution
     const executePromise = executor.execute(step, context);
@@ -115,11 +117,13 @@ describe('TransformStepExecutor Timeout Tests', () => {
     };
 
     // Mock only the evaluate method to throw a timeout error after the specified time
-    jest.spyOn(expressionEvaluator, 'evaluate').mockImplementation(async (expression, context, step) => {
-      const timeout = step?.timeout || context.timeout || 10000;
-      await new Promise(resolve => setTimeout(resolve, timeout + 1000)); // Wait longer than the timeout
-      throw EnhancedTimeoutError.forExpression(expression, timeout, timeout + 1000, step);
-    });
+    jest
+      .spyOn(expressionEvaluator, 'evaluate')
+      .mockImplementation(async (expression, context, step) => {
+        const timeout = step?.timeout || context.timeout || 10000;
+        await new Promise((resolve) => setTimeout(resolve, timeout + 1000)); // Wait longer than the timeout
+        throw EnhancedTimeoutError.forExpression(expression, timeout, timeout + 1000, step);
+      });
 
     // Remove timeout from context
     delete context.timeout;
@@ -159,11 +163,13 @@ describe('TransformStepExecutor Timeout Tests', () => {
     };
 
     // Mock only the evaluate method to throw a timeout error after the specified time
-    jest.spyOn(expressionEvaluator, 'evaluate').mockImplementation(async (expression, context, step) => {
-      const timeout = step?.timeout || context.timeout || 10000;
-      await new Promise(resolve => setTimeout(resolve, timeout + 1000)); // Wait longer than the timeout
-      throw EnhancedTimeoutError.forExpression(expression, timeout, timeout + 1000, step);
-    });
+    jest
+      .spyOn(expressionEvaluator, 'evaluate')
+      .mockImplementation(async (expression, context, step) => {
+        const timeout = step?.timeout || context.timeout || 10000;
+        await new Promise((resolve) => setTimeout(resolve, timeout + 1000)); // Wait longer than the timeout
+        throw EnhancedTimeoutError.forExpression(expression, timeout, timeout + 1000, step);
+      });
 
     // Start the execution
     const executePromise = executor.execute(step, context);
@@ -183,4 +189,4 @@ describe('TransformStepExecutor Timeout Tests', () => {
       isExpressionTimeout: true,
     });
   });
-}); 
+});

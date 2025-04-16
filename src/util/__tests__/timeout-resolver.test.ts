@@ -72,10 +72,10 @@ describe('TimeoutResolver', () => {
     it('should return the correct timeout key for each step type', () => {
       const flow = createMockFlow();
       const resolver = new TimeoutResolver(flow, undefined, logger);
-      
+
       // Access the private method using type assertion and indexing
       const getTimeoutKey = (resolver as any)['getTimeoutKey'].bind(resolver);
-      
+
       expect(getTimeoutKey(StepType.Request)).toBe('request');
       expect(getTimeoutKey(StepType.Transform)).toBe('transform');
       expect(getTimeoutKey(StepType.Condition)).toBe('condition');
@@ -221,27 +221,28 @@ describe('TimeoutResolver', () => {
     it('should handle special case for empty flow timeouts and executor timeouts', () => {
       // Create a completely empty flow
       const emptyFlow = createMockFlow(undefined); // No timeouts in flow
-      
+
       // Force empty executorTimeouts by setting it to undefined and then erasing it from the instance
       const resolver = new TimeoutResolver(emptyFlow, undefined, logger);
-      
+
       // Override the executorTimeouts property to force the special case
       Object.defineProperty(resolver, 'executorTimeouts', {
         value: undefined, // This will trigger the !this.executorTimeouts condition
         writable: true,
-        configurable: true
+        configurable: true,
       });
-      
+
       // Now clear debug spy to focus only on the call we care about
       jest.clearAllMocks();
-      
+
       const timeout = resolver.resolveExpressionTimeout();
-      
+
       expect(timeout).toBe(DEFAULT_TIMEOUTS.expression);
       const logs = logger.getLogs();
       expect(logs).toContainEqual({
         level: 'debug',
-        message: 'No executor-level expression timeout configured; Using default expression timeout',
+        message:
+          'No executor-level expression timeout configured; Using default expression timeout',
         data: { timeout: DEFAULT_TIMEOUTS.expression },
       });
     });
@@ -264,27 +265,27 @@ describe('TimeoutResolver', () => {
 
     it('should fall back to default expression timeout when no executor expression timeout is available', () => {
       const flow = createMockFlow();
-      
+
       // Create a resolver with default executor timeouts
       const resolver = new TimeoutResolver(flow, undefined, logger);
-      
+
       // Manually modify the executorTimeouts to remove the expression property completely
       // This will cause the this.executorTimeouts.expression check to be undefined
       const executorTimeoutsWithoutExpression = { ...DEFAULT_TIMEOUTS };
       delete executorTimeoutsWithoutExpression.expression;
-      
+
       // Override the executorTimeouts property
       Object.defineProperty(resolver, 'executorTimeouts', {
         value: executorTimeoutsWithoutExpression,
         writable: true,
-        configurable: true
+        configurable: true,
       });
-      
+
       // Now clear debug spy to focus only on the call we care about
       jest.clearAllMocks();
-      
+
       const timeout = resolver.resolveExpressionTimeout();
-      
+
       expect(timeout).toBe(DEFAULT_TIMEOUTS.expression);
       const logs = logger.getLogs();
       expect(logs).toContainEqual({
@@ -314,10 +315,10 @@ describe('TimeoutResolver', () => {
     it('should handle special case for request property in flow timeouts', () => {
       const flowTimeouts = { request: 10000 };
       const flow = createMockFlow(flowTimeouts);
-      
+
       const resolver = new TimeoutResolver(flow, undefined, logger);
       const timeouts = resolver.getCurrentTimeouts();
-      
+
       expect(timeouts).toEqual({
         transform: 3000,
         global: 5000,
@@ -329,10 +330,10 @@ describe('TimeoutResolver', () => {
       // Create a flow with no timeouts
       const flow = createMockFlow();
       const executorTimeouts = { request: 8000, transform: 3000 };
-      
+
       const resolver = new TimeoutResolver(flow, executorTimeouts, logger);
       const timeouts = resolver.getCurrentTimeouts();
-      
+
       // We don't need to test the exact structure, just verify it includes our custom values
       expect(timeouts.request).toBe(8000);
       expect(timeouts.transform).toBe(3000);
@@ -343,10 +344,10 @@ describe('TimeoutResolver', () => {
       const flowTimeouts = { global: 5000, transform: 4000 }; // No 'request' property
       const flow = createMockFlow(flowTimeouts);
       const executorTimeouts = { request: 8000 };
-      
+
       const resolver = new TimeoutResolver(flow, executorTimeouts, logger);
       const timeouts = resolver.getCurrentTimeouts();
-      
+
       // We don't need to test the exact structure, just verify it includes all values correctly
       expect(timeouts.global).toBe(5000);
       expect(timeouts.transform).toBe(4000);

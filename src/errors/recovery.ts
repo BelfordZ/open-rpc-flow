@@ -43,11 +43,11 @@ export class RetryableOperation<T> {
     let lastError: unknown;
 
     const strategy = this.policy.backoff.strategy || 'exponential';
-    
+
     this.logger.debug('Starting retryable operation', {
       maxAttempts: this.policy.maxAttempts,
       retryableErrors: this.policy.retryableErrors,
-      backoffStrategy: strategy
+      backoffStrategy: strategy,
     });
 
     while (attempt <= this.policy.maxAttempts) {
@@ -76,7 +76,12 @@ export class RetryableOperation<T> {
           attempt,
           error: error instanceof Error ? error.message : String(error),
           errorType: error?.constructor?.name,
-          errorCode: error instanceof FlowError ? error.code : (error && typeof error === 'object' && 'code' in error ? (error as any).code : 'unknown'),
+          errorCode:
+            error instanceof FlowError
+              ? error.code
+              : error && typeof error === 'object' && 'code' in error
+                ? (error as any).code
+                : 'unknown',
           isRetryable: this.isRetryable(error),
         });
 
@@ -102,10 +107,15 @@ export class RetryableOperation<T> {
               attempts: attempt,
               lastError: error instanceof Error ? error.message : String(error),
               lastErrorType: error?.constructor?.name,
-              lastErrorCode: error instanceof FlowError ? error.code : (error && typeof error === 'object' && 'code' in error ? (error as any).code : 'unknown'),
+              lastErrorCode:
+                error instanceof FlowError
+                  ? error.code
+                  : error && typeof error === 'object' && 'code' in error
+                    ? (error as any).code
+                    : 'unknown',
               policy: this.policy,
             },
-            toError(error)
+            toError(error),
           );
         }
 
@@ -116,7 +126,7 @@ export class RetryableOperation<T> {
           attempt,
           delay,
           error: error instanceof Error ? error.message : String(error),
-          backoffStrategy: strategy
+          backoffStrategy: strategy,
         });
 
         await new Promise((resolve) => setTimeout(resolve, delay));
@@ -135,7 +145,7 @@ export class RetryableOperation<T> {
       errorType: error?.constructor?.name,
       errorMessage: error instanceof Error ? error.message : String(error),
       code: error && typeof error === 'object' && 'code' in error ? (error as any).code : undefined,
-      errorObject: error
+      errorObject: error,
     });
 
     const errorDetails = {
@@ -214,7 +224,7 @@ export class RetryableOperation<T> {
 
     if (strategy === 'linear') {
       // Linear backoff: initial + (multiplier * (attempt - 1))
-      delay = this.policy.backoff.initial + (this.policy.backoff.multiplier * (attempt - 1));
+      delay = this.policy.backoff.initial + this.policy.backoff.multiplier * (attempt - 1);
     } else {
       // Default exponential backoff: initial * (multiplier ^ (attempt - 1))
       delay = this.policy.backoff.initial * Math.pow(this.policy.backoff.multiplier, attempt - 1);

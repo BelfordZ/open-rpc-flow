@@ -69,7 +69,7 @@ describe('TestLogger', () => {
     const logger = new TestLogger();
     logger.log('test message', { data: 123 });
     expect(logger.getLogs()).toEqual([
-      { level: 'log', message: 'test message', data: { data: 123 } }
+      { level: 'log', message: 'test message', data: { data: 123 } },
     ]);
   });
 
@@ -77,7 +77,7 @@ describe('TestLogger', () => {
     const logger = new TestLogger('TestPrefix');
     logger.log('test message', { data: 123 });
     expect(logger.getLogs()).toEqual([
-      { level: 'log', message: 'test message', data: { data: 123 } }
+      { level: 'log', message: 'test message', data: { data: 123 } },
     ]);
   });
 
@@ -88,7 +88,7 @@ describe('TestLogger', () => {
     expect(logger.getLogs()[0]).toMatchObject({
       level: 'error',
       message: 'error message',
-      data: error
+      data: error,
     });
   });
 
@@ -96,7 +96,7 @@ describe('TestLogger', () => {
     const logger = new TestLogger('TestPrefix');
     logger.warn('warning message', { warning: true });
     expect(logger.getLogs()).toEqual([
-      { level: 'warn', message: 'warning message', data: { warning: true } }
+      { level: 'warn', message: 'warning message', data: { warning: true } },
     ]);
   });
 
@@ -104,7 +104,7 @@ describe('TestLogger', () => {
     const logger = new TestLogger('TestPrefix');
     logger.debug('debug message', { debug: true });
     expect(logger.getLogs()).toEqual([
-      { level: 'debug', message: 'debug message', data: { debug: true } }
+      { level: 'debug', message: 'debug message', data: { debug: true } },
     ]);
   });
 
@@ -154,7 +154,7 @@ describe('TestLogger', () => {
     expect(parent.getLogs()).toBe(child.getLogs());
     expect(parent.getLogs()).toEqual([
       { level: 'log', message: 'parent message', data: undefined },
-      { level: 'log', message: 'child message', data: undefined }
+      { level: 'log', message: 'child message', data: undefined },
     ]);
   });
 
@@ -164,7 +164,7 @@ describe('TestLogger', () => {
     expect(logger.getLogs()[0]).toEqual({
       level: 'log',
       message: 'message',
-      data: { three: 3 }
+      data: { three: 3 },
     });
   });
 });

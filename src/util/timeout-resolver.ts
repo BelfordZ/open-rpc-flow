@@ -174,10 +174,7 @@ export class TimeoutResolver {
     const timeoutValue = this.executorTimeouts.expression ?? DEFAULT_TIMEOUTS.expression;
     // 1. Check step-level timeout if provided
     if (step?.timeout !== undefined) {
-      const validatedTimeout = TimeoutValidator.validateTimeout(
-        step.timeout,
-        timeoutValue,
-      );
+      const validatedTimeout = TimeoutValidator.validateTimeout(step.timeout, timeoutValue);
 
       logger.debug('Using step-level timeout for expression', {
         stepName: step?.name,
@@ -269,7 +266,7 @@ export class TimeoutResolver {
     if (typeof policyTimeout === 'number') {
       const validatedTimeout = TimeoutValidator.validateTimeout(
         policyTimeout,
-        this.executorTimeouts.global ?? DEFAULT_TIMEOUTS.global!
+        this.executorTimeouts.global ?? DEFAULT_TIMEOUTS.global!,
       );
       this.logger.debug('Using policies.global.timeout.timeout', { timeout: validatedTimeout });
       return validatedTimeout;
@@ -277,7 +274,7 @@ export class TimeoutResolver {
     if (this.executorTimeouts.global !== undefined) {
       const validatedTimeout = TimeoutValidator.validateTimeout(
         this.executorTimeouts.global,
-        DEFAULT_TIMEOUTS.global!
+        DEFAULT_TIMEOUTS.global!,
       );
       this.logger.debug('Using executor-level global timeout', { timeout: validatedTimeout });
       return validatedTimeout;

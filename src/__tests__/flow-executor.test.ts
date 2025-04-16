@@ -18,7 +18,7 @@ describe('FlowExecutor', () => {
       steps: [],
     };
     testLogger = new TestLogger('FlowExecutorTest');
-    executor = new FlowExecutor(flow, jsonRpcHandler, {logger: testLogger});
+    executor = new FlowExecutor(flow, jsonRpcHandler, { logger: testLogger });
   });
 
   afterEach(() => {
@@ -309,7 +309,7 @@ describe('FlowExecutor', () => {
 
     // Get reference to the original request executor
     const originalExecutor = getPrivateProperty('stepExecutors').find(
-      (e: any) => e instanceof RequestStepExecutor
+      (e: any) => e instanceof RequestStepExecutor,
     );
 
     // Update error handling options
@@ -322,10 +322,7 @@ describe('FlowExecutor', () => {
           multiplier: 1.5,
           maxDelay: 2000,
         },
-        retryableErrors: [
-          ErrorCode.NETWORK_ERROR,
-          ErrorCode.TIMEOUT_ERROR,
-        ],
+        retryableErrors: [ErrorCode.NETWORK_ERROR, ErrorCode.TIMEOUT_ERROR],
       },
     });
 
@@ -338,15 +335,12 @@ describe('FlowExecutor', () => {
         multiplier: 1.5,
         maxDelay: 2000,
       },
-      retryableErrors: [
-        ErrorCode.NETWORK_ERROR,
-        ErrorCode.TIMEOUT_ERROR,
-      ],
+      retryableErrors: [ErrorCode.NETWORK_ERROR, ErrorCode.TIMEOUT_ERROR],
     });
 
     // Verify the request executor was replaced
     const newExecutor = getPrivateProperty('stepExecutors').find(
-      (e: any) => e instanceof RequestStepExecutor
+      (e: any) => e instanceof RequestStepExecutor,
     );
     expect(newExecutor).not.toBe(originalExecutor);
 

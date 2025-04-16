@@ -53,12 +53,12 @@ function createMockHandler(options: MockHandlerOptions) {
     try {
       // Simulate network delay
       const delayTime = typeof delay === 'function' ? delay(request) : delay;
-      
+
       if (delayTime > 0) {
         // Instead of a simple setTimeout, we need to check for abortion during the delay
         await new Promise((resolve, reject) => {
           const timeout = setTimeout(resolve, delayTime);
-          
+
           // Setup abort listener for the delay
           if (opts?.signal) {
             const checkAbort = () => {
@@ -130,24 +130,26 @@ describe('Timeout and Retry Policies', () => {
     it('should respect step-level timeout configuration', async () => {
       // Create a short timeout for the step
       const shortTimeout = 50;
-      
+
       // Create a flow with JSON-RPC compliant interface
       const flow: Flow = {
         name: 'step-timeout-test',
         description: 'Test step-level timeout',
-        steps: [{
-          name: 'slowOperation',
-          timeout: shortTimeout,
-          request: {
-            method: 'slow',
-            params: []
-          }
-        }]
+        steps: [
+          {
+            name: 'slowOperation',
+            timeout: shortTimeout,
+            request: {
+              method: 'slow',
+              params: [],
+            },
+          },
+        ],
       };
 
       // Create mock handler that takes longer than the timeout
       const mockHandler = createMockHandler({ delay: shortTimeout * 2 });
-      
+
       // Create executor with the flow and handler
       const executor = new FlowExecutor(flow, mockHandler, testLogger);
 
@@ -170,24 +172,26 @@ describe('Timeout and Retry Policies', () => {
     it('should allow a step to complete within its timeout', async () => {
       // Create a timeout longer than the operation needs
       const timeout = 500;
-      
+
       // Create a flow with JSON-RPC compliant interface
       const flow: Flow = {
         name: 'step-timeout-success-test',
         description: 'Test successful completion within timeout',
-        steps: [{
-          name: 'quickOperation',
-          timeout: timeout,
-          request: {
-            method: 'quick',
-            params: []
-          }
-        }]
+        steps: [
+          {
+            name: 'quickOperation',
+            timeout: timeout,
+            request: {
+              method: 'quick',
+              params: [],
+            },
+          },
+        ],
       };
 
       // Create mock handler that completes quickly
       const mockHandler = createMockHandler({ delay: MOCK_DELAY });
-      
+
       // Create executor
       const executor = new FlowExecutor(flow, mockHandler, testLogger);
 
@@ -202,7 +206,7 @@ describe('Timeout and Retry Policies', () => {
     it('should respect global timeout configuration', async () => {
       // Set a global timeout
       const globalTimeout = 100;
-      
+
       // Create flow with global timeout
       const flow: Flow = {
         name: 'global-timeout-test',
@@ -217,18 +221,18 @@ describe('Timeout and Retry Policies', () => {
         steps: [
           {
             name: 'step1',
-            request: { method: 'step1', params: [] }
+            request: { method: 'step1', params: [] },
           },
           {
             name: 'step2',
-            request: { method: 'step2', params: [] }
-          }
-        ]
+            request: { method: 'step2', params: [] },
+          },
+        ],
       };
 
       // Create a mock handler that takes longer than the global timeout
       const mockHandler = createMockHandler({ delay: globalTimeout * 2 });
-      
+
       // Create executor
       const executor = new FlowExecutor(flow, mockHandler, testLogger);
 
@@ -264,13 +268,13 @@ describe('Timeout and Retry Policies', () => {
         steps: [
           {
             name: 'step1',
-            request: { method: 'step1', params: [] }
+            request: { method: 'step1', params: [] },
           },
           {
             name: 'step2',
-            request: { method: 'step2', params: [] }
-          }
-        ]
+            request: { method: 'step2', params: [] },
+          },
+        ],
       };
 
       // Create a mock handler that completes quickly
@@ -295,14 +299,16 @@ describe('Timeout and Retry Policies', () => {
       const flow: Flow = {
         name: 'step-retry-test',
         description: 'Test step-level retry policy',
-        steps: [{
-          name: 'retryableStep',
-          request: { 
-            method: 'flaky', 
-            params: [] 
+        steps: [
+          {
+            name: 'retryableStep',
+            request: {
+              method: 'flaky',
+              params: [],
+            },
+            timeout: 1000, // Longer timeout to allow for retries
           },
-          timeout: 1000, // Longer timeout to allow for retries
-        }]
+        ],
       };
 
       // Create a handler that fails for the first 2 attempts
@@ -324,7 +330,7 @@ describe('Timeout and Retry Policies', () => {
             maxDelay: 1000,
           },
           retryableErrors: [ErrorCode.NETWORK_ERROR],
-        }
+        },
       });
 
       // Execute and expect success after retries
@@ -344,12 +350,12 @@ describe('Timeout and Retry Policies', () => {
         steps: [
           {
             name: 'retryableStep',
-            request: { 
-              method: 'alwaysFails', 
-              params: [] 
-            }
-          }
-        ]
+            request: {
+              method: 'alwaysFails',
+              params: [],
+            },
+          },
+        ],
       };
 
       // Create a handler that always fails
@@ -371,7 +377,7 @@ describe('Timeout and Retry Policies', () => {
             maxDelay: 1000,
           },
           retryableErrors: [ErrorCode.NETWORK_ERROR],
-        }
+        },
       });
 
       // Execute and expect failure after max retries
@@ -400,13 +406,13 @@ describe('Timeout and Retry Policies', () => {
         steps: [
           {
             name: 'step1',
-            request: { method: 'flaky1', params: [] }
+            request: { method: 'flaky1', params: [] },
           },
           {
             name: 'step2',
-            request: { method: 'flaky2', params: [] }
-          }
-        ]
+            request: { method: 'flaky2', params: [] },
+          },
+        ],
       };
 
       // Create a handler that fails for the first attempt of each step
@@ -414,7 +420,11 @@ describe('Timeout and Retry Policies', () => {
         const stepName = request.method;
         attempts[stepName] = (attempts[stepName] || 0) + 1;
         if (attempts[stepName] === 1) {
-          throw new (require('../../errors/base').FlowError)('Network error', require('../../errors/codes').ErrorCode.NETWORK_ERROR, {});
+          throw new (require('../../errors/base').FlowError)(
+            'Network error',
+            require('../../errors/codes').ErrorCode.NETWORK_ERROR,
+            {},
+          );
         }
         return {
           jsonrpc: '2.0',
@@ -434,7 +444,7 @@ describe('Timeout and Retry Policies', () => {
             maxDelay: 1000,
           },
           retryableErrors: [ErrorCode.NETWORK_ERROR],
-        }
+        },
       });
 
       // Execute and expect success after retries
@@ -466,23 +476,23 @@ describe('Timeout and Retry Policies', () => {
         steps: [
           {
             name: 'exponentialRetry',
-            request: { 
-              method: 'flaky', 
-              params: [] 
-            }
-          }
-        ]
+            request: {
+              method: 'flaky',
+              params: [],
+            },
+          },
+        ],
       };
 
       // Create a handler that fails for 2 attempts and records timing
       const mockHandler = async (request: any) => {
         attempts.count++;
         recordRetryTime();
-        
+
         if (attempts.count <= 2) {
           throw new FlowError('Network error', ErrorCode.NETWORK_ERROR, {});
         }
-        
+
         return {
           jsonrpc: '2.0',
           id: request.id,
@@ -501,12 +511,12 @@ describe('Timeout and Retry Policies', () => {
             maxDelay: 1000,
           },
           retryableErrors: [ErrorCode.NETWORK_ERROR],
-        }
+        },
       });
 
       // Execute and verify exponential backoff timing
       await executor.execute();
-      
+
       // First retry should be around initial delay (MOCK_DELAY)
       // Second retry should be around initial * multiplier^1 (MOCK_DELAY * 2)
       expect(attempts.count).toBe(3);
@@ -532,23 +542,23 @@ describe('Timeout and Retry Policies', () => {
         steps: [
           {
             name: 'linearRetry',
-            request: { 
-              method: 'flaky', 
-              params: [] 
-            }
-          }
-        ]
+            request: {
+              method: 'flaky',
+              params: [],
+            },
+          },
+        ],
       };
 
       // Create a handler that fails for 2 attempts and records timing
       const mockHandler = async (request: any) => {
         attempts.count++;
         recordRetryTime();
-        
+
         if (attempts.count <= 2) {
           throw new FlowError('Network error', ErrorCode.NETWORK_ERROR, {});
         }
-        
+
         return {
           jsonrpc: '2.0',
           id: request.id,
@@ -567,17 +577,17 @@ describe('Timeout and Retry Policies', () => {
             maxDelay: 1000,
           },
           retryableErrors: [ErrorCode.NETWORK_ERROR],
-        }
+        },
       });
 
       // Execute and verify linear backoff timing
       await executor.execute();
-      
+
       // With linear backoff, retries should be at consistent intervals
       expect(attempts.count).toBe(3);
       const firstInterval = retryTimes[1] - retryTimes[0];
       const secondInterval = retryTimes[2] - retryTimes[1];
-      
+
       // The intervals should be approximately the same with linear backoff
       expect(Math.abs(secondInterval - firstInterval)).toBeLessThan(MOCK_DELAY / 2);
     });
@@ -595,13 +605,13 @@ describe('Timeout and Retry Policies', () => {
         steps: [
           {
             name: 'timeoutRetry',
-            request: { 
-              method: 'slow', 
-              params: [] 
+            request: {
+              method: 'slow',
+              params: [],
             },
-            timeout: 50 // Very short timeout
-          }
-        ]
+            timeout: 50, // Very short timeout
+          },
+        ],
       };
 
       // Create a handler that times out for the first attempt, then speeds up
@@ -610,7 +620,10 @@ describe('Timeout and Retry Policies', () => {
         testLogger.debug(`[mockHandler] Attempt: ${attempts.count}`);
         if (attempts.count === 1) {
           // Throw a TimeoutError with the correct error code
-          throw new TimeoutError('Operation timed out', { code: ErrorCode.TIMEOUT_ERROR, step: request.method });
+          throw new TimeoutError('Operation timed out', {
+            code: ErrorCode.TIMEOUT_ERROR,
+            step: request.method,
+          });
         }
         return {
           jsonrpc: '2.0',
@@ -630,7 +643,7 @@ describe('Timeout and Retry Policies', () => {
             maxDelay: 1000,
           },
           retryableErrors: [ErrorCode.TIMEOUT_ERROR],
-        }
+        },
       });
 
       // Execute and expect success after timeout retry
@@ -652,22 +665,22 @@ describe('Timeout and Retry Policies', () => {
         steps: [
           {
             name: 'combinedPolicies',
-            request: { 
-              method: 'flakyAndSlow', 
-              params: [] 
+            request: {
+              method: 'flakyAndSlow',
+              params: [],
             },
-            timeout: 50 // Short timeout
-          }
-        ]
+            timeout: 50, // Short timeout
+          },
+        ],
       };
 
       // Create a handler that fails with different errors
       const mockHandler = async (request: any) => {
         attempts.count++;
-        
+
         if (attempts.count === 1) {
           // First attempt: timeout
-          await new Promise(resolve => setTimeout(resolve, 100)); // Longer than timeout
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Longer than timeout
           return { jsonrpc: '2.0', id: request.id, result: 'Should not reach here' };
         } else if (attempts.count === 2) {
           // Second attempt: network error
@@ -689,7 +702,7 @@ describe('Timeout and Retry Policies', () => {
             maxDelay: 1000,
           },
           retryableErrors: [ErrorCode.TIMEOUT_ERROR, ErrorCode.NETWORK_ERROR],
-        }
+        },
       });
 
       // Execute and check handling of different errors
@@ -712,13 +725,13 @@ describe('Timeout and Retry Policies', () => {
         steps: [
           {
             name: 'priorityStep',
-            request: { 
-              method: 'slow', 
-              params: [] 
+            request: {
+              method: 'slow',
+              params: [],
             },
-            timeout: 50 // Short step timeout that should override global
-          }
-        ]
+            timeout: 50, // Short step timeout that should override global
+          },
+        ],
       };
 
       // Create a handler that times out
@@ -738,7 +751,7 @@ describe('Timeout and Retry Policies', () => {
             maxDelay: 1000,
           },
           retryableErrors: [ErrorCode.TIMEOUT_ERROR],
-        }
+        },
       });
 
       // Execute and check that step-level policies are used
@@ -768,19 +781,19 @@ describe('Timeout and Retry Policies', () => {
         steps: [
           {
             name: 'abortableOperation',
-            request: { 
-              method: 'slow', 
-              params: [] 
+            request: {
+              method: 'slow',
+              params: [],
             },
-            timeout: shortTimeout
-          }
-        ]
+            timeout: shortTimeout,
+          },
+        ],
       };
 
       // Create a mock handler that takes longer than the timeout but also monitors for aborts
-      const mockHandler = createMockHandler({ 
-        delay: 500,  // Much longer than timeout
-        onAbort: abortHandler
+      const mockHandler = createMockHandler({
+        delay: 500, // Much longer than timeout
+        onAbort: abortHandler,
       });
 
       const executor = new FlowExecutor(flow, mockHandler, testLogger);
@@ -801,7 +814,7 @@ describe('Timeout and Retry Policies', () => {
     it('should allow cancellation of a flow execution from outside', async () => {
       // Create an external AbortController to cancel the flow
       const externalController = new AbortController();
-      
+
       // Create a flow with a long-running operation
       const flow: Flow = {
         name: 'external-abort-test',
@@ -809,17 +822,17 @@ describe('Timeout and Retry Policies', () => {
         steps: [
           {
             name: 'longOperation',
-            request: { 
-              method: 'long', 
-              params: [] 
-            }
-          }
-        ]
+            request: {
+              method: 'long',
+              params: [],
+            },
+          },
+        ],
       };
 
       // Track if the operation was aborted
       let operationAborted = false;
-      
+
       // Create handler that responds to external abort
       const mockHandler = async (request: any, opts?: { signal?: AbortSignal }) => {
         if (opts?.signal) {
@@ -832,7 +845,7 @@ describe('Timeout and Retry Policies', () => {
         // Simulate long operation with abort checking
         await new Promise((resolve, reject) => {
           const timeout = setTimeout(resolve, 1000);
-          
+
           // Check for abort
           if (opts?.signal) {
             const checkInterval = setInterval(() => {
@@ -847,7 +860,7 @@ describe('Timeout and Retry Policies', () => {
             setTimeout(() => clearInterval(checkInterval), 1000);
           }
         });
-        
+
         return {
           jsonrpc: '2.0',
           id: request.id,
@@ -861,12 +874,12 @@ describe('Timeout and Retry Policies', () => {
 
       // Start execution, then abort it externally
       const promise = executor.execute({ signal: externalController.signal });
-      
+
       // Trigger external abort
       setTimeout(() => {
         externalController.abort();
       }, 50);
-      
+
       // Advance timer to trigger the external abort
       jest.advanceTimersByTime(60);
 
@@ -884,15 +897,17 @@ describe('Timeout and Retry Policies', () => {
       const flow: Flow = {
         name: 'abort-test',
         description: 'Test abort behavior',
-        steps: [{
-          name: 'abortableStep',
-          request: { method: 'test.method', params: {} }
-        }]
+        steps: [
+          {
+            name: 'abortableStep',
+            request: { method: 'test.method', params: {} },
+          },
+        ],
       };
 
       // Create a promise and controller that we can use to test abort
       const abortController = new AbortController();
-      
+
       // Abort after a short delay to simulate a timeout
       setTimeout(() => {
         abortController.abort();
@@ -902,20 +917,20 @@ describe('Timeout and Retry Policies', () => {
       // Create a mock handler with debug logging and a delay
       const mockHandler = createMockHandler({
         onAbort: () => testLogger.debug('[mockHandler] onAbort called'),
-        delay: 100
+        delay: 100,
       });
-      
+
       // Create a request executor and use it directly
       const executor = new RequestStepExecutor(mockHandler, testLogger);
       const context = {
         referenceResolver: {
-          resolveReferences: (value: any) => value
+          resolveReferences: (value: any) => value,
         },
         signal: abortController.signal,
         flow,
-        stepResults: new Map()
+        stepResults: new Map(),
       } as unknown as StepExecutionContext;
-      
+
       try {
         await executor.execute(flow.steps[0], context);
         throw new Error('Should have thrown an error');
@@ -931,18 +946,20 @@ describe('Timeout and Retry Policies', () => {
       const flow: Flow = {
         name: 'abort-test',
         description: 'Test step-level timeout with abort',
-        steps: [{
-          name: 'abortStep',
-          policies: {
-            timeout: {
-              timeout: 50
-            }
+        steps: [
+          {
+            name: 'abortStep',
+            policies: {
+              timeout: {
+                timeout: 50,
+              },
+            },
+            request: {
+              method: 'test.delay',
+              params: { delayMs: 1000 },
+            },
           },
-          request: { 
-            method: 'test.delay', 
-            params: { delayMs: 1000 } 
-          }
-        }]
+        ],
       };
 
       // Create a mock handler that will create a long-running promise
@@ -967,20 +984,20 @@ describe('Timeout and Retry Policies', () => {
         policies: {
           global: {
             timeout: {
-              timeout: 100 // Short timeout
-            }
-          }
+              timeout: 100, // Short timeout
+            },
+          },
         },
         steps: [
           {
             name: 'step1',
-            request: { method: 'test.delay', params: { delayMs: 50 } }
+            request: { method: 'test.delay', params: { delayMs: 50 } },
           },
           {
             name: 'step2',
-            request: { method: 'test.delay', params: { delayMs: 200 } }
-          }
-        ]
+            request: { method: 'test.delay', params: { delayMs: 200 } },
+          },
+        ],
       };
 
       const mockHandler = createMockHandler({ delay: 150 });
@@ -996,4 +1013,4 @@ describe('Timeout and Retry Policies', () => {
       }
     });
   });
-}); 
+});

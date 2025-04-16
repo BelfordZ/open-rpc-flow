@@ -123,7 +123,7 @@ export class TransformExecutor {
           resultType: typeof mapped,
         });
         return mapped;
-      })
+      }),
     );
 
     this.logger.debug('Map operation completed', {
@@ -147,7 +147,7 @@ export class TransformExecutor {
         const keep = await this.expressionEvaluator.evaluate(op.using, context, step);
         this.logger.debug('Filter evaluation', { index, keep });
         return keep;
-      })
+      }),
     );
     const result = data.filter((_, idx) => keepArr[idx]);
 

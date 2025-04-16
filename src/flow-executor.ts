@@ -101,15 +101,23 @@ export class FlowExecutor {
       } else if (flow.policies?.global?.retryPolicy) {
         // Convert flow.policies.global.retryPolicy to RetryPolicy format
         this.retryPolicy = {
-          maxAttempts: flow.policies.global.retryPolicy.maxAttempts ?? DEFAULT_RETRY_POLICY.maxAttempts,
+          maxAttempts:
+            flow.policies.global.retryPolicy.maxAttempts ?? DEFAULT_RETRY_POLICY.maxAttempts,
           backoff: {
-            initial: flow.policies.global.retryPolicy.backoff?.initial ?? DEFAULT_RETRY_POLICY.backoff.initial,
-            multiplier: flow.policies.global.retryPolicy.backoff?.multiplier ?? DEFAULT_RETRY_POLICY.backoff.multiplier,
-            maxDelay: flow.policies.global.retryPolicy.backoff?.maxDelay ?? DEFAULT_RETRY_POLICY.backoff.maxDelay,
+            initial:
+              flow.policies.global.retryPolicy.backoff?.initial ??
+              DEFAULT_RETRY_POLICY.backoff.initial,
+            multiplier:
+              flow.policies.global.retryPolicy.backoff?.multiplier ??
+              DEFAULT_RETRY_POLICY.backoff.multiplier,
+            maxDelay:
+              flow.policies.global.retryPolicy.backoff?.maxDelay ??
+              DEFAULT_RETRY_POLICY.backoff.maxDelay,
             strategy: flow.policies.global.retryPolicy.backoff?.strategy ?? 'exponential',
           },
           // Cast string[] to ErrorCode[] since we're sure they're valid error codes
-          retryableErrors: (flow.policies.global.retryPolicy.retryableErrors ?? DEFAULT_RETRY_POLICY.retryableErrors) as ErrorCode[],
+          retryableErrors: (flow.policies.global.retryPolicy.retryableErrors ??
+            DEFAULT_RETRY_POLICY.retryableErrors) as ErrorCode[],
         };
       } else if (flow.retryPolicy) {
         // Deprecated but still supported for backward compatibility
@@ -118,12 +126,14 @@ export class FlowExecutor {
           maxAttempts: flow.retryPolicy.maxAttempts ?? DEFAULT_RETRY_POLICY.maxAttempts,
           backoff: {
             initial: flow.retryPolicy.backoff?.initial ?? DEFAULT_RETRY_POLICY.backoff.initial,
-            multiplier: flow.retryPolicy.backoff?.multiplier ?? DEFAULT_RETRY_POLICY.backoff.multiplier,
+            multiplier:
+              flow.retryPolicy.backoff?.multiplier ?? DEFAULT_RETRY_POLICY.backoff.multiplier,
             maxDelay: flow.retryPolicy.backoff?.maxDelay ?? DEFAULT_RETRY_POLICY.backoff.maxDelay,
             strategy: 'exponential', // Default for backward compatibility
           },
           // Cast string[] to ErrorCode[] since we're sure they're valid error codes
-          retryableErrors: (flow.retryPolicy.retryableErrors ?? DEFAULT_RETRY_POLICY.retryableErrors) as ErrorCode[],
+          retryableErrors: (flow.retryPolicy.retryableErrors ??
+            DEFAULT_RETRY_POLICY.retryableErrors) as ErrorCode[],
         };
       } else {
         this.retryPolicy = DEFAULT_RETRY_POLICY;
@@ -229,7 +239,7 @@ export class FlowExecutor {
       // Set up global timeout if configured in the flow
       // Use TimeoutResolver to get the global timeout
       const globalTimeout = this.timeoutResolver.resolveGlobalTimeout();
-      
+
       // Combine external signal with our timeout signal if provided
       if (options?.signal) {
         // Forward abort from external signal to our controller
@@ -237,10 +247,10 @@ export class FlowExecutor {
           globalAbortController.abort(options.signal?.reason);
         });
       }
-      
+
       // Add abort signal to execution context
       this.executionContext.signal = globalAbortController.signal;
-      
+
       if (globalTimeout && globalTimeout > 0) {
         this.logger.debug('Setting global flow timeout', { timeout: globalTimeout });
         globalTimeoutId = setTimeout(() => {
@@ -248,7 +258,7 @@ export class FlowExecutor {
           globalAbortController.abort(new Error('Global flow timeout reached'));
         }, globalTimeout);
       }
-      
+
       // Get steps in dependency order
       const orderedSteps = this.dependencyResolver.getExecutionOrder();
       const orderedStepNames = orderedSteps.map((s) => s.name);
@@ -265,14 +275,14 @@ export class FlowExecutor {
           // Check if we've been aborted before executing step
           if (globalAbortController.signal.aborted) {
             const reason = globalAbortController.signal.reason || 'Flow execution aborted';
-            this.logger.debug('Skipping step due to abort', { 
+            this.logger.debug('Skipping step due to abort', {
               stepName: step.name,
-              reason: String(reason)
+              reason: String(reason),
             });
             this.events.emitStepSkip(step, String(reason));
             throw new Error(String(reason));
           }
-          
+
           this.events.emitStepStart(step, this.executionContext);
 
           const result = await this.executeStep(step);
@@ -298,23 +308,24 @@ export class FlowExecutor {
       return this.stepResults;
     } catch (error: any) {
       // Enhance error with flow context if it's an abort due to timeout
-      if (globalAbortController.signal.aborted && 
-          error.message?.includes('timeout') || 
-          error.name === 'AbortError') {
+      if (
+        (globalAbortController.signal.aborted && error.message?.includes('timeout')) ||
+        error.name === 'AbortError'
+      ) {
         const duration = Date.now() - startTime;
         const flowTimeout = this.flow.timeouts?.global || 0;
-        
+
         // Create a detailed timeout error for the flow
         const timeoutError = new EnhancedTimeoutError(
           `Flow execution timed out after ${duration}ms. Configured timeout: ${flowTimeout}ms.`,
           flowTimeout,
-          duration
+          duration,
         );
-        
+
         this.events.emitFlowError(this.flow.name, timeoutError, startTime);
         throw timeoutError;
       }
-      
+
       this.events.emitFlowError(this.flow.name, error, startTime);
       throw error;
     } finally {

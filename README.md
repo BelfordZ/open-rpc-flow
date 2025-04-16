@@ -408,10 +408,7 @@ const executor = new FlowExecutor(flow, jsonRpcHandler, {
       multiplier: 2, // Exponential backoff
       maxDelay: 5000, // Maximum 5s delay
     },
-    retryableErrors: [
-      ErrorCode.NETWORK_ERROR,
-      ErrorCode.TIMEOUT_ERROR
-    ],
+    retryableErrors: [ErrorCode.NETWORK_ERROR, ErrorCode.TIMEOUT_ERROR],
   },
 });
 ```

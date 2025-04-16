@@ -230,12 +230,12 @@ describe('TimeoutValidator', () => {
 
       // Should merge defaults and input
       const result = TimeoutValidator.validateTimeoutOptions(input, customDefaults);
-      
-      expect(result.global).toBe(2000);      // From customDefaults
-      expect(result.request).toBe(3000);     // From customDefaults
-      expect(result.transform).toBe(1500);   // From input
+
+      expect(result.global).toBe(2000); // From customDefaults
+      expect(result.request).toBe(3000); // From customDefaults
+      expect(result.transform).toBe(1500); // From input
       expect(result.condition).toBeDefined(); // Should still exist from DEFAULT_TIMEOUTS
-      expect(result.loop).toBeDefined();      // Should still exist from DEFAULT_TIMEOUTS
+      expect(result.loop).toBeDefined(); // Should still exist from DEFAULT_TIMEOUTS
       expect(result.expression).toBeDefined(); // Should still exist from DEFAULT_TIMEOUTS
     });
   });

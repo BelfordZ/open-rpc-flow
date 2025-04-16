@@ -72,15 +72,18 @@ describe('RequestStepExecutor', () => {
     const result = await executor.execute(step, context);
     expect(result.result).toEqual(['foo', 'bar']);
     expect(jsonRpcHandler).toHaveBeenCalledTimes(1);
-    expect(jsonRpcHandler).toHaveBeenCalledWith({
-      jsonrpc: '2.0',
-      method: 'permissions.get',
-      params: expect.objectContaining({
-        userId: 1,
-        role: 'admin',
-      }),
-      id: expect.any(Number),
-    }, undefined);
+    expect(jsonRpcHandler).toHaveBeenCalledWith(
+      {
+        jsonrpc: '2.0',
+        method: 'permissions.get',
+        params: expect.objectContaining({
+          userId: 1,
+          role: 'admin',
+        }),
+        id: expect.any(Number),
+      },
+      undefined,
+    );
   });
 
   it('handles JSON-RPC error responses', async () => {
@@ -190,14 +193,17 @@ describe('RequestStepExecutor', () => {
     jsonRpcHandler.mockResolvedValue({ success: true });
     await executor.execute(step, context);
 
-    expect(jsonRpcHandler).toHaveBeenCalledWith({
-      jsonrpc: '2.0',
-      method: 'test.method',
-      params: {
-        value: 'test',
+    expect(jsonRpcHandler).toHaveBeenCalledWith(
+      {
+        jsonrpc: '2.0',
+        method: 'test.method',
+        params: {
+          value: 'test',
+        },
+        id: expect.any(Number),
       },
-      id: expect.any(Number),
-    }, undefined);
+      undefined,
+    );
   });
 
   it('cycles request IDs correctly', async () => {
@@ -254,12 +260,15 @@ describe('RequestStepExecutor', () => {
 
     await executor.execute(step, context);
 
-    expect(jsonRpcHandler).toHaveBeenCalledWith({
-      jsonrpc: '2.0',
-      method: 'test.method',
-      params: ['first', 'second'],
-      id: expect.any(Number),
-    }, undefined);
+    expect(jsonRpcHandler).toHaveBeenCalledWith(
+      {
+        jsonrpc: '2.0',
+        method: 'test.method',
+        params: ['first', 'second'],
+        id: expect.any(Number),
+      },
+      undefined,
+    );
   });
 
   it('handles unknown errors', async () => {
@@ -357,11 +366,11 @@ describe('RequestStepExecutor', () => {
   describe('with retry policy', () => {
     let retryPolicy: RetryPolicy;
     let rpExecutor: RequestStepExecutor;
-    
+
     beforeEach(() => {
       // Reset the mocks
       jest.clearAllMocks();
-      
+
       // Create a retry policy with correct properties
       retryPolicy = {
         maxAttempts: 3,
@@ -369,23 +378,19 @@ describe('RequestStepExecutor', () => {
         backoff: {
           initial: 100,
           multiplier: 2,
-          maxDelay: 5000
+          maxDelay: 5000,
         },
-        retryDelay: 1000
+        retryDelay: 1000,
       };
-      
+
       // Create an executor with retry policy
-      rpExecutor = new RequestStepExecutor(
-        jsonRpcHandler,
-        testLogger,
-        retryPolicy
-      );
+      rpExecutor = new RequestStepExecutor(jsonRpcHandler, testLogger, retryPolicy);
     });
-    
+
     afterEach(() => {
       jest.clearAllMocks();
     });
-    
+
     it('executes request using retry policy', async () => {
       const step: RequestStep = {
         name: 'retryPolicyTest',
@@ -394,25 +399,25 @@ describe('RequestStepExecutor', () => {
           params: {},
         },
       };
-      
+
       jsonRpcHandler.mockResolvedValue({ success: true });
-      
+
       // Execute the step
       const result = await rpExecutor.execute(step, context);
-      
+
       // Verify jsonRpcHandler was called with correct parameters
       expect(jsonRpcHandler).toHaveBeenCalledWith(
         expect.objectContaining({
           method: 'test.method',
-          params: {}
+          params: {},
         }),
-        undefined
+        undefined,
       );
-      
+
       // Verify we got the correct result
       expect(result.result).toEqual({ success: true });
     });
-    
+
     it('uses step-level policies.retryPolicy when available', async () => {
       const stepWithPolicies: RequestStep = {
         name: 'stepWithPolicies',
@@ -427,13 +432,13 @@ describe('RequestStepExecutor', () => {
               initial: 50,
               multiplier: 3,
               maxDelay: 2000,
-              strategy: 'linear'
+              strategy: 'linear',
             },
-            retryableErrors: ['NETWORK_ERROR', 'VALIDATION_ERROR']
-          }
-        }
+            retryableErrors: ['NETWORK_ERROR', 'VALIDATION_ERROR'],
+          },
+        },
       };
-      
+
       // Mock implementation to fail a few times
       let callCount = 0;
       jsonRpcHandler.mockImplementation(() => {
@@ -443,20 +448,27 @@ describe('RequestStepExecutor', () => {
         }
         return { success: true };
       });
-      
+
       // Execute with step-level policies
       const result = await rpExecutor.execute(stepWithPolicies, context);
-      
+
       // Verify correct backoff was used (captured by logger)
-      expect(testLogger.getLogs().some(log => 
-        log.message === 'Starting retryable operation' && log.data && log.data.backoffStrategy === 'linear'
-      )).toBeTruthy();
-      
+      expect(
+        testLogger
+          .getLogs()
+          .some(
+            (log) =>
+              log.message === 'Starting retryable operation' &&
+              log.data &&
+              log.data.backoffStrategy === 'linear',
+          ),
+      ).toBeTruthy();
+
       // Verify success after retries
       expect(result.result).toEqual({ success: true });
       expect(jsonRpcHandler).toHaveBeenCalledTimes(3);
     });
-    
+
     it('handles errors with retry policy', async () => {
       const step: RequestStep = {
         name: 'retryPolicyErrorTest',
@@ -465,7 +477,7 @@ describe('RequestStepExecutor', () => {
           params: {},
         },
       };
-      
+
       // Simulate a temporary failure then success
       let callCount = 0;
       jsonRpcHandler.mockImplementation(() => {
@@ -475,10 +487,10 @@ describe('RequestStepExecutor', () => {
         }
         return { success: true };
       });
-      
+
       // Should succeed after retries
       const result = await rpExecutor.execute(step, context);
-      
+
       // Verify jsonRpcHandler was called multiple times
       expect(jsonRpcHandler).toHaveBeenCalledTimes(3);
       expect(result.result).toEqual({ success: true });
@@ -497,13 +509,13 @@ describe('RequestStepExecutor', () => {
     // Create an AbortError
     const abortError = new Error('The operation was aborted');
     abortError.name = 'AbortError';
-    
+
     // Mock JSON-RPC handler to throw the AbortError
     jsonRpcHandler.mockRejectedValue(abortError);
 
     // Expect the executor to throw a timeout error with the expected message pattern
     await expect(executor.execute(step, context)).rejects.toThrow(
-      /Step "abortTest" execution timed out after \d+ms/
+      /Step "abortTest" execution timed out after \d+ms/,
     );
   });
 
@@ -520,7 +532,7 @@ describe('RequestStepExecutor', () => {
     const abortController = new AbortController();
     const contextWithSignal = {
       ...context,
-      signal: abortController.signal
+      signal: abortController.signal,
     };
 
     await executor.execute(step, contextWithSignal);
@@ -528,9 +540,9 @@ describe('RequestStepExecutor', () => {
     // Verify that the signal was passed to jsonRpcHandler
     expect(jsonRpcHandler).toHaveBeenCalledWith(
       expect.objectContaining({
-        method: 'test.method'
+        method: 'test.method',
       }),
-      { signal: abortController.signal }
+      { signal: abortController.signal },
     );
   });
 
@@ -542,7 +554,7 @@ describe('RequestStepExecutor', () => {
         params: {},
       },
     };
-    
+
     // Create a custom error
     class CustomError extends Error {
       constructor(message: string) {
@@ -550,14 +562,15 @@ describe('RequestStepExecutor', () => {
         this.name = 'CustomError';
       }
     }
-    
+
     // Mock jsonRpcHandler to throw a custom error
     jsonRpcHandler.mockRejectedValue(new CustomError('Custom error'));
-    
+
     // Execute and expect the error to be rethrown as an ExecutionError
-    await expect(executor.execute(step, context))
-      .rejects.toThrow('Failed to execute request step "errorTest": Custom error');
-    
+    await expect(executor.execute(step, context)).rejects.toThrow(
+      'Failed to execute request step "errorTest": Custom error',
+    );
+
     expect(jsonRpcHandler).toHaveBeenCalledTimes(1);
   });
 
@@ -569,16 +582,16 @@ describe('RequestStepExecutor', () => {
         params: {},
       },
     };
-    
+
     // Create a JsonRpcRequestError
     const jsonRpcError = new JsonRpcRequestError('JSON-RPC error occurred', {
       code: -32001,
       message: 'JSON-RPC error',
     });
-    
+
     // Mock jsonRpcHandler to throw a JsonRpcRequestError
     jsonRpcHandler.mockRejectedValue(jsonRpcError);
-    
+
     // The error should be rethrown directly
     try {
       await executor.execute(step, context);

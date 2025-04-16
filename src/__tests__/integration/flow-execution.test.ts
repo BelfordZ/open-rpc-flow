@@ -11,12 +11,10 @@ describe('Flow Execution Integration', () => {
     testLogger = new TestLogger('FlowExecutionTest');
   });
 
-  
   afterEach(() => {
     //testLogger.print();
     testLogger.clear();
   });
-  
 
   it('executes a complex data processing flow', async () => {
     const flow: Flow = {
@@ -206,7 +204,7 @@ describe('Flow Execution Integration', () => {
     expect(results.get('getData').metadata.hasError).toBe(true);
     // processData should not have been called
     expect(results.get('processData')).toBeUndefined();
-   
+
     const getDataResult = results.get('getData').result;
     expect(getDataResult.result).toBeUndefined();
     expect(getDataResult.error).toEqual({
@@ -220,8 +218,8 @@ describe('Flow Execution Integration', () => {
         params: { message: 'Data fetch failed' },
       }),
       expect.objectContaining({
-        signal: expect.any(Object)
-      })
+        signal: expect.any(Object),
+      }),
     );
   });
 
@@ -309,8 +307,8 @@ describe('Flow Execution Integration', () => {
         },
       }),
       expect.objectContaining({
-        signal: expect.any(Object)
-      })
+        signal: expect.any(Object),
+      }),
     );
     expect(jsonRpcHandler).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -322,8 +320,8 @@ describe('Flow Execution Integration', () => {
         },
       }),
       expect.objectContaining({
-        signal: expect.any(Object)
-      })
+        signal: expect.any(Object),
+      }),
     );
   });
 

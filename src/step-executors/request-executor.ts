@@ -42,12 +42,12 @@ export class RequestStepExecutor implements StepExecutor {
     if (step.policies?.timeout?.timeout !== undefined) {
       return step.policies.timeout.timeout;
     }
-    
+
     // Check deprecated step-level timeout
     if (step.timeout !== undefined) {
       return step.timeout;
     }
-    
+
     // Check for flow-level step policies (applies to all steps)
     if (context.flow?.policies?.step?.timeout?.timeout !== undefined) {
       return context.flow.policies.step.timeout.timeout;
@@ -86,7 +86,7 @@ export class RequestStepExecutor implements StepExecutor {
     // Check for step-level retry policy (new structure)
     if (step.policies?.retryPolicy) {
       const stepPolicy = step.policies.retryPolicy;
-      
+
       // Convert to RetryPolicy format
       return {
         maxAttempts: stepPolicy.maxAttempts ?? this.retryPolicy.maxAttempts,
@@ -96,7 +96,8 @@ export class RequestStepExecutor implements StepExecutor {
           maxDelay: stepPolicy.backoff?.maxDelay ?? this.retryPolicy.backoff.maxDelay,
           strategy: stepPolicy.backoff?.strategy ?? this.retryPolicy.backoff.strategy,
         },
-        retryableErrors: stepPolicy.retryableErrors as ErrorCode[] ?? this.retryPolicy.retryableErrors,
+        retryableErrors:
+          (stepPolicy.retryableErrors as ErrorCode[]) ?? this.retryPolicy.retryableErrors,
       };
     }
 
@@ -104,11 +105,11 @@ export class RequestStepExecutor implements StepExecutor {
     if (step.retryPolicy) {
       return step.retryPolicy;
     }
-    
+
     // Check for flow-level step policy (applies to all steps)
     if (context.flow?.policies?.step?.retryPolicy) {
       const stepPolicy = context.flow.policies.step.retryPolicy;
-      
+
       // Convert to RetryPolicy format
       return {
         maxAttempts: stepPolicy.maxAttempts ?? this.retryPolicy.maxAttempts,
@@ -118,7 +119,8 @@ export class RequestStepExecutor implements StepExecutor {
           maxDelay: stepPolicy.backoff?.maxDelay ?? this.retryPolicy.backoff.maxDelay,
           strategy: stepPolicy.backoff?.strategy ?? this.retryPolicy.backoff.strategy,
         },
-        retryableErrors: stepPolicy.retryableErrors as ErrorCode[] ?? this.retryPolicy.retryableErrors,
+        retryableErrors:
+          (stepPolicy.retryableErrors as ErrorCode[]) ?? this.retryPolicy.retryableErrors,
       };
     }
 
@@ -158,14 +160,14 @@ export class RequestStepExecutor implements StepExecutor {
 
       if (timeout) {
         abortController = new AbortController();
-        
+
         // Set up timeout to abort the request
         timeoutId = setTimeout(() => {
           this.logger.debug(`Step timeout exceeded`, {
             stepName: step.name,
             timeout,
           });
-          
+
           abortController?.abort();
         }, timeout);
       }
@@ -195,7 +197,7 @@ export class RequestStepExecutor implements StepExecutor {
 
         // Create options object with AbortSignal if available
         const options: Record<string, any> = {};
-        
+
         // Use either our timeout's abort signal or the one from context
         if (abortController?.signal) {
           options.signal = abortController.signal;
@@ -211,7 +213,7 @@ export class RequestStepExecutor implements StepExecutor {
             params: resolvedParams,
             id: requestId,
           },
-          Object.keys(options).length > 0 ? options : undefined
+          Object.keys(options).length > 0 ? options : undefined,
         );
 
         // If the request was aborted due to timeout, throw a timeout error
@@ -221,7 +223,7 @@ export class RequestStepExecutor implements StepExecutor {
             step,
             StepType.Request,
             timeout || 0,
-            executionTime
+            executionTime,
           );
           throw timeoutError;
         }
@@ -247,7 +249,7 @@ export class RequestStepExecutor implements StepExecutor {
         if (error instanceof Error) {
           // Handle AbortError for timeouts
           if (
-            error.name === 'AbortError' || 
+            error.name === 'AbortError' ||
             (abortController?.signal.aborted && error.message?.includes('aborted'))
           ) {
             // Create a detailed timeout error
@@ -256,25 +258,28 @@ export class RequestStepExecutor implements StepExecutor {
               step,
               StepType.Request,
               timeout || 0,
-              executionTime
+              executionTime,
             );
-            
+
             throw timeoutError;
           }
-          
+
           // Special case: Pass through JsonRpcRequestError without wrapping
           if (error instanceof JsonRpcRequestError) {
             throw error;
           }
         }
-        
+
         const err = error as any;
         // Wrap other errors as ExecutionError with NETWORK_ERROR code for retries
         const errorMessage = `Failed to execute request step "${step.name}": ${err?.message || 'Unknown error'}`;
         throw new ExecutionError(
           errorMessage,
           {
-            code: (err && typeof err === 'object' && 'code' in err && err.code) ? err.code : ErrorCode.NETWORK_ERROR,
+            code:
+              err && typeof err === 'object' && 'code' in err && err.code
+                ? err.code
+                : ErrorCode.NETWORK_ERROR,
             stepName: step.name,
             requestId,
             originalError: err,

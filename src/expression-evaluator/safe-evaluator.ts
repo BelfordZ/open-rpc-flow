@@ -363,10 +363,7 @@ export class SafeExpressionEvaluator {
       const token = tokens[i];
 
       // Function call: identifier followed by '('
-      if (
-        token.type === 'identifier' &&
-        tokens[i + 1] && tokens[i + 1].value === '('
-      ) {
+      if (token.type === 'identifier' && tokens[i + 1] && tokens[i + 1].value === '(') {
         // Find matching closing parenthesis
         let depth = 1;
         let j = i + 2;
@@ -738,11 +735,21 @@ export class SafeExpressionEvaluator {
         if (!ast.name || !Array.isArray(ast.args)) {
           throw new ExpressionError('Malformed function call node');
         }
-        if (!Object.prototype.hasOwnProperty.call(SafeExpressionEvaluator.ALLOWED_FUNCTIONS, ast.name as keyof typeof SafeExpressionEvaluator.ALLOWED_FUNCTIONS)) {
+        if (
+          !Object.prototype.hasOwnProperty.call(
+            SafeExpressionEvaluator.ALLOWED_FUNCTIONS,
+            ast.name as keyof typeof SafeExpressionEvaluator.ALLOWED_FUNCTIONS,
+          )
+        ) {
           throw new ExpressionError(`Function '${ast.name}' is not allowed`);
         }
-        const fn = SafeExpressionEvaluator.ALLOWED_FUNCTIONS[ast.name as keyof typeof SafeExpressionEvaluator.ALLOWED_FUNCTIONS];
-        const argVals = ast.args.map((arg: AstNode) => this.evaluateAst(arg, context, startTime, expression, step));
+        const fn =
+          SafeExpressionEvaluator.ALLOWED_FUNCTIONS[
+            ast.name as keyof typeof SafeExpressionEvaluator.ALLOWED_FUNCTIONS
+          ];
+        const argVals = ast.args.map((arg: AstNode) =>
+          this.evaluateAst(arg, context, startTime, expression, step),
+        );
         return (fn as Function).apply(null, argVals);
       }
 

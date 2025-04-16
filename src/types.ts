@@ -144,7 +144,7 @@ export interface JsonRpcHandlerOptions {
    * AbortSignal that can be used to cancel the request
    */
   signal?: AbortSignal;
-  
+
   /**
    * Additional options specific to the JsonRpcHandler implementation
    */
@@ -156,7 +156,7 @@ export interface JsonRpcHandlerOptions {
  */
 export type JsonRpcHandler = (
   request: JsonRpcRequest,
-  options?: JsonRpcHandlerOptions
+  options?: JsonRpcHandlerOptions,
 ) => Promise<any>;
 
 /**
@@ -251,7 +251,7 @@ export interface TimeoutOptions {
  */
 export interface Policies {
   /**
-   * Retry policy configuration 
+   * Retry policy configuration
    */
   retryPolicy?: {
     /**

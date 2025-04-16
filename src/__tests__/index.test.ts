@@ -228,15 +228,15 @@ describe('FlowExecutor', () => {
     const groupedResults = results.get('group_by_value').result;
     expect(groupedResults).toHaveLength(3);
     expect(groupedResults[0]).toEqual({
-      key: "100",
+      key: '100',
       items: [{ id: 1, name: 'Item 1', value: 100 }],
     });
     expect(groupedResults[1]).toEqual({
-      key: "200",
+      key: '200',
       items: [{ id: 2, name: 'Item 2', value: 200 }],
     });
     expect(groupedResults[2]).toEqual({
-      key: "300",
+      key: '300',
       items: [{ id: 3, name: 'Item 3', value: 300 }],
     });
   });

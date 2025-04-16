@@ -9,7 +9,10 @@ export interface Logger {
 }
 
 export class ConsoleLogger implements Logger {
-  constructor(private prefix?: string, private _console: Console = console) {}
+  constructor(
+    private prefix?: string,
+    private _console: Console = console,
+  ) {}
 
   log(message: string, data?: any) {
     if (this.prefix) {
@@ -86,7 +89,7 @@ export class TestLogger implements Logger {
     for (const log of this.logs) {
       console.log(
         `[${log.level.toUpperCase()}] [${this.name}] ${log.message}`,
-        log.data ? JSON.stringify(log.data) : ''
+        log.data ? JSON.stringify(log.data) : '',
       );
     }
   }

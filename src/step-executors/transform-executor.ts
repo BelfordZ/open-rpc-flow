@@ -28,7 +28,7 @@ export class TransformExecutor {
     this.logger = logger.createNested('TransformExecutor');
   }
 
-  async execute(operations: TransformOperation[], input: any, step?: Step): Promise<any> {
+  async execute(operations: TransformOperation[], input: string | any[], step?: Step): Promise<any> {
     this.logger.debug('Starting transform execution', {
       operationCount: operations.length,
       operations: operations.map((op) => ({ type: op.type, as: op.as })),
@@ -37,7 +37,14 @@ export class TransformExecutor {
       hasStep: !!step,
     });
 
-    let data = input;
+    let data: any;
+    if (typeof input === 'string' && !Array.isArray(input)) {
+      // Evaluate the input expression
+      data = await this.expressionEvaluator.evaluate(input, this.context, step);
+    } else {
+      // Use the array literal directly
+      data = input;
+    }
 
     for (const op of operations) {
       this.logger.debug('Executing operation', {
@@ -114,18 +121,29 @@ export class TransformExecutor {
       hasStep: !!step,
     });
 
-    const result = await Promise.all(
-      data.map(async (item, index) => {
-        const context = { item, index };
-        const mapped = await this.expressionEvaluator.evaluate(op.using, context, step);
-        this.logger.debug('Mapped item', {
-          index,
-          originalType: typeof item,
-          resultType: typeof mapped,
-        });
-        return mapped;
-      }),
-    );
+    const start = Date.now();
+    const timeout = step?.timeout ?? 10000; // fallback to default if not set
+    const result: any[] = [];
+    for (let index = 0; index < data.length; index++) {
+      if (Date.now() - start > timeout) {
+        throw new TimeoutError(
+          `Transform step "${step?.name}" timed out after ${timeout}ms`,
+          timeout,
+          Date.now() - start,
+          step,
+          StepType.Transform,
+          false
+        );
+      }
+      const context = { item: data[index], index };
+      const mapped = this.expressionEvaluator.evaluate(op.using, context, step);
+      this.logger.debug('Mapped item', {
+        index,
+        originalType: typeof data[index],
+        resultType: typeof mapped,
+      });
+      result.push(mapped);
+    }
 
     this.logger.debug('Map operation completed', {
       inputLength: data.length,

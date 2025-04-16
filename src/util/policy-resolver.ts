@@ -16,10 +16,12 @@ import { DEFAULT_TIMEOUTS } from '../constants/timeouts';
 export class PolicyResolver {
   private flow: Flow;
   private logger: Logger;
+  private overrides: Record<string, any>;
 
-  constructor(flow: Flow, logger: Logger = defaultLogger) {
+  constructor(flow: Flow, logger: Logger = defaultLogger, overrides: Record<string, any> = {}) {
     this.flow = flow;
     this.logger = logger.createNested('PolicyResolver');
+    this.overrides = overrides;
   }
 
   /**
@@ -35,6 +37,11 @@ export class PolicyResolver {
     policyName: string,
     defaultValue?: T,
   ): T | undefined {
+    // 0. Highest precedence: overrides
+    if (this.overrides && this.overrides[policyName] !== undefined) {
+      this.logger.debug('Using override policy', { policyName });
+      return this.overrides[policyName] as T;
+    }
     // 1. Step-level policy
     if (step.policies && (step.policies as any)[policyName] !== undefined) {
       this.logger.debug('Using step-level policy', { step: step.name, policyName });

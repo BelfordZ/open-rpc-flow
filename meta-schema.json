@@ -185,8 +185,10 @@
           "required": ["input", "operations"],
           "properties": {
             "input": {
-              "type": "string",
-              "description": "Expression that evaluates to the input data for transformation."
+              "oneOf": [
+                { "type": "string", "description": "Expression that evaluates to the input data for transformation." },
+                { "type": "array", "description": "Array literal to use as input for transformation.", "items": {} }
+              ]
             },
             "operations": {
               "type": "array",

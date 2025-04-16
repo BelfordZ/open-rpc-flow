@@ -173,7 +173,7 @@ describe('FlowExecutor', () => {
     });
   });
 
-  it.only('executes aggregate operations', async () => {
+  it('executes aggregate operations', async () => {
     const flow: Flow = {
       name: 'Aggregate Test',
       description: 'Test aggregation operations',

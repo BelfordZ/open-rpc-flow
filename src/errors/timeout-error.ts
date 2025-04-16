@@ -103,6 +103,7 @@ export class TimeoutError extends FlowError {
    * @param timeout - The configured timeout value in milliseconds
    * @param executionTime - The execution time before timeout in milliseconds
    * @param step - The step context (if applicable)
+   * @param stepType - The type of step that timed out (if applicable)
    * @returns A new TimeoutError
    */
   static forExpression(
@@ -110,6 +111,7 @@ export class TimeoutError extends FlowError {
     timeout: number,
     executionTime: number,
     step?: Step,
+    stepType?: StepType,
   ): TimeoutError {
     return new TimeoutError(
       `Expression evaluation timed out after ${executionTime}ms. ` +
@@ -117,7 +119,7 @@ export class TimeoutError extends FlowError {
       timeout,
       executionTime,
       step,
-      undefined,
+      stepType,
       true,
     );
   }

@@ -166,7 +166,11 @@ export class FlowExecutor {
     this.timeoutResolver = new TimeoutResolver(this.flow, undefined, this.logger);
 
     // Initialize PolicyResolver for policy-based execution
-    this.policyResolver = new PolicyResolver(this.flow, this.logger);
+    const policyOverrides: Record<string, any> = {};
+    if (options?.retryPolicy) {
+      policyOverrides.retryPolicy = options.retryPolicy;
+    }
+    this.policyResolver = new PolicyResolver(this.flow, this.logger, policyOverrides);
 
     // Initialize step executors in order of specificity
     this.stepExecutors = [

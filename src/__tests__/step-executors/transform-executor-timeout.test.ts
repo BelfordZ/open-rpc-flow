@@ -80,9 +80,15 @@ describe('TransformStepExecutor Timeout Tests', () => {
     // Mock only the evaluate method to throw a timeout error immediately
     jest
       .spyOn(expressionEvaluator, 'evaluate')
-      .mockImplementation(async (expression, context, step) => {
+      .mockImplementation((expression, context, step) => {
         const timeout = step?.timeout || 10000;
-        throw TimeoutError.forExpression(expression, timeout, timeout + 1000, step);
+        throw TimeoutError.forExpression(
+          expression,
+          timeout,
+          timeout + 1000,
+          step,
+          StepType.Transform
+        );
       });
 
     // Start the execution
@@ -119,9 +125,15 @@ describe('TransformStepExecutor Timeout Tests', () => {
     // Mock only the evaluate method to throw a timeout error immediately
     jest
       .spyOn(expressionEvaluator, 'evaluate')
-      .mockImplementation(async (expression, context, step) => {
+      .mockImplementation((expression, context, step) => {
         const timeout = step?.timeout || 10000;
-        throw TimeoutError.forExpression(expression, timeout, timeout + 1000, step);
+        throw TimeoutError.forExpression(
+          expression,
+          timeout,
+          timeout + 1000,
+          step,
+          StepType.Transform
+        );
       });
 
     // Remove timeout from context
@@ -164,9 +176,15 @@ describe('TransformStepExecutor Timeout Tests', () => {
     // Mock only the evaluate method to throw a timeout error immediately
     jest
       .spyOn(expressionEvaluator, 'evaluate')
-      .mockImplementation(async (expression, context, step) => {
+      .mockImplementation((expression, context, step) => {
         const timeout = step?.timeout || 10000;
-        throw TimeoutError.forExpression(expression, timeout, timeout + 1000, step);
+        throw TimeoutError.forExpression(
+          expression,
+          timeout,
+          timeout + 1000,
+          step,
+          StepType.Transform
+        );
       });
 
     // Start the execution

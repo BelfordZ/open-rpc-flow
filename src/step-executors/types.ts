@@ -119,13 +119,6 @@ export interface ConditionStep extends Step {
   };
 }
 
-export interface TransformStep extends Step {
-  transform: {
-    input: string;
-    operations: TransformOperation[];
-  };
-}
-
 /**
  * Type guards for each step type
  */
@@ -139,7 +132,7 @@ export const isConditionStep = (step: Step): step is ConditionStep =>
   'condition' in step && step.condition !== undefined;
 
 export const isTransformStep = (step: Step): step is TransformStep =>
-  'transform' in step && typeof step.transform === 'object';
+  !!step.transform && typeof step.transform === 'object';
 
 /**
  * Type guard for loop results
@@ -166,3 +159,10 @@ export interface LoopResult<T> extends LoopResultBase {
  * Utility type for loop step results
  */
 export type LoopStepResult<T> = StepExecutionResult<LoopResult<T>>;
+
+export interface TransformStep extends Step {
+  transform: {
+    input: string | any[];
+    operations: TransformOperation[];
+  };
+}

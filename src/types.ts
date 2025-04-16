@@ -139,7 +139,7 @@ export interface Step {
     else?: Step;
   };
   transform?: {
-    input?: string;
+    input?: string | any[];
     operations: TransformOperation[];
   };
   stop?: {

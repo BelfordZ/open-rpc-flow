@@ -7,6 +7,7 @@ import { TokenizerError } from './tokenizer';
 import { TimeoutError } from '../errors/timeout-error';
 import { PolicyResolver } from '../util/policy-resolver';
 import { Step, getStepType } from '../types';
+import { StepType } from '../step-executors/types';
 import { DEFAULT_TIMEOUTS } from '../constants/timeouts';
 
 type Operator = keyof typeof SafeExpressionEvaluator.OPERATORS;
@@ -212,14 +213,21 @@ export class SafeExpressionEvaluator {
       this.logger.debug('AST:', ast);
       return this.evaluateAst(ast, context, startTime, expression, step, stepType);
     } catch (error) {
+      let extraHint = '';
       if (
         error instanceof TokenizerError ||
         error instanceof PathSyntaxError ||
         error instanceof PropertyAccessError ||
         error instanceof ExpressionError
       ) {
+        if (
+          typeof expression === 'string' &&
+          /^[a-zA-Z_][a-zA-Z0-9_ ]*$/.test(expression.trim())
+        ) {
+          extraHint = ` (Did you mean to use a string literal? Wrap your value in quotes, e.g. "'${expression.trim()}'")`;
+        }
         throw new ExpressionError(
-          `Failed to evaluate expression: ${expression}. Got error: ${error.message}`,
+          `Failed to evaluate expression: ${expression}. Got error: ${error.message}${extraHint}`,
         );
       }
       throw error;
@@ -295,7 +303,8 @@ export class SafeExpressionEvaluator {
 
     if (elapsedTime > timeout) {
       this.logger.error(`Expression evaluation timed out after ${elapsedTime}ms`);
-      throw TimeoutError.forExpression(expression, timeout, elapsedTime, step);
+      this.logger.debug('TimeoutError debug info:', { step, stepType: step ? getStepType(step) : undefined });
+      throw TimeoutError.forExpression(expression, timeout, elapsedTime, step, step ? getStepType(step) as StepType : undefined);
     }
   }
 

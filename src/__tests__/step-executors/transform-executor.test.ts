@@ -271,7 +271,7 @@ describe('Transform Executors', () => {
           },
         ];
         await expect(executor.execute(operations, data)).rejects.toThrow(
-          'Input to map operation must be an array',
+          'Did you mean to use a string literal? Wrap your value in quotes',
         );
       });
 

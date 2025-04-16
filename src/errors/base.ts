@@ -27,9 +27,12 @@ export class FlowError extends Error {
     if (this.code) str += ` [code=${this.code}]`;
     if (this.context) {
       for (const [key, value] of Object.entries(this.context)) {
-        if (key === 'cause' || key === 'lastError' || key === 'code' || key === 'lastErrorCode') continue; // handled below
+        if (key === 'cause' || key === 'lastError' || key === 'code' || key === 'lastErrorCode')
+          continue; // handled below
         let val = value;
-        if (key === 'step') { val = value.name; }
+        if (key === 'step') {
+          val = value.name;
+        }
         str += ` [${key}=${val}]`;
       }
     }
@@ -74,22 +77,26 @@ export class StateError extends FlowError {
   }
 }
 type RetryErrorContext = {
-  code: ErrorCode.MAX_RETRIES_EXCEEDED,
-  attempts: number,
-  lastError: string,
-  lastErrorType?: string,
-  lastErrorCode: string,
-  policy: any,
+  code: ErrorCode.MAX_RETRIES_EXCEEDED;
+  attempts: number;
+  lastError: string;
+  lastErrorType?: string;
+  lastErrorCode: string;
+  policy: any;
 };
 export class MaxRetriesExceededError extends ExecutionError {
   public readonly allErrors: any[];
 
   constructor(message: string, context: RetryErrorContext, allErrors: any[], cause?: Error) {
-    super(message, {
-      code: context.code,
-      attempts: context.attempts,
-      policyMaxAttempts: context.policy.maxAttempts,
-    }, cause);
+    super(
+      message,
+      {
+        code: context.code,
+        attempts: context.attempts,
+        policyMaxAttempts: context.policy.maxAttempts,
+      },
+      cause,
+    );
     this.name = 'MaxRetriesExceededError';
     this.allErrors = allErrors;
     Object.setPrototypeOf(this, MaxRetriesExceededError.prototype);

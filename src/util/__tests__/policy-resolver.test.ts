@@ -105,11 +105,7 @@ describe('PolicyResolver', () => {
         maxDelay: 5000,
         strategy: 'exponential',
       },
-      retryableErrors: [
-        'NETWORK_ERROR',
-        'TIMEOUT_ERROR',
-        'OPERATION_TIMEOUT',
-      ],
+      retryableErrors: ['NETWORK_ERROR', 'TIMEOUT_ERROR', 'OPERATION_TIMEOUT'],
     };
     // Step-level
     const step: Step = { ...baseStep, policies: { retryPolicy: retryObj } };

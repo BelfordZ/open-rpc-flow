@@ -1,8 +1,7 @@
-import { FlowExecutor } from '../flow-executor';
+import { FlowExecutor, DEFAULT_RETRY_POLICY } from '../flow-executor';
 import { Flow } from '../types';
 import { TestLogger } from '../util/logger';
 import { TransformStepExecutor } from '../step-executors/transform-executor';
-import { RequestStepExecutor } from '../step-executors/request-executor';
 import { ErrorCode } from '../errors/codes';
 import { RetryPolicy } from '../errors/recovery';
 
@@ -321,7 +320,12 @@ describe('FlowExecutor', () => {
         global: {
           retryPolicy: {
             maxAttempts: 4,
-            backoff: { initial: 50, multiplier: 2, maxDelay: 500, strategy: 'exponential' as const },
+            backoff: {
+              initial: 50,
+              multiplier: 2,
+              maxDelay: 500,
+              strategy: 'exponential' as const,
+            },
             retryableErrors: [ErrorCode.TIMEOUT_ERROR],
           },
         },
@@ -372,7 +376,7 @@ describe('FlowExecutor', () => {
     const flow: Flow = { name: 'RetryPolicyTest', description: '', steps: [] };
     executor = new FlowExecutor(flow, jest.fn(), { logger: testLogger });
     expect((executor as any).retryPolicy).toEqual({
-      ...require('../flow-executor').DEFAULT_RETRY_POLICY,
+      ...DEFAULT_RETRY_POLICY,
       maxAttempts: 1,
     });
   });

@@ -1,4 +1,4 @@
-import { FlowError, ExecutionError, MaxRetriesExceededError } from './base';
+import { FlowError, MaxRetriesExceededError } from './base';
 import { ErrorCode } from './codes';
 import { Logger } from '../util/logger';
 

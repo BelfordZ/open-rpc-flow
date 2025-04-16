@@ -1,5 +1,4 @@
 import { ExecutionError } from './base';
-import { ErrorCode } from './codes';
 import { Step } from '../types';
 import { StepType } from '../step-executors/types';
 
@@ -53,11 +52,15 @@ export class TimeoutError extends ExecutionError {
     isExpressionTimeout: boolean = false,
     cause?: Error,
   ) {
-    super(message, {
-      code: 'TIMEOUT_ERROR',
-      step: step ? { name: step.name } : undefined,
-      stepType,
-    }, cause);
+    super(
+      message,
+      {
+        code: 'TIMEOUT_ERROR',
+        step: step ? { name: step.name } : undefined,
+        stepType,
+      },
+      cause,
+    );
 
     this.name = 'TimeoutError';
     this.timeout = timeout;

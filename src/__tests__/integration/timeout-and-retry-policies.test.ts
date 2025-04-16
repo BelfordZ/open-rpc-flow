@@ -4,9 +4,6 @@ import { ErrorCode as ImportedErrorCode } from '../../errors/codes';
 import { TimeoutError } from '../../errors/timeout-error';
 import { FlowError, ExecutionError } from '../../errors/base';
 import { TestLogger } from '../../util/logger';
-import { RequestStepExecutor } from '../../step-executors/request-executor';
-import { StepExecutionContext } from '../../types';
-import { PolicyResolver } from '../../util/policy-resolver';
 import { StepType } from '../../step-executors/types';
 
 const MOCK_DELAY = 100; // Use a small delay for faster tests
@@ -156,143 +153,149 @@ describe('Timeout and Retry Policies', () => {
     describe('Step-level timeout policies', () => {
       it('should respect step-level timeout configuration', async () => {
         // Create a short timeout for the step
-      const shortTimeout = 50;
+        const shortTimeout = 50;
 
-      // Create a flow with JSON-RPC compliant interface
-      const flow: Flow = {
-        name: 'step-timeout-test',
-        description: 'Test step-level timeout',
-        steps: [
-          {
-            name: 'slowOperation',
-            policies: { timeout: { timeout: shortTimeout } },
-            request: {
-              method: 'slow',
-              params: [],
+        // Create a flow with JSON-RPC compliant interface
+        const flow: Flow = {
+          name: 'step-timeout-test',
+          description: 'Test step-level timeout',
+          steps: [
+            {
+              name: 'slowOperation',
+              policies: { timeout: { timeout: shortTimeout } },
+              request: {
+                method: 'slow',
+                params: [],
+              },
             },
-          },
-        ],
-      };
+          ],
+        };
 
-      // Create mock handler that takes longer than the timeout
-      const mockHandler = createMockHandler({ delay: shortTimeout * 2 });
+        // Create mock handler that takes longer than the timeout
+        const mockHandler = createMockHandler({ delay: shortTimeout * 2 });
 
-      // Create executor with the flow and handler
-      const executor = new FlowExecutor(flow, mockHandler, testLogger);
+        // Create executor with the flow and handler
+        const executor = new FlowExecutor(flow, mockHandler, testLogger);
 
-      // Execute and expect timeout error
-      jest.advanceTimersByTime(shortTimeout);
-      await expectError(executor.execute(), { errorClass: ExecutionError, messageIncludes: 'timed out' });
-    });
+        // Execute and expect timeout error
+        jest.advanceTimersByTime(shortTimeout);
+        await expectError(executor.execute(), {
+          errorClass: ExecutionError,
+          messageIncludes: 'timed out',
+        });
+      });
 
-    it('should allow a step to complete within its timeout', async () => {
-      // Create a timeout longer than the operation needs
-      const timeout = 500;
+      it('should allow a step to complete within its timeout', async () => {
+        // Create a timeout longer than the operation needs
+        const timeout = 500;
 
-      // Create a flow with JSON-RPC compliant interface
-      const flow: Flow = {
-        name: 'step-timeout-success-test',
-        description: 'Test successful completion within timeout',
-        steps: [
-          {
-            name: 'quickOperation',
-            policies: { timeout: { timeout } },
-            request: {
-              method: 'quick',
-              params: [],
+        // Create a flow with JSON-RPC compliant interface
+        const flow: Flow = {
+          name: 'step-timeout-success-test',
+          description: 'Test successful completion within timeout',
+          steps: [
+            {
+              name: 'quickOperation',
+              policies: { timeout: { timeout } },
+              request: {
+                method: 'quick',
+                params: [],
+              },
             },
-          },
-        ],
-      };
+          ],
+        };
 
-      // Create mock handler that completes quickly
-      const mockHandler = createMockHandler({ delay: MOCK_DELAY });
+        // Create mock handler that completes quickly
+        const mockHandler = createMockHandler({ delay: MOCK_DELAY });
 
-      // Create executor
-      const executor = new FlowExecutor(flow, mockHandler, testLogger);
+        // Create executor
+        const executor = new FlowExecutor(flow, mockHandler, testLogger);
 
-      // Execute and expect success
-      const results = await executor.execute();
-      expect(results).toBeDefined();
-      expect(results.get('quickOperation').result.result).toBe('Result for quick');
-    });
+        // Execute and expect success
+        const results = await executor.execute();
+        expect(results).toBeDefined();
+        expect(results.get('quickOperation').result.result).toBe('Result for quick');
+      });
     });
 
     describe('Global timeout policies', () => {
-    it('should respect global timeout configuration', async () => {
-      // Set a global timeout
-      const globalTimeout = 100;
+      it('should respect global timeout configuration', async () => {
+        // Set a global timeout
+        const globalTimeout = 100;
 
-      // Create flow with global timeout
-      const flow: Flow = {
-        name: 'global-timeout-test',
-        description: 'Test global timeout',
-        policies: {
-          global: {
-            timeout: {
-              timeout: globalTimeout,
+        // Create flow with global timeout
+        const flow: Flow = {
+          name: 'global-timeout-test',
+          description: 'Test global timeout',
+          policies: {
+            global: {
+              timeout: {
+                timeout: globalTimeout,
+              },
             },
           },
-        },
-        steps: [
-          {
-            name: 'step1',
-            request: { method: 'step1', params: [] },
-          },
-          {
-            name: 'step2',
-            request: { method: 'step2', params: [] },
-          },
-        ],
-      };
+          steps: [
+            {
+              name: 'step1',
+              request: { method: 'step1', params: [] },
+            },
+            {
+              name: 'step2',
+              request: { method: 'step2', params: [] },
+            },
+          ],
+        };
 
-      // Create a mock handler that takes longer than the global timeout
-      const mockHandler = createMockHandler({ delay: globalTimeout * 2 });
+        // Create a mock handler that takes longer than the global timeout
+        const mockHandler = createMockHandler({ delay: globalTimeout * 2 });
 
-      // Create executor
-      const executor = new FlowExecutor(flow, mockHandler, testLogger);
+        // Create executor
+        const executor = new FlowExecutor(flow, mockHandler, testLogger);
 
-      // Execute and expect timeout error
-      jest.advanceTimersByTime(globalTimeout);
-      await expectError(executor.execute(), { errorClass: ExecutionError, messageIncludes: 'timed out' });
-    });
+        // Execute and expect timeout error
+        jest.advanceTimersByTime(globalTimeout);
+        await expectError(executor.execute(), {
+          errorClass: ExecutionError,
+          messageIncludes: 'timed out',
+        });
+      });
 
-    it('should allow a flow with multiple steps to complete within global timeout', async () => {
-      // Set a global timeout longer than needed
-      const globalTimeout = 1000;
-      const flow: Flow = {
-        name: 'global-timeout-success-test',
-        description: 'Test successful completion within global timeout',
-        policies: {
-          global: {
-            timeout: {
-              timeout: globalTimeout,
+      it('should allow a flow with multiple steps to complete within global timeout', async () => {
+        // Set a global timeout longer than needed
+        const globalTimeout = 1000;
+        const flow: Flow = {
+          name: 'global-timeout-success-test',
+          description: 'Test successful completion within global timeout',
+          policies: {
+            global: {
+              timeout: {
+                timeout: globalTimeout,
+              },
             },
           },
-        },
-        steps: [
-          {
-            name: 'step1',
-            request: { method: 'step1', params: [] },
-          },
-          {
-            name: 'step2',
-            request: { method: 'step2', params: [] },
-          },
-        ],
-      };
+          steps: [
+            {
+              name: 'step1',
+              request: { method: 'step1', params: [] },
+            },
+            {
+              name: 'step2',
+              request: { method: 'step2', params: [] },
+            },
+          ],
+        };
 
-      // Create a mock handler that completes quickly
-      const mockHandler = createMockHandler({ delay: MOCK_DELAY });
-      const executor = new FlowExecutor(flow, mockHandler, testLogger);
+        // Create a mock handler that completes quickly
+        const mockHandler = createMockHandler({ delay: MOCK_DELAY });
+        const executor = new FlowExecutor(flow, mockHandler, testLogger);
 
-      // Execute and expect success
-      const results = await executor.execute();
-      expect(results).toBeDefined();
-      // We can't directly access executionTime, but we can check that all steps completed
-      expect(results.get('step1')).toBeDefined();
-      expect(results.get('step2')).toBeDefined();
-    });
+        // Execute and expect success
+        const results = await executor.execute();
+        expect(results).toBeDefined();
+        // We can't directly access executionTime, but we can check that all steps completed
+        expect(results.get('step1')).toBeDefined();
+        expect(results.get('step2')).toBeDefined();
+      });
     });
   });
 
@@ -603,9 +606,9 @@ describe('Timeout and Retry Policies', () => {
               method: 'slow',
               params: [],
             },
-            policies: { 
+            policies: {
               timeout: { timeout: 50 },
-              retryPolicy: { 
+              retryPolicy: {
                 maxAttempts: 3,
                 retryableErrors: [ImportedErrorCode.TIMEOUT_ERROR],
               },
@@ -716,12 +719,12 @@ describe('Timeout and Retry Policies', () => {
               method: 'slow',
               params: [],
             },
-            policies: { 
+            policies: {
               timeout: { timeout: 50 },
               retryPolicy: {
                 maxAttempts: 3,
               },
-            }, 
+            },
           },
         ],
       };
@@ -735,7 +738,10 @@ describe('Timeout and Retry Policies', () => {
       const executor = new FlowExecutor(flow, mockHandler, testLogger);
 
       // Execute and check that step-level policies are used
-      await expectError(executor.execute(), { errorClass: ExecutionError, messageIncludes: 'timed out' });
+      await expectError(executor.execute(), {
+        errorClass: ExecutionError,
+        messageIncludes: 'timed out',
+      });
       expect(attempts.count).toBe(3); // Should use retry policy (3 attempts)
     });
   });
@@ -770,7 +776,10 @@ describe('Timeout and Retry Policies', () => {
       });
 
       const executor = new FlowExecutor(flow, handler, testLogger);
-      await expectError(executor.execute(), { errorClass: ExecutionError, messageIncludes: 'timed out' });
+      await expectError(executor.execute(), {
+        errorClass: ExecutionError,
+        messageIncludes: 'timed out',
+      });
       expect(abortHandlerCalled).toBe(true);
     });
 
@@ -830,7 +839,10 @@ describe('Timeout and Retry Policies', () => {
         testLogger.debug('[test] Called externalController.abort()');
       }, 10);
 
-      await expectError(promise, { errorClass: ExecutionError, messageIncludes: /timed out|TimeoutError/ });
+      await expectError(promise, {
+        errorClass: ExecutionError,
+        messageIncludes: /timed out|TimeoutError/,
+      });
     });
 
     it('should abort a request if the promise is aborted', async () => {
@@ -892,7 +904,10 @@ describe('Timeout and Retry Policies', () => {
       const mockHandler = createMockHandler({ delay: 100 });
       const executor = new FlowExecutor(flow, mockHandler, { logger: testLogger });
 
-      await expectError(executor.execute(), { errorClass: ExecutionError, messageIncludes: 'timed out' });
+      await expectError(executor.execute(), {
+        errorClass: ExecutionError,
+        messageIncludes: 'timed out',
+      });
     });
   });
 
@@ -925,7 +940,10 @@ describe('Timeout and Retry Policies', () => {
       const controller = new AbortController();
 
       // Pass the signal to executor.execute
-      await expectError(executor.execute({ signal: controller.signal }), { errorClass: ExecutionError, messageIncludes: 'timed out' });
+      await expectError(executor.execute({ signal: controller.signal }), {
+        errorClass: ExecutionError,
+        messageIncludes: 'timed out',
+      });
     });
   });
 });

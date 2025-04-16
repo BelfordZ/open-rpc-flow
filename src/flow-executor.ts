@@ -94,12 +94,19 @@ export class FlowExecutor {
       this.retryPolicy = {
         maxAttempts: flow.policies.global.retryPolicy.maxAttempts ?? 1,
         backoff: {
-          initial: flow.policies.global.retryPolicy.backoff?.initial ?? DEFAULT_RETRY_POLICY.backoff.initial,
-          multiplier: flow.policies.global.retryPolicy.backoff?.multiplier ?? DEFAULT_RETRY_POLICY.backoff.multiplier,
-          maxDelay: flow.policies.global.retryPolicy.backoff?.maxDelay ?? DEFAULT_RETRY_POLICY.backoff.maxDelay,
+          initial:
+            flow.policies.global.retryPolicy.backoff?.initial ??
+            DEFAULT_RETRY_POLICY.backoff.initial,
+          multiplier:
+            flow.policies.global.retryPolicy.backoff?.multiplier ??
+            DEFAULT_RETRY_POLICY.backoff.multiplier,
+          maxDelay:
+            flow.policies.global.retryPolicy.backoff?.maxDelay ??
+            DEFAULT_RETRY_POLICY.backoff.maxDelay,
           strategy: flow.policies.global.retryPolicy.backoff?.strategy ?? 'exponential',
         },
-        retryableErrors: (flow.policies.global.retryPolicy.retryableErrors ?? DEFAULT_RETRY_POLICY.retryableErrors) as ErrorCode[],
+        retryableErrors: (flow.policies.global.retryPolicy.retryableErrors ??
+          DEFAULT_RETRY_POLICY.retryableErrors) as ErrorCode[],
       };
     } else {
       this.retryPolicy = {
@@ -167,6 +174,7 @@ export class FlowExecutor {
    * Execute the flow and return all step results
    */
   async execute(options?: { signal?: AbortSignal }): Promise<Map<string, any>> {
+    this.logger.log('Executing flow with options:', options);
     const startTime = Date.now();
     let globalTimeoutId: NodeJS.Timeout | undefined;
     const globalAbortController = new AbortController();

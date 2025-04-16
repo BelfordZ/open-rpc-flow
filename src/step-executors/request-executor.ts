@@ -155,23 +155,13 @@ export class RequestStepExecutor implements StepExecutor {
             : await handlerPromise;
         } catch (error) {
           if (timedOut) {
-            throw TimeoutError.forStep(
-              step,
-              StepType.Request,
-              timeout || 0,
-              timeout || 0
-            );
+            throw TimeoutError.forStep(step, StepType.Request, timeout || 0, timeout || 0);
           }
           throw error;
         }
 
         if (raceResult === TIMEOUT_SYMBOL) {
-          throw TimeoutError.forStep(
-            step,
-            StepType.Request,
-            timeout || 0,
-            timeout || 0
-          );
+          throw TimeoutError.forStep(step, StepType.Request, timeout || 0, timeout || 0);
         }
 
         this.logger.debug('Request completed successfully', {

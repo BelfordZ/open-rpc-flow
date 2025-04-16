@@ -121,10 +121,9 @@ async function runFlow() {
 
 // Run the example when this file is executed directly
 if (require.main === module) {
-  runFlow()
-    .then(() => {
-      console.log('Example completed.');
-    });
+  runFlow().then(() => {
+    console.log('Example completed.');
+  });
 }
 
 // Export for use in other examples

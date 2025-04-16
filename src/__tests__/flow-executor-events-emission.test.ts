@@ -36,31 +36,47 @@ describe('FlowExecutor event emission', () => {
     const fevents = executor.events;
 
     // Listen to all event types
-    fevents.on(FlowEventType.FLOW_START, (payload) => events.push({ type: FlowEventType.FLOW_START, payload }));
-    fevents.on(FlowEventType.FLOW_COMPLETE, (payload) => events.push({ type: FlowEventType.FLOW_COMPLETE, payload }));
-    fevents.on(FlowEventType.FLOW_ERROR, (payload) => events.push({ type: FlowEventType.FLOW_ERROR, payload }));
-    fevents.on(FlowEventType.STEP_START, (payload) => events.push({ type: FlowEventType.STEP_START, payload }));
-    fevents.on(FlowEventType.STEP_COMPLETE, (payload) => events.push({ type: FlowEventType.STEP_COMPLETE, payload }));
-    fevents.on(FlowEventType.STEP_ERROR, (payload) => events.push({ type: FlowEventType.STEP_ERROR, payload }));
-    fevents.on(FlowEventType.STEP_SKIP, (payload) => events.push({ type: FlowEventType.STEP_SKIP, payload }));
-    fevents.on(FlowEventType.DEPENDENCY_RESOLVED, (payload) => events.push({ type: FlowEventType.DEPENDENCY_RESOLVED, payload }));
+    fevents.on(FlowEventType.FLOW_START, (payload) =>
+      events.push({ type: FlowEventType.FLOW_START, payload }),
+    );
+    fevents.on(FlowEventType.FLOW_COMPLETE, (payload) =>
+      events.push({ type: FlowEventType.FLOW_COMPLETE, payload }),
+    );
+    fevents.on(FlowEventType.FLOW_ERROR, (payload) =>
+      events.push({ type: FlowEventType.FLOW_ERROR, payload }),
+    );
+    fevents.on(FlowEventType.STEP_START, (payload) =>
+      events.push({ type: FlowEventType.STEP_START, payload }),
+    );
+    fevents.on(FlowEventType.STEP_COMPLETE, (payload) =>
+      events.push({ type: FlowEventType.STEP_COMPLETE, payload }),
+    );
+    fevents.on(FlowEventType.STEP_ERROR, (payload) =>
+      events.push({ type: FlowEventType.STEP_ERROR, payload }),
+    );
+    fevents.on(FlowEventType.STEP_SKIP, (payload) =>
+      events.push({ type: FlowEventType.STEP_SKIP, payload }),
+    );
+    fevents.on(FlowEventType.DEPENDENCY_RESOLVED, (payload) =>
+      events.push({ type: FlowEventType.DEPENDENCY_RESOLVED, payload }),
+    );
 
     await executor.execute();
 
     // Check for dependency resolved event
-    expect(events.some(e => e.type === FlowEventType.DEPENDENCY_RESOLVED)).toBe(true);
+    expect(events.some((e) => e.type === FlowEventType.DEPENDENCY_RESOLVED)).toBe(true);
     // Check for flow start and complete
-    expect(events.some(e => e.type === FlowEventType.FLOW_START)).toBe(true);
-    expect(events.some(e => e.type === FlowEventType.FLOW_COMPLETE)).toBe(true);
+    expect(events.some((e) => e.type === FlowEventType.FLOW_START)).toBe(true);
+    expect(events.some((e) => e.type === FlowEventType.FLOW_COMPLETE)).toBe(true);
     // Check for step start and complete for each step
-    const stepStartEvents = events.filter(e => e.type === FlowEventType.STEP_START);
-    const stepCompleteEvents = events.filter(e => e.type === FlowEventType.STEP_COMPLETE);
+    const stepStartEvents = events.filter((e) => e.type === FlowEventType.STEP_START);
+    const stepCompleteEvents = events.filter((e) => e.type === FlowEventType.STEP_COMPLETE);
     expect(stepStartEvents.length).toBe(2);
     expect(stepCompleteEvents.length).toBe(2);
     // No error or skip events expected
-    expect(events.some(e => e.type === FlowEventType.FLOW_ERROR)).toBe(false);
-    expect(events.some(e => e.type === FlowEventType.STEP_ERROR)).toBe(false);
-    expect(events.some(e => e.type === FlowEventType.STEP_SKIP)).toBe(false);
+    expect(events.some((e) => e.type === FlowEventType.FLOW_ERROR)).toBe(false);
+    expect(events.some((e) => e.type === FlowEventType.STEP_ERROR)).toBe(false);
+    expect(events.some((e) => e.type === FlowEventType.STEP_SKIP)).toBe(false);
   });
 
   it('emits error events on step failure', async () => {
@@ -78,11 +94,15 @@ describe('FlowExecutor event emission', () => {
     const executor = new FlowExecutor(flow, jsonRpcHandler, { logger: testLogger });
     const events: { type: string; payload: any }[] = [];
     const fevents = executor.events;
-    fevents.on(FlowEventType.STEP_ERROR, (payload) => events.push({ type: FlowEventType.STEP_ERROR, payload }));
-    fevents.on(FlowEventType.FLOW_ERROR, (payload) => events.push({ type: FlowEventType.FLOW_ERROR, payload }));
+    fevents.on(FlowEventType.STEP_ERROR, (payload) =>
+      events.push({ type: FlowEventType.STEP_ERROR, payload }),
+    );
+    fevents.on(FlowEventType.FLOW_ERROR, (payload) =>
+      events.push({ type: FlowEventType.FLOW_ERROR, payload }),
+    );
     await expect(executor.execute()).rejects.toThrow('fail!');
-    expect(events.some(e => e.type === FlowEventType.STEP_ERROR)).toBe(true);
-    expect(events.some(e => e.type === FlowEventType.FLOW_ERROR)).toBe(true);
+    expect(events.some((e) => e.type === FlowEventType.STEP_ERROR)).toBe(true);
+    expect(events.some((e) => e.type === FlowEventType.FLOW_ERROR)).toBe(true);
   });
 
   it('emits step skip and flow complete if a stop step is encountered', async () => {
@@ -103,11 +123,15 @@ describe('FlowExecutor event emission', () => {
     const executor = new FlowExecutor(flow, jsonRpcHandler, { logger: testLogger });
     const events: { type: string; payload: any }[] = [];
     const fevents = executor.events;
-    fevents.on(FlowEventType.STEP_SKIP, (payload) => events.push({ type: FlowEventType.STEP_SKIP, payload }));
-    fevents.on(FlowEventType.FLOW_COMPLETE, (payload) => events.push({ type: FlowEventType.FLOW_COMPLETE, payload }));
+    fevents.on(FlowEventType.STEP_SKIP, (payload) =>
+      events.push({ type: FlowEventType.STEP_SKIP, payload }),
+    );
+    fevents.on(FlowEventType.FLOW_COMPLETE, (payload) =>
+      events.push({ type: FlowEventType.FLOW_COMPLETE, payload }),
+    );
     await executor.execute();
     // Should emit a skip for the second step
-    expect(events.some(e => e.type === FlowEventType.STEP_SKIP)).toBe(true);
-    expect(events.some(e => e.type === FlowEventType.FLOW_COMPLETE)).toBe(true);
+    expect(events.some((e) => e.type === FlowEventType.STEP_SKIP)).toBe(true);
+    expect(events.some((e) => e.type === FlowEventType.FLOW_COMPLETE)).toBe(true);
   });
-}); 
+});

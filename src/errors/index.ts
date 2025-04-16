@@ -2,7 +2,6 @@
 export * from './base'; // Contains all error class definitions (FlowError, ValidationError, ExecutionError, TimeoutError, StateError)
 export * from './codes';
 export * from './recovery';
-export * from './circuit-breaker';
 export * from './context';
 export * from './timeout-error'; // Enhanced timeout error with additional context
 

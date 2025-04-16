@@ -11,11 +11,72 @@ export interface Flow {
   steps: Step[];
   context?: Record<string, any>;
   timeouts?: TimeoutOptions;
+  /**
+   * Global and step-level policies for the flow
+   */
+  policies?: {
+    /**
+     * Global policies that apply to the workflow as a whole
+     */
+    global?: Policies;
+    /**
+     * Step level policies that apply to all steps unless overridden
+     */
+    step?: Policies;
+  };
+  /**
+   * @deprecated Use policies.global instead
+   * Global retry policy settings for all steps
+   */
+  retryPolicy?: {
+    /**
+     * Maximum number of retry attempts
+     * @minimum 1
+     * @maximum 10
+     * @default 3
+     */
+    maxAttempts?: number;
+    /**
+     * Backoff configuration for retries
+     */
+    backoff?: {
+      /**
+       * Initial delay in milliseconds
+       * @minimum 10
+       * @maximum 30000
+       * @default 100
+       */
+      initial?: number;
+      /**
+       * Multiplier for exponential backoff
+       * @minimum 1
+       * @maximum 10
+       * @default 2
+       */
+      multiplier?: number;
+      /**
+       * Maximum delay in milliseconds
+       * @minimum 100
+       * @maximum 300000
+       * @default 5000
+       */
+      maxDelay?: number;
+    };
+    /**
+     * List of error codes that are considered retryable
+     * @default ["NETWORK_ERROR", "TIMEOUT_ERROR", "OPERATION_TIMEOUT"]
+     */
+    retryableErrors?: string[];
+  };
 }
 
 export interface Step {
   name: string;
   description?: string;
+  /**
+   * Optional policies for this specific step
+   */
+  policies?: Policies;
   request?: {
     method: string;
     params: Record<string, any> | any[];
@@ -41,6 +102,7 @@ export interface Step {
     endWorkflow?: boolean;
   };
   /**
+   * @deprecated Use policies.timeout.timeout instead
    * Timeout for this specific step in milliseconds.
    * Takes precedence over flow-level timeouts.
    * @minimum 50 - Must be at least 50ms
@@ -110,6 +172,10 @@ export interface StepExecutionContext {
    * AbortSignal that can be used to cancel operations
    */
   signal?: AbortSignal;
+  /**
+   * The flow being executed (for accessing flow-level configuration)
+   */
+  flow?: Flow;
 }
 
 /**
@@ -178,4 +244,59 @@ export interface TimeoutOptions {
    * @maximum 3600000 - Cannot exceed 1 hour (3600000ms)
    */
   expression?: number;
+}
+
+/**
+ * Policies configuration for flow and steps
+ */
+export interface Policies {
+  /**
+   * Retry policy configuration 
+   */
+  retryPolicy?: {
+    /**
+     * Maximum number of retry attempts
+     * @minimum 0
+     * @maximum 100
+     * @default 3
+     */
+    maxAttempts?: number;
+    /**
+     * Backoff configuration for retries
+     */
+    backoff?: {
+      /**
+       * The strategy to use for the backoff
+       * @default "exponential"
+       */
+      strategy?: 'exponential' | 'linear';
+      /**
+       * Initial delay in milliseconds
+       */
+      initial?: number;
+      /**
+       * Multiplier/exponent for the backoff
+       */
+      multiplier?: number;
+      /**
+       * Maximum delay in milliseconds
+       * @default 5000
+       */
+      maxDelay?: number;
+    };
+    /**
+     * List of error codes that are considered retryable
+     */
+    retryableErrors?: string[];
+  };
+  /**
+   * Timeout policy configuration
+   */
+  timeout?: {
+    /**
+     * Timeout in milliseconds
+     * @default 10000
+     */
+    timeout?: number;
+  };
 }

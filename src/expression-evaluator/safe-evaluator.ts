@@ -5,7 +5,7 @@ import { PathSyntaxError, PropertyAccessError } from '../path-accessor';
 import { tokenize, Token } from './tokenizer';
 import { TokenizerError } from './tokenizer';
 import { EnhancedTimeoutError } from '../errors/timeout-error';
-import { TimeoutResolver } from '../utils/timeout-resolver';
+import { TimeoutResolver } from '../util/timeout-resolver';
 import { Step } from '../types';
 import { DEFAULT_TIMEOUTS } from '../constants/timeouts';
 
@@ -13,7 +13,7 @@ type Operator = keyof typeof SafeExpressionEvaluator.OPERATORS;
 type StackOperator = Operator | '(' | ')';
 
 interface AstNode {
-  type: 'literal' | 'reference' | 'operation' | 'object' | 'array';
+  type: 'literal' | 'reference' | 'operation' | 'object' | 'array' | 'function_call';
   value?: any;
   path?: string;
   operator?: Operator;
@@ -21,6 +21,8 @@ interface AstNode {
   right?: AstNode;
   properties?: { key: string; value: AstNode; spread?: boolean }[];
   elements?: { value: AstNode; spread?: boolean }[];
+  name?: string;
+  args?: AstNode[];
 }
 
 export class _UnknownReferenceError extends Error {
@@ -107,6 +109,15 @@ export class SafeExpressionEvaluator {
     '||': (a: any, b: any) => a || b,
     '??': (a: any, b: any) => a ?? b,
   } as const;
+
+  // Add whitelist of allowed global functions
+  private static readonly ALLOWED_FUNCTIONS = {
+    Number,
+    String,
+    Boolean,
+    parseInt,
+    parseFloat,
+  };
 
   constructor(
     logger: Logger,
@@ -350,6 +361,43 @@ export class SafeExpressionEvaluator {
 
     for (let i = 0; i < tokens.length; i++) {
       const token = tokens[i];
+
+      // Function call: identifier followed by '('
+      if (
+        token.type === 'identifier' &&
+        tokens[i + 1] && tokens[i + 1].value === '('
+      ) {
+        // Find matching closing parenthesis
+        let depth = 1;
+        let j = i + 2;
+        const argTokens: Token[] = [];
+        while (j < tokens.length && depth > 0) {
+          if (tokens[j].value === '(') depth++;
+          else if (tokens[j].value === ')') depth--;
+          if (depth > 0) argTokens.push(tokens[j]);
+          j++;
+        }
+        if (depth !== 0) throw new ExpressionError('Mismatched parentheses in function call');
+        // Split args by commas at top level
+        const args: AstNode[] = [];
+        let current: Token[] = [];
+        let argDepth = 0;
+        for (const t of argTokens) {
+          if (t.value === '(') argDepth++;
+          if (t.value === ')') argDepth--;
+          if (t.value === ',' && argDepth === 0) {
+            if (current.length > 0) args.push(this.parse(current));
+            current = [];
+          } else {
+            current.push(t);
+          }
+        }
+        if (current.length > 0) args.push(this.parse(current));
+        outputQueue.push({ type: 'function_call', name: token.value, args });
+        i = j - 1;
+        expectOperator = true;
+        continue;
+      }
 
       // Handle parentheses tokens first, regardless of token type
       if (token.value === '(') {
@@ -686,17 +734,33 @@ export class SafeExpressionEvaluator {
         return result;
       }
 
+      case 'function_call': {
+        if (!ast.name || !Array.isArray(ast.args)) {
+          throw new ExpressionError('Malformed function call node');
+        }
+        if (!Object.prototype.hasOwnProperty.call(SafeExpressionEvaluator.ALLOWED_FUNCTIONS, ast.name as keyof typeof SafeExpressionEvaluator.ALLOWED_FUNCTIONS)) {
+          throw new ExpressionError(`Function '${ast.name}' is not allowed`);
+        }
+        const fn = SafeExpressionEvaluator.ALLOWED_FUNCTIONS[ast.name as keyof typeof SafeExpressionEvaluator.ALLOWED_FUNCTIONS];
+        const argVals = ast.args.map((arg: AstNode) => this.evaluateAst(arg, context, startTime, expression, step));
+        return (fn as Function).apply(null, argVals);
+      }
+
       default:
         throw new ExpressionError(`Unknown AST node type: ${(ast as AstNode).type}`);
     }
   }
 
-  /**
-   * Extract all references from an expression without evaluating it.
-   * This is useful for dependency analysis.
-   * @param expression The expression to extract references from
-   * @returns An array of reference paths found in the expression
-   */
+  private handleReferenceError(error: unknown, customMessage?: string): never {
+    const originalMessage = error instanceof Error ? error.message : String(error);
+    const message = customMessage ? `${customMessage}: ${originalMessage}` : originalMessage;
+    throw new ExpressionError(message, error instanceof Error ? error : undefined);
+  }
+
+  private static isSpecialVariable(name: string): boolean {
+    return ['item', 'context', 'acc'].includes(name);
+  }
+
   public extractReferences(expression: string): string[] {
     const refs = new Set<string>();
 
@@ -721,7 +785,7 @@ export class SafeExpressionEvaluator {
         if (braceCount === 0) {
           const inner = expr.substring(startIdx + 2, i - 1);
           const baseRef = inner.split(/[[.\s]+/)[0];
-          if (baseRef && !this.isSpecialVariable(baseRef)) {
+          if (baseRef && !SafeExpressionEvaluator.isSpecialVariable(baseRef)) {
             refs.add(baseRef);
           }
           extractRefs(inner);
@@ -733,30 +797,6 @@ export class SafeExpressionEvaluator {
     };
 
     extractRefs(expression);
-
     return Array.from(refs).sort();
-  }
-
-  /**
-   * Check if a variable name is a special variable that should be ignored
-   */
-  private isSpecialVariable(name: string): boolean {
-    return ['item', 'context', 'acc'].includes(name);
-  }
-
-  /**
-   * Helper method to handle reference resolution errors consistently
-   */
-  private handleReferenceError(
-    error: unknown,
-    message: string = 'Error resolving reference',
-  ): never {
-    if (error instanceof PropertyAccessError || error instanceof PathSyntaxError) {
-      throw new ExpressionError(error.message);
-    }
-    if (error instanceof Error) {
-      throw new ExpressionError(`${message}: ${error.message}`);
-    }
-    throw new ExpressionError(`${message}: ${String(error)}`);
   }
 }

@@ -155,6 +155,25 @@ describe('SafeExpressionEvaluator', () => {
       // Test spreading object values into array
       expect(evaluator.evaluate('[...${context.object}]', {})).toEqual([1, 2]);
     });
+
+    it('evaluates whitelisted global function calls', () => {
+      expect(evaluator.evaluate('Number("123")', {})).toBe(123);
+      expect(evaluator.evaluate('String(123)', {})).toBe('123');
+      expect(evaluator.evaluate('Boolean(0)', {})).toBe(false);
+      expect(evaluator.evaluate('Boolean(1)', {})).toBe(true);
+      expect(evaluator.evaluate('parseInt("42")', {})).toBe(42);
+      expect(evaluator.evaluate('parseFloat("3.14")', {})).toBeCloseTo(3.14);
+      // Arguments can be expressions
+      expect(evaluator.evaluate('Number(100 + 23)', {})).toBe(123);
+      // Nested function calls
+      expect(evaluator.evaluate('String(Number("456"))', {})).toBe('456');
+    });
+
+    it('throws on non-whitelisted function calls', () => {
+      expect(() => evaluator.evaluate('eval("2+2")', {})).toThrow(ExpressionError);
+      expect(() => evaluator.evaluate('alert("hi")', {})).toThrow(ExpressionError);
+      expect(() => evaluator.evaluate('Function("return 1")', {})).toThrow(ExpressionError);
+    });
   });
 
   describe('error handling', () => {

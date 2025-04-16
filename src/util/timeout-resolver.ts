@@ -257,4 +257,32 @@ export class TimeoutResolver {
       ...this.flow.timeouts,
     };
   }
+
+  /**
+   * Resolves the effective global timeout for the flow
+   * Precedence: flow.policies.global.timeout.timeout > executorTimeouts.global > DEFAULT_TIMEOUTS.global
+   * @returns The resolved global timeout in milliseconds
+   */
+  resolveGlobalTimeout(): number {
+    // Check for schema-compliant policies.global.timeout.timeout
+    const policyTimeout = this.flow.policies?.global?.timeout?.timeout;
+    if (typeof policyTimeout === 'number') {
+      const validatedTimeout = TimeoutValidator.validateTimeout(
+        policyTimeout,
+        this.executorTimeouts.global ?? DEFAULT_TIMEOUTS.global!
+      );
+      this.logger.debug('Using policies.global.timeout.timeout', { timeout: validatedTimeout });
+      return validatedTimeout;
+    }
+    if (this.executorTimeouts.global !== undefined) {
+      const validatedTimeout = TimeoutValidator.validateTimeout(
+        this.executorTimeouts.global,
+        DEFAULT_TIMEOUTS.global!
+      );
+      this.logger.debug('Using executor-level global timeout', { timeout: validatedTimeout });
+      return validatedTimeout;
+    }
+    this.logger.debug('Using default global timeout', { timeout: DEFAULT_TIMEOUTS.global });
+    return DEFAULT_TIMEOUTS.global!;
+  }
 }

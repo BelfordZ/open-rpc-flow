@@ -27,7 +27,7 @@ export class TransformExecutor {
     this.logger = logger.createNested('TransformExecutor');
   }
 
-  execute(operations: TransformOperation[], input: any, step?: Step): any {
+  async execute(operations: TransformOperation[], input: any, step?: Step): Promise<any> {
     this.logger.debug('Starting transform execution', {
       operationCount: operations.length,
       operations: operations.map((op) => ({ type: op.type, as: op.as })),
@@ -47,7 +47,7 @@ export class TransformExecutor {
         isArray: Array.isArray(data),
       });
 
-      data = this.executeOperation(op, data, step);
+      data = await this.executeOperation(op, data, step);
 
       if (op.as) {
         this.logger.debug('Storing operation result in context', {
@@ -68,7 +68,7 @@ export class TransformExecutor {
     return data;
   }
 
-  private executeOperation(op: TransformOperation, data: any, step?: Step): any {
+  private async executeOperation(op: TransformOperation, data: any, step?: Step): Promise<any> {
     this.logger.debug('Executing operation', {
       type: op.type,
       using: op.using,
@@ -81,19 +81,19 @@ export class TransformExecutor {
     try {
       switch (op.type) {
         case 'map':
-          return this.executeMap(op, data, step);
+          return await this.executeMap(op, data, step);
         case 'filter':
-          return this.executeFilter(op, data, step);
+          return await this.executeFilter(op, data, step);
         case 'reduce':
-          return this.executeReduce(op, data, step);
+          return await this.executeReduce(op, data, step);
         case 'flatten':
           return this.executeFlatten(op, data);
         case 'sort':
-          return this.executeSort(op, data, step);
+          return await this.executeSort(op, data, step);
         case 'unique':
           return this.executeUnique(op, data);
         case 'group':
-          return this.executeGroup(op, data, step);
+          return await this.executeGroup(op, data, step);
         case 'join':
           return this.executeJoin(op, data);
         default:
@@ -105,7 +105,7 @@ export class TransformExecutor {
     }
   }
 
-  private executeMap(op: TransformOperation, data: any[], step?: Step): any[] {
+  private async executeMap(op: TransformOperation, data: any[], step?: Step): Promise<any[]> {
     this.validateArray(data, 'map');
     this.logger.debug('Executing map operation', {
       inputLength: data.length,
@@ -113,16 +113,18 @@ export class TransformExecutor {
       hasStep: !!step,
     });
 
-    const result = data.map((item, index) => {
-      const context = { item, index };
-      const mapped = this.expressionEvaluator.evaluate(op.using, context, step);
-      this.logger.debug('Mapped item', {
-        index,
-        originalType: typeof item,
-        resultType: typeof mapped,
-      });
-      return mapped;
-    });
+    const result = await Promise.all(
+      data.map(async (item, index) => {
+        const context = { item, index };
+        const mapped = await this.expressionEvaluator.evaluate(op.using, context, step);
+        this.logger.debug('Mapped item', {
+          index,
+          originalType: typeof item,
+          resultType: typeof mapped,
+        });
+        return mapped;
+      })
+    );
 
     this.logger.debug('Map operation completed', {
       inputLength: data.length,
@@ -131,7 +133,7 @@ export class TransformExecutor {
     return result;
   }
 
-  private executeFilter(op: TransformOperation, data: any[], step?: Step): any[] {
+  private async executeFilter(op: TransformOperation, data: any[], step?: Step): Promise<any[]> {
     this.validateArray(data, 'filter');
     this.logger.debug('Executing filter operation', {
       inputLength: data.length,
@@ -139,12 +141,15 @@ export class TransformExecutor {
       hasStep: !!step,
     });
 
-    const result = data.filter((item, index) => {
-      const context = { item, index };
-      const keep = this.expressionEvaluator.evaluate(op.using, context, step);
-      this.logger.debug('Filter evaluation', { index, keep });
-      return keep;
-    });
+    const keepArr = await Promise.all(
+      data.map(async (item, index) => {
+        const context = { item, index };
+        const keep = await this.expressionEvaluator.evaluate(op.using, context, step);
+        this.logger.debug('Filter evaluation', { index, keep });
+        return keep;
+      })
+    );
+    const result = data.filter((_, idx) => keepArr[idx]);
 
     this.logger.debug('Filter operation completed', {
       inputLength: data.length,
@@ -154,7 +159,7 @@ export class TransformExecutor {
     return result;
   }
 
-  private executeReduce(op: TransformOperation, data: any[], step?: Step): any {
+  private async executeReduce(op: TransformOperation, data: any[], step?: Step): Promise<any> {
     this.validateArray(data, 'reduce');
     this.logger.debug('Executing reduce operation', {
       inputLength: data.length,
@@ -163,23 +168,24 @@ export class TransformExecutor {
       hasStep: !!step,
     });
 
-    const result = data.reduce((acc, item, index) => {
+    let acc = op.initial;
+    for (let index = 0; index < data.length; index++) {
+      const item = data[index];
       const context = { acc, item, index };
-      const reduced = this.expressionEvaluator.evaluate(op.using, context, step);
+      acc = await this.expressionEvaluator.evaluate(op.using, context, step);
       this.logger.debug('Reduced item', {
         index,
         accType: typeof acc,
         itemType: typeof item,
-        resultType: typeof reduced,
+        resultType: typeof acc,
       });
-      return reduced;
-    }, op.initial);
+    }
 
     this.logger.debug('Reduce operation completed', {
       inputLength: data.length,
-      resultType: typeof result,
+      resultType: typeof acc,
     });
-    return result;
+    return acc;
   }
 
   private executeFlatten(op: TransformOperation, data: any[]): any[] {
@@ -197,7 +203,7 @@ export class TransformExecutor {
     return result;
   }
 
-  private executeSort(op: TransformOperation, data: any[], step?: Step): any[] {
+  private async executeSort(op: TransformOperation, data: any[], step?: Step): Promise<any[]> {
     this.validateArray(data, 'sort');
     this.logger.debug('Executing sort operation', {
       inputLength: data.length,
@@ -205,10 +211,27 @@ export class TransformExecutor {
       hasStep: !!step,
     });
 
-    const result = [...data].sort((a, b) => {
-      const context = { a, b };
-      return this.expressionEvaluator.evaluate(op.using, context, step);
-    });
+    // Sort using async comparator
+    const result = [...data];
+    // Use a stable sort algorithm with async comparator
+    for (let i = 0; i < result.length; i++) {
+      for (let j = i + 1; j < result.length; j++) {
+        const context = { a: result[i], b: result[j], indexA: i, indexB: j };
+        this.logger.debug('Sort comparison context', {
+          aKey: context.a.key,
+          bKey: context.b.key,
+          aKeyType: typeof context.a.key,
+          bKeyType: typeof context.b.key,
+        });
+        const cmp = await this.expressionEvaluator.evaluate(op.using, context, step);
+        if (cmp > 0) {
+          // Swap
+          const temp = result[i];
+          result[i] = result[j];
+          result[j] = temp;
+        }
+      }
+    }
 
     this.logger.debug('Sort operation completed', {
       inputLength: data.length,
@@ -223,16 +246,15 @@ export class TransformExecutor {
       inputLength: data.length,
     });
 
-    const result = [...new Set(data)];
+    const result = Array.from(new Set(data));
     this.logger.debug('Unique operation completed', {
       inputLength: data.length,
       outputLength: result.length,
-      duplicatesRemoved: data.length - result.length,
     });
     return result;
   }
 
-  private executeGroup(op: TransformOperation, data: any[], step?: Step): any[] {
+  private async executeGroup(op: TransformOperation, data: any[], step?: Step): Promise<any[]> {
     this.validateArray(data, 'group');
     this.logger.debug('Executing group operation', {
       inputLength: data.length,
@@ -240,22 +262,16 @@ export class TransformExecutor {
       hasStep: !!step,
     });
 
-    const groupedObj = data.reduce((acc, item, index) => {
+    const groups: Record<string, any[]> = {};
+    for (let index = 0; index < data.length; index++) {
+      const item = data[index];
       const context = { item, index };
-      const key = this.expressionEvaluator.evaluate(op.using, context, step);
-      if (!acc[key]) {
-        acc[key] = [];
-      }
-      acc[key].push(item);
-      return acc;
-    }, {});
-
-    // Convert the grouped object to an array of key-value pairs
-    const result = Object.entries(groupedObj).map(([key, items]) => ({
-      key: isNaN(Number(key)) ? key : Number(key),
-      items,
-    }));
-
+      const key = await this.expressionEvaluator.evaluate(op.using, context, step);
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(item);
+    }
+    // Return array of { key, items }
+    const result = Object.entries(groups).map(([key, items]) => ({ key, items }));
     this.logger.debug('Group operation completed', {
       inputLength: data.length,
       groupCount: result.length,
@@ -280,7 +296,7 @@ export class TransformExecutor {
 
   private validateArray(data: any, operation: string): void {
     if (!Array.isArray(data)) {
-      throw new Error(`${operation} operation requires an array input, got ${typeof data}`);
+      throw new Error(`Input to ${operation} operation must be an array`);
     }
   }
 }

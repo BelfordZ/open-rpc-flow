@@ -2,7 +2,7 @@ import { TimeoutResolver } from '../timeout-resolver';
 import { DEFAULT_TIMEOUTS } from '../../constants/timeouts';
 import { Step, Flow, TimeoutOptions } from '../../types';
 import { StepType } from '../../step-executors/types';
-import { defaultLogger } from '../../util/logger';
+import { TestLogger } from '../../util/logger';
 
 // Mock the TimeoutValidator dependency
 jest.mock('../timeout-validator', () => {
@@ -32,16 +32,10 @@ describe('TimeoutResolver', () => {
     timeouts,
   });
 
-  let logger: any;
-  let debugSpy: jest.SpyInstance;
+  let logger: TestLogger;
 
   beforeEach(() => {
-    logger = {
-      ...defaultLogger,
-      createNested: jest.fn().mockReturnThis(),
-      debug: jest.fn(),
-    };
-    debugSpy = jest.spyOn(logger, 'debug');
+    logger = new TestLogger('TimeoutResolverTest');
   });
 
   afterEach(() => {
@@ -51,7 +45,7 @@ describe('TimeoutResolver', () => {
   describe('constructor', () => {
     it('should initialize with default values', () => {
       const flow = createMockFlow();
-      const result = new TimeoutResolver(flow);
+      const result = new TimeoutResolver(flow, undefined, logger);
       expect(result).toBeDefined();
     });
 
@@ -62,9 +56,14 @@ describe('TimeoutResolver', () => {
 
       new TimeoutResolver(flow, executorTimeouts, logger);
 
-      expect(debugSpy).toHaveBeenCalledWith('Initialized TimeoutResolver', {
-        flowTimeouts: { ...DEFAULT_TIMEOUTS, ...flowTimeouts },
-        executorTimeouts: { ...DEFAULT_TIMEOUTS, ...executorTimeouts },
+      const logs = logger.getLogs();
+      expect(logs).toContainEqual({
+        level: 'debug',
+        message: 'Initialized TimeoutResolver',
+        data: {
+          flowTimeouts: { ...DEFAULT_TIMEOUTS, ...flowTimeouts },
+          executorTimeouts: { ...DEFAULT_TIMEOUTS, ...executorTimeouts },
+        },
       });
     });
   });
@@ -96,9 +95,11 @@ describe('TimeoutResolver', () => {
       const timeout = resolver.resolveStepTimeout(step, StepType.Request);
 
       expect(timeout).toBe(2000);
-      expect(debugSpy).toHaveBeenCalledWith('Using step-level timeout', {
-        stepName: 'TestStep',
-        timeout: 2000,
+      const logs = logger.getLogs();
+      expect(logs).toContainEqual({
+        level: 'debug',
+        message: 'Using step-level timeout',
+        data: { stepName: 'TestStep', timeout: 2000 },
       });
     });
 
@@ -112,9 +113,11 @@ describe('TimeoutResolver', () => {
       const timeout = resolver.resolveStepTimeout(step, StepType.Request);
 
       expect(timeout).toBe(10000);
-      expect(debugSpy).toHaveBeenCalledWith('Using flow-level type-specific timeout', {
-        stepName: 'TestStep',
-        timeout: 10000,
+      const logs = logger.getLogs();
+      expect(logs).toContainEqual({
+        level: 'debug',
+        message: 'Using flow-level type-specific timeout',
+        data: { stepName: 'TestStep', timeout: 10000 },
       });
     });
 
@@ -128,9 +131,11 @@ describe('TimeoutResolver', () => {
       const timeout = resolver.resolveStepTimeout(step, StepType.Transform);
 
       expect(timeout).toBe(5000);
-      expect(debugSpy).toHaveBeenCalledWith('Using flow-level global timeout', {
-        stepName: 'TestStep',
-        timeout: 5000,
+      const logs = logger.getLogs();
+      expect(logs).toContainEqual({
+        level: 'debug',
+        message: 'Using flow-level global timeout',
+        data: { stepName: 'TestStep', timeout: 5000 },
       });
     });
 
@@ -142,9 +147,11 @@ describe('TimeoutResolver', () => {
       const timeout = resolver.resolveStepTimeout(step, StepType.Request);
 
       expect(timeout).toBe(DEFAULT_TIMEOUTS.request);
-      expect(debugSpy).toHaveBeenCalledWith('Using default timeout', {
-        stepName: 'TestStep',
-        timeout: DEFAULT_TIMEOUTS.request,
+      const logs = logger.getLogs();
+      expect(logs).toContainEqual({
+        level: 'debug',
+        message: 'Using default timeout',
+        data: { stepName: 'TestStep', timeout: DEFAULT_TIMEOUTS.request },
       });
     });
 
@@ -171,9 +178,11 @@ describe('TimeoutResolver', () => {
       const timeout = resolver.resolveExpressionTimeout(step);
 
       expect(timeout).toBe(500);
-      expect(debugSpy).toHaveBeenCalledWith('Using step-level timeout for expression', {
-        stepName: 'TestStep',
-        timeout: 500,
+      const logs = logger.getLogs();
+      expect(logs).toContainEqual({
+        level: 'debug',
+        message: 'Using step-level timeout for expression',
+        data: { stepName: 'TestStep', timeout: 500 },
       });
     });
 
@@ -185,8 +194,11 @@ describe('TimeoutResolver', () => {
       const timeout = resolver.resolveExpressionTimeout();
 
       expect(timeout).toBe(2000);
-      expect(debugSpy).toHaveBeenCalledWith('Using flow-level expression timeout', {
-        timeout: 2000,
+      const logs = logger.getLogs();
+      expect(logs).toContainEqual({
+        level: 'debug',
+        message: 'Using flow-level expression timeout',
+        data: { timeout: 2000 },
       });
     });
 
@@ -198,8 +210,11 @@ describe('TimeoutResolver', () => {
       const timeout = resolver.resolveExpressionTimeout();
 
       expect(timeout).toBe(5000);
-      expect(debugSpy).toHaveBeenCalledWith('Using flow-level global timeout for expression', {
-        timeout: 5000,
+      const logs = logger.getLogs();
+      expect(logs).toContainEqual({
+        level: 'debug',
+        message: 'Using flow-level global timeout for expression',
+        data: { timeout: 5000 },
       });
     });
 
@@ -223,8 +238,11 @@ describe('TimeoutResolver', () => {
       const timeout = resolver.resolveExpressionTimeout();
       
       expect(timeout).toBe(DEFAULT_TIMEOUTS.expression);
-      expect(logger.debug).toHaveBeenCalledWith('No executor-level expression timeout configured; Using default expression timeout', {
-        timeout: DEFAULT_TIMEOUTS.expression,
+      const logs = logger.getLogs();
+      expect(logs).toContainEqual({
+        level: 'debug',
+        message: 'No executor-level expression timeout configured; Using default expression timeout',
+        data: { timeout: DEFAULT_TIMEOUTS.expression },
       });
     });
 
@@ -236,8 +254,11 @@ describe('TimeoutResolver', () => {
       const timeout = resolver.resolveExpressionTimeout();
 
       expect(timeout).toBe(3000);
-      expect(debugSpy).toHaveBeenCalledWith('Using executor-level expression timeout', {
-        timeout: 3000,
+      const logs = logger.getLogs();
+      expect(logs).toContainEqual({
+        level: 'debug',
+        message: 'Using executor-level expression timeout',
+        data: { timeout: 3000 },
       });
     });
 
@@ -265,8 +286,11 @@ describe('TimeoutResolver', () => {
       const timeout = resolver.resolveExpressionTimeout();
       
       expect(timeout).toBe(DEFAULT_TIMEOUTS.expression);
-      expect(logger.debug).toHaveBeenCalledWith('Using default expression timeout', {
-        timeout: DEFAULT_TIMEOUTS.expression,
+      const logs = logger.getLogs();
+      expect(logs).toContainEqual({
+        level: 'debug',
+        message: 'Using default expression timeout',
+        data: { timeout: DEFAULT_TIMEOUTS.expression },
       });
     });
   });

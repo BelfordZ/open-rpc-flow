@@ -1,7 +1,7 @@
 import { TransformStepExecutor } from '../../step-executors/transform-executor';
 import { SafeExpressionEvaluator } from '../../expression-evaluator/safe-evaluator';
 import { ReferenceResolver } from '../../reference-resolver';
-import { TimeoutResolver } from '../../utils/timeout-resolver';
+import { TimeoutResolver } from '../../util/timeout-resolver';
 import { EnhancedTimeoutError } from '../../errors/timeout-error';
 import { TestLogger } from '../../util/logger';
 import { Flow, Step } from '../../types';
@@ -76,13 +76,6 @@ describe('TransformStepExecutor Timeout Tests', () => {
       },
     };
 
-    // Create a slow operation that will take longer than the timeout
-    const slowOperation = new Promise((resolve) => {
-      setTimeout(() => {
-        resolve([2, 4, 6]);
-      }, 6000); // 6 seconds, longer than our 5 second timeout
-    });
-
     // Mock only the evaluate method to throw a timeout error after the specified time
     jest.spyOn(expressionEvaluator, 'evaluate').mockImplementation(async (expression, context, step) => {
       const timeout = step?.timeout || context.timeout || 10000;
@@ -92,10 +85,9 @@ describe('TransformStepExecutor Timeout Tests', () => {
 
     // Start the execution
     const executePromise = executor.execute(step, context);
-
     // Fast-forward time past the timeout
     jest.advanceTimersByTime(6000);
-
+    await Promise.resolve();
     // Verify that the operation times out
     await expect(executePromise).rejects.toThrow(EnhancedTimeoutError);
     await expect(executePromise).rejects.toMatchObject({
@@ -122,13 +114,6 @@ describe('TransformStepExecutor Timeout Tests', () => {
       },
     };
 
-    // Create a slow operation that will take longer than the default timeout
-    const slowOperation = new Promise((resolve) => {
-      setTimeout(() => {
-        resolve([2, 4, 6]);
-      }, 11000); // 11 seconds, longer than the default 10 second timeout
-    });
-
     // Mock only the evaluate method to throw a timeout error after the specified time
     jest.spyOn(expressionEvaluator, 'evaluate').mockImplementation(async (expression, context, step) => {
       const timeout = step?.timeout || context.timeout || 10000;
@@ -144,6 +129,7 @@ describe('TransformStepExecutor Timeout Tests', () => {
 
     // Fast-forward time past the default timeout
     jest.advanceTimersByTime(11000);
+    await Promise.resolve();
 
     // Verify that the operation times out
     await expect(executePromise).rejects.toThrow(EnhancedTimeoutError);
@@ -172,13 +158,6 @@ describe('TransformStepExecutor Timeout Tests', () => {
       },
     };
 
-    // Create a slow operation that will take longer than the step timeout
-    const slowOperation = new Promise((resolve) => {
-      setTimeout(() => {
-        resolve([2, 4, 6]);
-      }, 4000); // 4 seconds, longer than our 3 second timeout
-    });
-
     // Mock only the evaluate method to throw a timeout error after the specified time
     jest.spyOn(expressionEvaluator, 'evaluate').mockImplementation(async (expression, context, step) => {
       const timeout = step?.timeout || context.timeout || 10000;
@@ -191,6 +170,7 @@ describe('TransformStepExecutor Timeout Tests', () => {
 
     // Fast-forward time past the step timeout
     jest.advanceTimersByTime(4000);
+    await Promise.resolve();
 
     // Verify that the operation times out
     await expect(executePromise).rejects.toThrow(EnhancedTimeoutError);

@@ -392,58 +392,26 @@ The engine supports dynamic expressions using the `${...}` syntax:
 
 Flow provides built-in error handling capabilities including automatic retries and circuit breaker patterns for request steps.
 
-##### Retry Configuration
+#### Error Handling with Retry
 
-Configure automatic retries for transient errors:
-
-```typescript
-const executor = new FlowExecutor(flow, jsonRpcHandler, {
-  // Enable automatic retries for request steps
-  enableRetries: true,
-  // Configure retry behavior (or use DEFAULT_RETRY_POLICY)
-  retryPolicy: {
-    maxAttempts: 3,
-    backoff: {
-      initial: 100, // Initial delay in ms
-      multiplier: 2, // Exponential multiplier
-      maxDelay: 5000, // Maximum delay in ms
-    },
-    retryableErrors: [ErrorCode.NETWORK_ERROR, ErrorCode.TIMEOUT_ERROR],
-  },
-});
-```
-
-Retries can be updated at runtime:
-
-```typescript
-// Update retry configuration during execution
-executor.updateErrorHandlingOptions({
-  enableRetries: true,
-  retryPolicy: {
-    maxAttempts: 5,
-    backoff: {
-      initial: 200,
-      multiplier: 1.5,
-      maxDelay: 10000,
-    },
-    retryableErrors: [ErrorCode.NETWORK_ERROR, ErrorCode.TIMEOUT_ERROR, ErrorCode.RESOURCE_ERROR],
-  },
-});
-```
-
-##### Circuit Breaker
-
-Enable circuit breaker protection for request steps:
+Enable automatic retries for failed request steps:
 
 ```typescript
 const executor = new FlowExecutor(flow, jsonRpcHandler, {
-  // Enable circuit breaker
-  enableCircuitBreaker: true,
-  // Configure circuit breaker (or use DEFAULT_CIRCUIT_BREAKER_CONFIG)
-  circuitBreakerConfig: {
-    failureThreshold: 5, // Number of failures before opening circuit
-    recoveryTime: 30000, // Time in ms before attempting recovery
-    monitorWindow: 60000, // Time window for failure evaluation
+  // Enable retry policy
+  enableRetries: true,
+  // Configure retry policy (or use DEFAULT_RETRY_POLICY)
+  retryPolicy: {
+    maxAttempts: 3, // Retry up to 3 times
+    backoff: {
+      initial: 100, // 100ms initial delay
+      multiplier: 2, // Exponential backoff
+      maxDelay: 5000, // Maximum 5s delay
+    },
+    retryableErrors: [
+      ErrorCode.NETWORK_ERROR,
+      ErrorCode.TIMEOUT_ERROR
+    ],
   },
 });
 ```

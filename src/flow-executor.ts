@@ -15,8 +15,10 @@ import {
 import { Logger, defaultLogger } from './util/logger';
 import { FlowExecutorEvents, FlowEventOptions } from './util/flow-executor-events';
 import { RetryPolicy } from './errors/recovery';
-import { CircuitBreakerConfig } from './errors/circuit-breaker';
 import { ErrorCode } from './errors/codes';
+import { EnhancedTimeoutError } from './errors/timeout-error';
+import { TimeoutError, ExecutionError } from './errors/base';
+import { TimeoutResolver } from './util/timeout-resolver';
 
 /**
  * Default retry policy
@@ -27,17 +29,9 @@ export const DEFAULT_RETRY_POLICY: RetryPolicy = {
     initial: 100,
     multiplier: 2,
     maxDelay: 5000,
+    strategy: 'exponential',
   },
   retryableErrors: [ErrorCode.NETWORK_ERROR, ErrorCode.TIMEOUT_ERROR, ErrorCode.OPERATION_TIMEOUT],
-};
-
-/**
- * Default circuit breaker configuration
- */
-export const DEFAULT_CIRCUIT_BREAKER_CONFIG: CircuitBreakerConfig = {
-  failureThreshold: 5,
-  recoveryTime: 30000,
-  monitorWindow: 60000,
 };
 
 /**
@@ -50,10 +44,6 @@ export interface FlowExecutorOptions {
   eventOptions?: Partial<FlowEventOptions>;
   /** Retry policy for request steps */
   retryPolicy?: RetryPolicy;
-  /** Circuit breaker configuration for request steps */
-  circuitBreakerConfig?: CircuitBreakerConfig;
-  /** Whether to enable the circuit breaker */
-  enableCircuitBreaker?: boolean;
   /** Whether to enable retries */
   enableRetries?: boolean;
 }
@@ -73,9 +63,8 @@ export class FlowExecutor {
   private stepExecutors: StepExecutor[];
   private logger: Logger;
   private retryPolicy: RetryPolicy | null;
-  private circuitBreakerConfig: CircuitBreakerConfig | null;
   private enableRetries: boolean;
-  private enableCircuitBreaker: boolean;
+  private timeoutResolver: TimeoutResolver;
 
   constructor(
     private flow: Flow,
@@ -103,15 +92,45 @@ export class FlowExecutor {
 
     // Initialize error handling options
     this.enableRetries = options?.enableRetries ?? false;
-    this.enableCircuitBreaker = options?.enableCircuitBreaker ?? false;
 
     // Initialize retry policy if enabled
-    this.retryPolicy = this.enableRetries ? options?.retryPolicy || DEFAULT_RETRY_POLICY : null;
-
-    // Initialize circuit breaker config if enabled
-    this.circuitBreakerConfig = this.enableCircuitBreaker
-      ? options?.circuitBreakerConfig || DEFAULT_CIRCUIT_BREAKER_CONFIG
-      : null;
+    if (this.enableRetries) {
+      // Priority: options.retryPolicy > flow.policies.global > flow.retryPolicy > DEFAULT_RETRY_POLICY
+      if (options?.retryPolicy) {
+        this.retryPolicy = options.retryPolicy;
+      } else if (flow.policies?.global?.retryPolicy) {
+        // Convert flow.policies.global.retryPolicy to RetryPolicy format
+        this.retryPolicy = {
+          maxAttempts: flow.policies.global.retryPolicy.maxAttempts ?? DEFAULT_RETRY_POLICY.maxAttempts,
+          backoff: {
+            initial: flow.policies.global.retryPolicy.backoff?.initial ?? DEFAULT_RETRY_POLICY.backoff.initial,
+            multiplier: flow.policies.global.retryPolicy.backoff?.multiplier ?? DEFAULT_RETRY_POLICY.backoff.multiplier,
+            maxDelay: flow.policies.global.retryPolicy.backoff?.maxDelay ?? DEFAULT_RETRY_POLICY.backoff.maxDelay,
+            strategy: flow.policies.global.retryPolicy.backoff?.strategy ?? 'exponential',
+          },
+          // Cast string[] to ErrorCode[] since we're sure they're valid error codes
+          retryableErrors: (flow.policies.global.retryPolicy.retryableErrors ?? DEFAULT_RETRY_POLICY.retryableErrors) as ErrorCode[],
+        };
+      } else if (flow.retryPolicy) {
+        // Deprecated but still supported for backward compatibility
+        // Convert flow.retryPolicy to RetryPolicy format
+        this.retryPolicy = {
+          maxAttempts: flow.retryPolicy.maxAttempts ?? DEFAULT_RETRY_POLICY.maxAttempts,
+          backoff: {
+            initial: flow.retryPolicy.backoff?.initial ?? DEFAULT_RETRY_POLICY.backoff.initial,
+            multiplier: flow.retryPolicy.backoff?.multiplier ?? DEFAULT_RETRY_POLICY.backoff.multiplier,
+            maxDelay: flow.retryPolicy.backoff?.maxDelay ?? DEFAULT_RETRY_POLICY.backoff.maxDelay,
+            strategy: 'exponential', // Default for backward compatibility
+          },
+          // Cast string[] to ErrorCode[] since we're sure they're valid error codes
+          retryableErrors: (flow.retryPolicy.retryableErrors ?? DEFAULT_RETRY_POLICY.retryableErrors) as ErrorCode[],
+        };
+      } else {
+        this.retryPolicy = DEFAULT_RETRY_POLICY;
+      }
+    } else {
+      this.retryPolicy = null;
+    }
 
     // Initialize shared execution context
     this.referenceResolver = new ReferenceResolver(this.stepResults, this.context, this.logger);
@@ -128,6 +147,7 @@ export class FlowExecutor {
       stepResults: this.stepResults,
       context: this.context,
       logger: this.logger,
+      flow: this.flow,
     };
 
     // Initialize step executors in order of specificity
@@ -143,6 +163,9 @@ export class FlowExecutor {
       ),
       new StopStepExecutor(this.logger),
     ];
+
+    // Initialize TimeoutResolver for resolving timeouts
+    this.timeoutResolver = new TimeoutResolver(this.flow, undefined, this.logger);
   }
 
   /**
@@ -153,7 +176,6 @@ export class FlowExecutor {
       this.jsonRpcHandler,
       this.logger,
       this.enableRetries ? this.retryPolicy : null,
-      this.enableCircuitBreaker ? this.circuitBreakerConfig : null,
     );
   }
 
@@ -169,27 +191,16 @@ export class FlowExecutor {
    */
   updateErrorHandlingOptions(options: {
     retryPolicy?: RetryPolicy;
-    circuitBreakerConfig?: CircuitBreakerConfig;
     enableRetries?: boolean;
-    enableCircuitBreaker?: boolean;
   }): void {
     // Update enable flags if provided
     if (options.enableRetries !== undefined) {
       this.enableRetries = options.enableRetries;
     }
 
-    if (options.enableCircuitBreaker !== undefined) {
-      this.enableCircuitBreaker = options.enableCircuitBreaker;
-    }
-
     // Update retry policy if provided
     if (options.retryPolicy) {
       this.retryPolicy = options.retryPolicy;
-    }
-
-    // Update circuit breaker config if provided
-    if (options.circuitBreakerConfig) {
-      this.circuitBreakerConfig = options.circuitBreakerConfig;
     }
 
     // Replace the request step executor with updated options
@@ -203,19 +214,41 @@ export class FlowExecutor {
 
     this.logger.debug('Updated error handling options', {
       enableRetries: this.enableRetries,
-      enableCircuitBreaker: this.enableCircuitBreaker,
       retryPolicy: this.retryPolicy,
-      circuitBreakerConfig: this.circuitBreakerConfig,
     });
   }
 
   /**
    * Execute the flow and return all step results
    */
-  async execute(): Promise<Map<string, any>> {
+  async execute(options?: { signal?: AbortSignal }): Promise<Map<string, any>> {
     const startTime = Date.now();
-
+    let globalTimeoutId: NodeJS.Timeout | undefined;
+    const globalAbortController = new AbortController();
     try {
+      // Set up global timeout if configured in the flow
+      // Use TimeoutResolver to get the global timeout
+      const globalTimeout = this.timeoutResolver.resolveGlobalTimeout();
+      
+      // Combine external signal with our timeout signal if provided
+      if (options?.signal) {
+        // Forward abort from external signal to our controller
+        options.signal.addEventListener('abort', () => {
+          globalAbortController.abort(options.signal?.reason);
+        });
+      }
+      
+      // Add abort signal to execution context
+      this.executionContext.signal = globalAbortController.signal;
+      
+      if (globalTimeout && globalTimeout > 0) {
+        this.logger.debug('Setting global flow timeout', { timeout: globalTimeout });
+        globalTimeoutId = setTimeout(() => {
+          this.logger.debug('Global flow timeout reached', { timeout: globalTimeout });
+          globalAbortController.abort(new Error('Global flow timeout reached'));
+        }, globalTimeout);
+      }
+      
       // Get steps in dependency order
       const orderedSteps = this.dependencyResolver.getExecutionOrder();
       const orderedStepNames = orderedSteps.map((s) => s.name);
@@ -229,6 +262,17 @@ export class FlowExecutor {
         const stepStartTime = Date.now();
 
         try {
+          // Check if we've been aborted before executing step
+          if (globalAbortController.signal.aborted) {
+            const reason = globalAbortController.signal.reason || 'Flow execution aborted';
+            this.logger.debug('Skipping step due to abort', { 
+              stepName: step.name,
+              reason: String(reason)
+            });
+            this.events.emitStepSkip(step, String(reason));
+            throw new Error(String(reason));
+          }
+          
           this.events.emitStepStart(step, this.executionContext);
 
           const result = await this.executeStep(step);
@@ -253,8 +297,31 @@ export class FlowExecutor {
       this.events.emitFlowComplete(this.flow.name, this.stepResults, startTime);
       return this.stepResults;
     } catch (error: any) {
+      // Enhance error with flow context if it's an abort due to timeout
+      if (globalAbortController.signal.aborted && 
+          error.message?.includes('timeout') || 
+          error.name === 'AbortError') {
+        const duration = Date.now() - startTime;
+        const flowTimeout = this.flow.timeouts?.global || 0;
+        
+        // Create a detailed timeout error for the flow
+        const timeoutError = new EnhancedTimeoutError(
+          `Flow execution timed out after ${duration}ms. Configured timeout: ${flowTimeout}ms.`,
+          flowTimeout,
+          duration
+        );
+        
+        this.events.emitFlowError(this.flow.name, timeoutError, startTime);
+        throw timeoutError;
+      }
+      
       this.events.emitFlowError(this.flow.name, error, startTime);
       throw error;
+    } finally {
+      // Clean up timeout if it was set
+      if (globalTimeoutId) {
+        clearTimeout(globalTimeoutId);
+      }
     }
   }
 
@@ -304,6 +371,15 @@ export class FlowExecutor {
       // Only emit step error for nested steps
       if (Object.keys(extraContext).length > 0) {
         this.events.emitStepError(step, error, stepStartTime);
+      }
+
+      // Do not wrap custom errors
+      if (
+        error instanceof EnhancedTimeoutError ||
+        error instanceof TimeoutError ||
+        error instanceof ExecutionError
+      ) {
+        throw error;
       }
 
       throw new Error(`Failed to execute step ${step.name}: ${errorMessage}`);

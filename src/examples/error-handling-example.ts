@@ -67,11 +67,9 @@ const jsonRpcHandler = async (request: JsonRpcRequest) => {
 
 // Create the flow executor with error handling options
 const executor = new FlowExecutor(flow, jsonRpcHandler, {
-  // Enable retry policy
-  enableRetries: true,
-  // Configure retry policy
+  // Retry policy
   retryPolicy: {
-    maxAttempts: 3,
+    maxAttempts: 3, // Retry up to 3 times
     backoff: {
       initial: 100, // 100ms initial delay
       multiplier: 2, // Exponential backoff with multiplier 2
@@ -80,14 +78,8 @@ const executor = new FlowExecutor(flow, jsonRpcHandler, {
     retryableErrors: [ErrorCode.NETWORK_ERROR, ErrorCode.TIMEOUT_ERROR],
   },
 
-  // Enable circuit breaker
-  enableCircuitBreaker: true,
-  // Configure circuit breaker
-  circuitBreakerConfig: {
-    failureThreshold: 3, // Open after 3 failures
-    recoveryTime: 5000, // Try again after 5 seconds
-    monitorWindow: 10000, // Monitor failures in 10 second window
-  },
+  // Enable retries
+  enableRetries: true,
 
   // Also enable event emitter for logging
   eventOptions: {
@@ -148,7 +140,6 @@ function updateErrorOptions() {
         ErrorCode.RESOURCE_ERROR, // Add more retryable errors
       ],
     },
-    enableCircuitBreaker: false, // Disable circuit breaker
   });
 
   console.log('Updated error handling options');

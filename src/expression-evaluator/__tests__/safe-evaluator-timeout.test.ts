@@ -1,12 +1,12 @@
 import { SafeExpressionEvaluator } from '../safe-evaluator';
 import { ReferenceResolver } from '../../reference-resolver';
-import { TimeoutResolver } from '../../utils/timeout-resolver';
+import { TimeoutResolver } from '../../util/timeout-resolver';
 import { Flow, Step } from '../../types';
 import { EnhancedTimeoutError } from '../../errors/timeout-error';
 import { defaultLogger } from '../../util/logger';
 
 // Mock dependencies
-jest.mock('../../utils/timeout-resolver');
+jest.mock('../../util/timeout-resolver');
 jest.mock('../../reference-resolver');
 jest.mock('../tokenizer', () => {
   return {

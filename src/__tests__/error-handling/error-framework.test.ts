@@ -5,8 +5,6 @@ import {
   ErrorCode,
   RetryableOperation,
   RetryPolicy,
-  CircuitBreaker,
-  CircuitBreakerConfig,
   ContextCollector,
 } from '../../errors';
 import { noLogger, TestLogger } from '../../util/logger';
@@ -145,88 +143,6 @@ describe('Error Framework', () => {
       expect(error.context.code).toBe(ErrorCode.MAX_RETRIES_EXCEEDED);
       expect(operation).toHaveBeenCalledTimes(3);
       expect(attempts).toBe(3);
-    });
-  });
-
-  describe('CircuitBreaker', () => {
-    const config: CircuitBreakerConfig = {
-      failureThreshold: 2,
-      recoveryTime: 1000,
-      monitorWindow: 5000,
-    };
-
-    let circuitBreaker: CircuitBreaker;
-
-    beforeEach(() => {
-      circuitBreaker = new CircuitBreaker(config, noLogger);
-    });
-
-    it('should allow operations when closed', async () => {
-      const operation = jest.fn().mockResolvedValue('success');
-
-      const result = await circuitBreaker.execute(operation);
-
-      expect(result).toBe('success');
-      expect(operation).toHaveBeenCalledTimes(1);
-    });
-
-    it('should open after failure threshold', async () => {
-      const operation = jest.fn().mockRejectedValue(
-        new ExecutionError('Failed', {
-          code: ErrorCode.NETWORK_ERROR,
-        }),
-      );
-
-      // First failure
-      await expect(circuitBreaker.execute(operation)).rejects.toThrow('Failed');
-
-      // Second failure opens the circuit
-      await expect(circuitBreaker.execute(operation)).rejects.toThrow('Failed');
-
-      // Circuit is now open
-      await expect(circuitBreaker.execute(operation)).rejects.toThrow('Circuit breaker is open');
-
-      expect(operation).toHaveBeenCalledTimes(2);
-    });
-
-    it('should transition to half-open after recovery time', async () => {
-      const logger = testLogger.createNested('circuit-breaker');
-      const testConfig = {
-        ...config,
-        recoveryTime: 200, // Reduce from 1000 to make test faster
-      };
-      const circuitBreaker = new CircuitBreaker(testConfig, logger);
-
-      // Fail enough times to open the circuit
-      const operation = jest.fn().mockRejectedValue(
-        new ExecutionError('Failed', {
-          code: ErrorCode.NETWORK_ERROR,
-        }),
-      );
-
-      // First failure
-      await expect(circuitBreaker.execute(operation)).rejects.toThrow();
-
-      // Second failure - should open the circuit
-      await expect(circuitBreaker.execute(operation)).rejects.toThrow();
-
-      // This should throw a StateError - check by message instead of constructor
-      await expect(circuitBreaker.execute(operation)).rejects.toThrow('Circuit breaker is open');
-
-      logger.debug('Waiting for recovery time');
-      // Wait for recovery time to pass
-      await new Promise((resolve) => setTimeout(resolve, 250));
-
-      // After recovery time, circuit should be half-open
-      // which means it will allow the operation to run again
-      operation.mockResolvedValueOnce('success');
-
-      const result = await circuitBreaker.execute(operation);
-      expect(result).toBe('success');
-
-      // After success, circuit should be closed
-      logger.debug('Circuit should be closed now');
-      expect(operation).toHaveBeenCalledTimes(3);
     });
   });
 

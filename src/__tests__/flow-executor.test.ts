@@ -18,7 +18,7 @@ describe('FlowExecutor', () => {
       steps: [],
     };
     testLogger = new TestLogger('FlowExecutorTest');
-    executor = new FlowExecutor(flow, jsonRpcHandler, testLogger);
+    executor = new FlowExecutor(flow, jsonRpcHandler, {logger: testLogger});
   });
 
   afterEach(() => {
@@ -41,7 +41,7 @@ describe('FlowExecutor', () => {
     };
 
     jsonRpcHandler.mockResolvedValue({ success: true });
-    executor = new FlowExecutor(flow, jsonRpcHandler);
+    executor = new FlowExecutor(flow, jsonRpcHandler, testLogger);
     await executor.execute();
 
     // expect testLogger to have captured logs
@@ -301,7 +301,7 @@ describe('FlowExecutor', () => {
     expect(jsonRpcHandler).toHaveBeenCalledTimes(0);
   });
 
-  it('updates error handling options correctly', () => {
+  it('should update error handling options', () => {
     // Use reflection to access private properties for validation
     const getPrivateProperty = (prop: string): any => {
       return (executor as any)[prop];
@@ -315,7 +315,6 @@ describe('FlowExecutor', () => {
     // Update error handling options
     executor.updateErrorHandlingOptions({
       enableRetries: true,
-      enableCircuitBreaker: true,
       retryPolicy: {
         maxAttempts: 5,
         backoff: {
@@ -328,16 +327,10 @@ describe('FlowExecutor', () => {
           ErrorCode.TIMEOUT_ERROR,
         ],
       },
-      circuitBreakerConfig: {
-        failureThreshold: 5,
-        recoveryTime: 30000,
-        monitorWindow: 60000,
-      },
     });
 
     // Verify all options were updated
     expect(getPrivateProperty('enableRetries')).toBe(true);
-    expect(getPrivateProperty('enableCircuitBreaker')).toBe(true);
     expect(getPrivateProperty('retryPolicy')).toEqual({
       maxAttempts: 5,
       backoff: {
@@ -349,11 +342,6 @@ describe('FlowExecutor', () => {
         ErrorCode.NETWORK_ERROR,
         ErrorCode.TIMEOUT_ERROR,
       ],
-    });
-    expect(getPrivateProperty('circuitBreakerConfig')).toEqual({
-      failureThreshold: 5,
-      recoveryTime: 30000,
-      monitorWindow: 60000,
     });
 
     // Verify the request executor was replaced
@@ -367,6 +355,5 @@ describe('FlowExecutor', () => {
       enableRetries: false,
     });
     expect(getPrivateProperty('enableRetries')).toBe(false);
-    expect(getPrivateProperty('enableCircuitBreaker')).toBe(true); // Unchanged
   });
 });

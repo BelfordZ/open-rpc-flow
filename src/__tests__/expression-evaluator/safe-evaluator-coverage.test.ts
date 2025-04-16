@@ -327,13 +327,6 @@ describe('SafeExpressionEvaluator Coverage Improvements', () => {
       expect(() => evaluator['extractReferences'](expr4)).not.toThrow();
     });
 
-    it('tests isSpecialVariable functionality', () => {
-      // Check if isSpecialVariable is working (we may not know what variables are "special")
-      const isSpecial = evaluator['isSpecialVariable']('this');
-      // Just check the return type is boolean
-      expect(typeof isSpecial).toBe('boolean');
-    });
-
     // Additional tests to target lines 614-617
     it('handles nested references correctly', () => {
       // This will test the recursive call to extractRefs

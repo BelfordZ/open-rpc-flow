@@ -1,5 +1,6 @@
 import { Step } from '../types';
 import { StepExecutionContext } from '../types';
+import { RetryPolicy } from '../errors/recovery';
 
 export { Step };
 
@@ -92,6 +93,11 @@ export interface RequestStep extends Step {
     method: string;
     params: Record<string, any> | any[];
   };
+  /**
+   * @deprecated Use step.policies.retryPolicy instead
+   * Retry policy that overrides the global retry policy for this specific step
+   */
+  retryPolicy?: RetryPolicy;
 }
 
 export interface LoopStep extends Step {

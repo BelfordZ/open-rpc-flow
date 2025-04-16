@@ -141,6 +141,13 @@
               "default": 10000,
               "minimum": 0,
               "maximum": 3600000
+            },
+            "expressionEval": {
+              "type": "number",
+              "description": "Optional timeout for expression evaluation in milliseconds. If not provided, the default expression timeout will be used.",
+              "default": 1000,
+              "minimum": 0,
+              "maximum": 3600000
             }
           }
         }

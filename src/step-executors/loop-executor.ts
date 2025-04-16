@@ -122,6 +122,7 @@ export class LoopStepExecutor implements StepExecutor {
           const conditionMet = context.expressionEvaluator.evaluate(
             loopStep.loop.condition,
             iterationContext,
+            step,
           );
 
           if (!conditionMet) {

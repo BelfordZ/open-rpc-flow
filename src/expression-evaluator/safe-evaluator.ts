@@ -4,9 +4,9 @@ import { ReferenceResolver } from '../reference-resolver';
 import { PathSyntaxError, PropertyAccessError } from '../path-accessor';
 import { tokenize, Token } from './tokenizer';
 import { TokenizerError } from './tokenizer';
-import { EnhancedTimeoutError } from '../errors/timeout-error';
-import { TimeoutResolver } from '../util/timeout-resolver';
-import { Step } from '../types';
+import { TimeoutError } from '../errors/timeout-error';
+import { PolicyResolver } from '../util/policy-resolver';
+import { Step, getStepType } from '../types';
 import { DEFAULT_TIMEOUTS } from '../constants/timeouts';
 
 type Operator = keyof typeof SafeExpressionEvaluator.OPERATORS;
@@ -35,7 +35,7 @@ export class _UnknownReferenceError extends Error {
 export class SafeExpressionEvaluator {
   private static readonly MAX_EXPRESSION_LENGTH = 1000;
   private logger: Logger;
-  private timeoutResolver?: TimeoutResolver;
+  private policyResolver?: PolicyResolver;
   private defaultExpressionTimeout: number = DEFAULT_TIMEOUTS.expression!;
 
   // Helper functions for operators
@@ -124,28 +124,29 @@ export class SafeExpressionEvaluator {
   constructor(
     logger: Logger,
     private referenceResolver: ReferenceResolver,
-    timeoutResolver?: TimeoutResolver,
+    policyResolver?: PolicyResolver,
   ) {
     this.logger = logger.createNested('SafeExpressionEvaluator');
-    this.timeoutResolver = timeoutResolver;
+    this.policyResolver = policyResolver;
   }
 
   /**
-   * Set the timeout resolver to be used for expression timeouts
-   * @param timeoutResolver The timeout resolver
+   * Set the policy resolver to be used for expression timeouts
+   * @param policyResolver The policy resolver
    */
-  setTimeoutResolver(timeoutResolver: TimeoutResolver): void {
-    this.timeoutResolver = timeoutResolver;
+  setPolicyResolver(policyResolver: PolicyResolver): void {
+    this.policyResolver = policyResolver;
   }
 
   /**
    * Get the current expression timeout in milliseconds
    * @param step Optional step context for timeout resolution
+   * @param stepType Optional step type for timeout resolution
    * @returns The resolved timeout value
    */
-  getExpressionTimeout(step?: Step): number {
-    if (this.timeoutResolver) {
-      return this.timeoutResolver.resolveExpressionTimeout(step);
+  getExpressionTimeout(step?: Step, stepType?: string): number {
+    if (this.policyResolver && step && stepType) {
+      return this.policyResolver.resolveExpressionTimeout(step, stepType as any);
     }
     return this.defaultExpressionTimeout;
   }
@@ -158,7 +159,8 @@ export class SafeExpressionEvaluator {
     this.logger.debug(`Expression validated at: ${startTime}`);
 
     try {
-      this.checkTimeout(startTime, expression, step);
+      const stepType = step ? getStepType(step) : undefined;
+      this.checkTimeout(startTime, expression, step, stepType);
 
       // Handle simple literals directly
       if (
@@ -208,7 +210,7 @@ export class SafeExpressionEvaluator {
       // Parse and evaluate the AST
       const ast = this.parse(tokens);
       this.logger.debug('AST:', ast);
-      return this.evaluateAst(ast, context, startTime, expression, step);
+      return this.evaluateAst(ast, context, startTime, expression, step, stepType);
     } catch (error) {
       if (
         error instanceof TokenizerError ||
@@ -284,16 +286,16 @@ export class SafeExpressionEvaluator {
     }
   }
 
-  private checkTimeout(startTime: number, expression: string, step?: Step): void {
+  private checkTimeout(startTime: number, expression: string, step?: Step, stepType?: string): void {
     const currentTime = Date.now();
     const elapsedTime = currentTime - startTime;
-    const timeout = this.getExpressionTimeout(step);
+    const timeout = this.getExpressionTimeout(step, stepType);
 
     this.logger.debug(`Checking timeout - elapsed time: ${elapsedTime}ms, timeout: ${timeout}ms`);
 
     if (elapsedTime > timeout) {
       this.logger.error(`Expression evaluation timed out after ${elapsedTime}ms`);
-      throw EnhancedTimeoutError.forExpression(expression, timeout, elapsedTime, step);
+      throw TimeoutError.forExpression(expression, timeout, elapsedTime, step);
     }
   }
 
@@ -645,8 +647,9 @@ export class SafeExpressionEvaluator {
     startTime: number,
     expression: string,
     step?: Step,
+    stepType?: string,
   ): unknown {
-    this.checkTimeout(startTime, expression, step);
+    this.checkTimeout(startTime, expression, step, stepType);
 
     switch (ast.type) {
       case 'literal':
@@ -673,8 +676,8 @@ export class SafeExpressionEvaluator {
             `Failed to evaluate expression: unknown operator '${ast.operator}'`,
           );
         }
-        const left = this.evaluateAst(ast.left, context, startTime, expression, step);
-        const right = this.evaluateAst(ast.right, context, startTime, expression, step);
+        const left = this.evaluateAst(ast.left, context, startTime, expression, step, stepType);
+        const right = this.evaluateAst(ast.right, context, startTime, expression, step, stepType);
         try {
           return operator(left, right);
         } catch (error: unknown) {
@@ -695,14 +698,14 @@ export class SafeExpressionEvaluator {
         const obj: Record<string, unknown> = {};
         for (const prop of ast.properties) {
           if (prop.spread) {
-            const spreadValue = this.evaluateAst(prop.value, context, startTime, expression, step);
+            const spreadValue = this.evaluateAst(prop.value, context, startTime, expression, step, stepType);
             if (typeof spreadValue === 'object' && spreadValue !== null) {
               Object.assign(obj, spreadValue);
             } else {
               throw new ExpressionError('Invalid spread operator usage: can only spread objects');
             }
           } else {
-            obj[prop.key] = this.evaluateAst(prop.value, context, startTime, expression, step);
+            obj[prop.key] = this.evaluateAst(prop.value, context, startTime, expression, step, stepType);
           }
         }
         return obj;
@@ -716,7 +719,7 @@ export class SafeExpressionEvaluator {
         const result: unknown[] = [];
         for (const elem of ast.elements) {
           if (elem.spread) {
-            const spreadValue = this.evaluateAst(elem.value, context, startTime, expression, step);
+            const spreadValue = this.evaluateAst(elem.value, context, startTime, expression, step, stepType);
             if (Array.isArray(spreadValue)) {
               result.push(...spreadValue);
             } else if (spreadValue !== null && typeof spreadValue === 'object') {
@@ -727,7 +730,7 @@ export class SafeExpressionEvaluator {
               );
             }
           } else {
-            result.push(this.evaluateAst(elem.value, context, startTime, expression, step));
+            result.push(this.evaluateAst(elem.value, context, startTime, expression, step, stepType));
           }
         }
         return result;
@@ -750,7 +753,7 @@ export class SafeExpressionEvaluator {
             ast.name as keyof typeof SafeExpressionEvaluator.ALLOWED_FUNCTIONS
           ];
         const argVals = ast.args.map((arg: AstNode) =>
-          this.evaluateAst(arg, context, startTime, expression, step),
+          this.evaluateAst(arg, context, startTime, expression, step, stepType),
         );
         return fn(...argVals);
       }

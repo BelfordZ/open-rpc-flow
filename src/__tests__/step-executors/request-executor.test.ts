@@ -6,6 +6,7 @@ import { RetryPolicy } from '../../errors/recovery';
 import { ErrorCode } from '../../errors/codes';
 import { ExecutionError } from '../../errors/base';
 import { RequestStepExecutor } from '../../step-executors';
+import { PolicyResolver } from '../../util/policy-resolver';
 
 interface RequestStep extends Step {
   request: {
@@ -22,7 +23,9 @@ describe('RequestStepExecutor', () => {
 
   beforeEach(() => {
     jsonRpcHandler = jest.fn();
-    executor = new RequestStepExecutor(jsonRpcHandler, testLogger);
+    const flow = { name: 'test', description: '', steps: [] };
+    const policyResolver = new PolicyResolver(flow, testLogger);
+    executor = new RequestStepExecutor(jsonRpcHandler, testLogger, policyResolver);
     context = createMockContext();
   });
 
@@ -81,7 +84,7 @@ describe('RequestStepExecutor', () => {
         }),
         id: expect.any(Number),
       },
-      undefined,
+      expect.anything(),
     );
   });
 
@@ -201,7 +204,7 @@ describe('RequestStepExecutor', () => {
         },
         id: expect.any(Number),
       },
-      undefined,
+      expect.anything(),
     );
   });
 
@@ -266,7 +269,7 @@ describe('RequestStepExecutor', () => {
         params: ['first', 'second'],
         id: expect.any(Number),
       },
-      undefined,
+      expect.anything(),
     );
   });
 
@@ -363,27 +366,32 @@ describe('RequestStepExecutor', () => {
   });
 
   describe('with retry policy', () => {
-    let retryPolicy: RetryPolicy;
     let rpExecutor: RequestStepExecutor;
 
     beforeEach(() => {
-      // Reset the mocks
       jest.clearAllMocks();
-
-      // Create a retry policy with correct properties
-      retryPolicy = {
-        maxAttempts: 3,
-        retryableErrors: [ErrorCode.NETWORK_ERROR],
-        backoff: {
-          initial: 100,
-          multiplier: 2,
-          maxDelay: 5000,
+      // Create a flow with a global retry policy
+      const flow: any = {
+        name: 'test',
+        description: '',
+        steps: [],
+        policies: {
+          global: {
+            retryPolicy: {
+              maxAttempts: 3,
+              retryableErrors: [ErrorCode.NETWORK_ERROR],
+              backoff: {
+                initial: 100,
+                multiplier: 2,
+                maxDelay: 5000,
+                strategy: 'exponential',
+              },
+            },
+          },
         },
-        retryDelay: 1000,
       };
-
-      // Create an executor with retry policy
-      rpExecutor = new RequestStepExecutor(jsonRpcHandler, testLogger, retryPolicy);
+      const policyResolver = new PolicyResolver(flow, testLogger);
+      rpExecutor = new RequestStepExecutor(jsonRpcHandler, testLogger, policyResolver);
     });
 
     afterEach(() => {
@@ -410,7 +418,7 @@ describe('RequestStepExecutor', () => {
           method: 'test.method',
           params: {},
         }),
-        undefined,
+        expect.anything(),
       );
 
       // Verify we got the correct result

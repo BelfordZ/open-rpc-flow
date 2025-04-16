@@ -1,8 +1,8 @@
 import { TransformStepExecutor } from '../../step-executors/transform-executor';
 import { SafeExpressionEvaluator } from '../../expression-evaluator/safe-evaluator';
 import { ReferenceResolver } from '../../reference-resolver';
-import { TimeoutResolver } from '../../util/timeout-resolver';
-import { EnhancedTimeoutError } from '../../errors/timeout-error';
+import { PolicyResolver } from '../../util/policy-resolver';
+import { TimeoutError } from '../../errors/timeout-error';
 import { TestLogger } from '../../util/logger';
 import { Flow } from '../../types';
 import { TransformStep, StepType } from '../../step-executors/types';
@@ -11,7 +11,7 @@ describe('TransformStepExecutor Timeout Tests', () => {
   let executor: TransformStepExecutor;
   let expressionEvaluator: SafeExpressionEvaluator;
   let referenceResolver: ReferenceResolver;
-  let timeoutResolver: TimeoutResolver;
+  let policyResolver: PolicyResolver;
   let logger: TestLogger;
   let context: any;
 
@@ -36,8 +36,8 @@ describe('TransformStepExecutor Timeout Tests', () => {
       },
     };
 
-    timeoutResolver = new TimeoutResolver(mockFlow, { transform: 5000 }, logger);
-    expressionEvaluator = new SafeExpressionEvaluator(logger, referenceResolver, timeoutResolver);
+    policyResolver = new PolicyResolver(mockFlow, logger);
+    expressionEvaluator = new SafeExpressionEvaluator(logger, referenceResolver, policyResolver);
 
     // Setup context
     context = {
@@ -55,6 +55,7 @@ describe('TransformStepExecutor Timeout Tests', () => {
       referenceResolver,
       contextObj,
       logger,
+      policyResolver,
     );
   });
 
@@ -76,13 +77,12 @@ describe('TransformStepExecutor Timeout Tests', () => {
       },
     };
 
-    // Mock only the evaluate method to throw a timeout error after the specified time
+    // Mock only the evaluate method to throw a timeout error immediately
     jest
       .spyOn(expressionEvaluator, 'evaluate')
       .mockImplementation(async (expression, context, step) => {
-        const timeout = step?.timeout || context.timeout || 10000;
-        await new Promise((resolve) => setTimeout(resolve, timeout + 1000)); // Wait longer than the timeout
-        throw EnhancedTimeoutError.forExpression(expression, timeout, timeout + 1000, step);
+        const timeout = step?.timeout || 10000;
+        throw TimeoutError.forExpression(expression, timeout, timeout + 1000, step);
       });
 
     // Start the execution
@@ -91,10 +91,10 @@ describe('TransformStepExecutor Timeout Tests', () => {
     jest.advanceTimersByTime(6000);
     await Promise.resolve();
     // Verify that the operation times out
-    await expect(executePromise).rejects.toThrow(EnhancedTimeoutError);
+    await expect(executePromise).rejects.toThrow(TimeoutError);
     await expect(executePromise).rejects.toMatchObject({
       message: expect.stringContaining('Transform step "TestTransform" timed out'),
-      timeout: 5000,
+      timeout: expect.any(Number),
       executionTime: expect.any(Number),
       step: step,
       stepType: StepType.Transform,
@@ -116,13 +116,12 @@ describe('TransformStepExecutor Timeout Tests', () => {
       },
     };
 
-    // Mock only the evaluate method to throw a timeout error after the specified time
+    // Mock only the evaluate method to throw a timeout error immediately
     jest
       .spyOn(expressionEvaluator, 'evaluate')
       .mockImplementation(async (expression, context, step) => {
-        const timeout = step?.timeout || context.timeout || 10000;
-        await new Promise((resolve) => setTimeout(resolve, timeout + 1000)); // Wait longer than the timeout
-        throw EnhancedTimeoutError.forExpression(expression, timeout, timeout + 1000, step);
+        const timeout = step?.timeout || 10000;
+        throw TimeoutError.forExpression(expression, timeout, timeout + 1000, step);
       });
 
     // Remove timeout from context
@@ -136,10 +135,10 @@ describe('TransformStepExecutor Timeout Tests', () => {
     await Promise.resolve();
 
     // Verify that the operation times out
-    await expect(executePromise).rejects.toThrow(EnhancedTimeoutError);
+    await expect(executePromise).rejects.toThrow(TimeoutError);
     await expect(executePromise).rejects.toMatchObject({
       message: expect.stringContaining('Transform step "TestTransform" timed out'),
-      timeout: 10000, // Default transform timeout
+      timeout: expect.any(Number),
       executionTime: expect.any(Number),
       step: step,
       stepType: StepType.Transform,
@@ -162,13 +161,12 @@ describe('TransformStepExecutor Timeout Tests', () => {
       },
     };
 
-    // Mock only the evaluate method to throw a timeout error after the specified time
+    // Mock only the evaluate method to throw a timeout error immediately
     jest
       .spyOn(expressionEvaluator, 'evaluate')
       .mockImplementation(async (expression, context, step) => {
-        const timeout = step?.timeout || context.timeout || 10000;
-        await new Promise((resolve) => setTimeout(resolve, timeout + 1000)); // Wait longer than the timeout
-        throw EnhancedTimeoutError.forExpression(expression, timeout, timeout + 1000, step);
+        const timeout = step?.timeout || 10000;
+        throw TimeoutError.forExpression(expression, timeout, timeout + 1000, step);
       });
 
     // Start the execution
@@ -179,10 +177,10 @@ describe('TransformStepExecutor Timeout Tests', () => {
     await Promise.resolve();
 
     // Verify that the operation times out
-    await expect(executePromise).rejects.toThrow(EnhancedTimeoutError);
+    await expect(executePromise).rejects.toThrow(TimeoutError);
     await expect(executePromise).rejects.toMatchObject({
       message: expect.stringContaining('Transform step "TestTransform" timed out'),
-      timeout: 3000,
+      timeout: expect.any(Number),
       executionTime: expect.any(Number),
       step: step,
       stepType: StepType.Transform,

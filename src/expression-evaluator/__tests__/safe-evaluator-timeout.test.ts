@@ -1,8 +1,7 @@
 import { SafeExpressionEvaluator } from '../safe-evaluator';
 import { ReferenceResolver } from '../../reference-resolver';
-import { TimeoutResolver } from '../../util/timeout-resolver';
 import { Flow, Step } from '../../types';
-import { EnhancedTimeoutError } from '../../errors/timeout-error';
+import { TimeoutError } from '../../errors/timeout-error';
 import { defaultLogger } from '../../util/logger';
 
 // Mock dependencies
@@ -23,7 +22,6 @@ describe('SafeExpressionEvaluator with Timeouts', () => {
   let logger: any;
   let evaluator: SafeExpressionEvaluator;
   let mockReferenceResolver: jest.Mocked<ReferenceResolver>;
-  let mockTimeoutResolver: jest.Mocked<TimeoutResolver>;
 
   beforeEach(() => {
     logger = {
@@ -54,54 +52,15 @@ describe('SafeExpressionEvaluator with Timeouts', () => {
       },
     };
 
-    mockTimeoutResolver = new TimeoutResolver(
-      mockFlow,
-      { expression: 1000 },
-      logger,
-    ) as jest.Mocked<TimeoutResolver>;
-
-    mockTimeoutResolver.resolveExpressionTimeout = jest.fn().mockReturnValue(1000);
-
-    evaluator = new SafeExpressionEvaluator(logger, mockReferenceResolver, mockTimeoutResolver);
+    evaluator = new SafeExpressionEvaluator(logger, mockReferenceResolver);
   });
 
   afterEach(() => {
     jest.clearAllMocks();
   });
 
-  describe('timeout resolution', () => {
-    it('should use the timeout resolver to get expression timeout', () => {
-      const step: Step = { name: 'TestStep', timeout: 500 };
-      const timeout = evaluator.getExpressionTimeout(step);
-
-      expect(mockTimeoutResolver.resolveExpressionTimeout).toHaveBeenCalledWith(step);
-      expect(timeout).toBe(1000);
-    });
-
-    it('should use the default timeout when no resolver is available', () => {
-      // Create evaluator without timeout resolver
-      const evalWithoutResolver = new SafeExpressionEvaluator(logger, mockReferenceResolver);
-
-      const timeout = evalWithoutResolver.getExpressionTimeout();
-      expect(timeout).toBeGreaterThan(0);
-    });
-
-    it('should allow setting the timeout resolver after construction', () => {
-      // Create evaluator without timeout resolver
-      const evalWithoutResolver = new SafeExpressionEvaluator(logger, mockReferenceResolver);
-
-      // Set the resolver after construction
-      evalWithoutResolver.setTimeoutResolver(mockTimeoutResolver);
-
-      const step: Step = { name: 'TestStep' };
-      evalWithoutResolver.getExpressionTimeout(step);
-
-      expect(mockTimeoutResolver.resolveExpressionTimeout).toHaveBeenCalledWith(step);
-    });
-  });
-
   describe('timeout handling', () => {
-    it('should throw EnhancedTimeoutError when evaluation exceeds timeout', () => {
+    it('should throw TimeoutError when evaluation exceeds timeout', () => {
       // Mock date.now to simulate elapsed time
       const originalDateNow = Date.now;
       let callCount = 0;
@@ -115,10 +74,11 @@ describe('SafeExpressionEvaluator with Timeouts', () => {
       try {
         const expression = 'context.value + 5';
         const context = { value: 10 };
+        const step: Step = { name: 'TestStep' };
 
         expect(() => {
-          evaluator.evaluate(expression, context);
-        }).toThrow(EnhancedTimeoutError);
+          evaluator.evaluate(expression, context, step);
+        }).toThrow(TimeoutError);
       } finally {
         // Restore original Date.now
         Date.now = originalDateNow;
@@ -143,8 +103,8 @@ describe('SafeExpressionEvaluator with Timeouts', () => {
           evaluator.evaluate(expression, context, step);
           fail('Expected an error to be thrown');
         } catch (error) {
-          expect(error).toBeInstanceOf(EnhancedTimeoutError);
-          const timeoutError = error as EnhancedTimeoutError;
+          expect(error).toBeInstanceOf(TimeoutError);
+          const timeoutError = error as TimeoutError;
           expect(timeoutError.step).toBe(step);
           expect(timeoutError.isExpressionTimeout).toBe(true);
           expect(timeoutError.timeout).toBe(1000);
@@ -164,6 +124,7 @@ describe('SafeExpressionEvaluator with Timeouts', () => {
       try {
         const expression = 'context.value + 5';
         const context = { value: 10 };
+        const step: Step = { name: 'TestStep' };
 
         // Create a simplified mock version of the evaluator to avoid tokenizer issues
         const mockEvaluator = {
@@ -172,11 +133,11 @@ describe('SafeExpressionEvaluator with Timeouts', () => {
         };
 
         // Perform the evaluation
-        const result = mockEvaluator.evaluate(expression, context);
+        const result = mockEvaluator.evaluate(expression, context, step);
 
         // Verify the result
         expect(result).toBe(15);
-        expect(mockEvaluator.evaluate).toHaveBeenCalledWith(expression, context);
+        expect(mockEvaluator.evaluate).toHaveBeenCalledWith(expression, context, step);
       } finally {
         Date.now = originalDateNow;
       }

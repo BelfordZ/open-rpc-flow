@@ -5,34 +5,18 @@ import { Logger } from './util/logger';
 
 export type StepType = 'request' | 'loop' | 'condition' | 'transform' | 'stop';
 
-export interface Flow {
-  name: string;
-  description: string;
-  steps: Step[];
-  context?: Record<string, any>;
-  timeouts?: TimeoutOptions;
+/**
+ * Policies for a specific step type or as a default for all steps
+ */
+export interface Policies {
   /**
-   * Global and step-level policies for the flow
-   */
-  policies?: {
-    /**
-     * Global policies that apply to the workflow as a whole
-     */
-    global?: Policies;
-    /**
-     * Step level policies that apply to all steps unless overridden
-     */
-    step?: Policies;
-  };
-  /**
-   * @deprecated Use policies.global instead
-   * Global retry policy settings for all steps
+   * Retry policy configuration
    */
   retryPolicy?: {
     /**
      * Maximum number of retry attempts
-     * @minimum 1
-     * @maximum 10
+     * @minimum 0
+     * @maximum 100
      * @default 3
      */
     maxAttempts?: number;
@@ -41,31 +25,91 @@ export interface Flow {
      */
     backoff?: {
       /**
+       * The strategy to use for the backoff
+       * @default "exponential"
+       */
+      strategy?: 'exponential' | 'linear';
+      /**
        * Initial delay in milliseconds
-       * @minimum 10
-       * @maximum 30000
-       * @default 100
        */
       initial?: number;
       /**
-       * Multiplier for exponential backoff
-       * @minimum 1
-       * @maximum 10
-       * @default 2
+       * Multiplier/exponent for the backoff
        */
       multiplier?: number;
       /**
        * Maximum delay in milliseconds
-       * @minimum 100
-       * @maximum 300000
        * @default 5000
        */
       maxDelay?: number;
     };
     /**
      * List of error codes that are considered retryable
-     * @default ["NETWORK_ERROR", "TIMEOUT_ERROR", "OPERATION_TIMEOUT"]
      */
+    retryableErrors?: string[];
+  };
+  /**
+   * Timeout policy configuration
+   */
+  timeout?: {
+    /**
+     * Timeout in milliseconds
+     * @default 10000
+     */
+    timeout?: number;
+    /**
+     * Timeout for expression evaluation in milliseconds
+     * @default 1000
+     */
+    expressionEval?: number;
+  };
+}
+
+/**
+ * Metaschema-compliant policies for the flow
+ * - global: applies to the whole flow
+ * - step: can be a default for all steps, or per-stepType (request, transform, etc)
+ */
+export interface FlowPolicies {
+  global?: Policies;
+  step?: {
+    // Per-stepType policies (metaschema-compliant)
+    request?: Policies;
+    transform?: Policies;
+    loop?: Policies;
+    condition?: Policies;
+    stop?: Policies;
+    // Default for all steps (metaschema-compliant)
+    timeout?: Policies['timeout'];
+    retryPolicy?: Policies['retryPolicy'];
+    // Allow additional keys for future extensibility
+    [key: string]: any;
+  };
+}
+
+export interface Flow {
+  name: string;
+  description: string;
+  steps: Step[];
+  context?: Record<string, any>;
+  /**
+   * @deprecated Use policies.global and policies.step instead
+   */
+  timeouts?: TimeoutOptions;
+  /**
+   * Global and step-level policies for the flow (metaschema-compliant)
+   */
+  policies?: FlowPolicies;
+  /**
+   * @deprecated Use policies.global.retryPolicy instead
+   */
+  retryPolicy?: {
+    maxAttempts?: number;
+    backoff?: {
+      initial?: number;
+      multiplier?: number;
+      maxDelay?: number;
+    };
     retryableErrors?: string[];
   };
 }
@@ -102,7 +146,6 @@ export interface Step {
     endWorkflow?: boolean;
   };
   /**
-   * @deprecated Use policies.timeout.timeout instead
    * Timeout for this specific step in milliseconds.
    * Takes precedence over flow-level timeouts.
    * @minimum 50 - Must be at least 50ms
@@ -247,56 +290,13 @@ export interface TimeoutOptions {
 }
 
 /**
- * Policies configuration for flow and steps
+ * Utility to determine the step type from a Step object
  */
-export interface Policies {
-  /**
-   * Retry policy configuration
-   */
-  retryPolicy?: {
-    /**
-     * Maximum number of retry attempts
-     * @minimum 0
-     * @maximum 100
-     * @default 3
-     */
-    maxAttempts?: number;
-    /**
-     * Backoff configuration for retries
-     */
-    backoff?: {
-      /**
-       * The strategy to use for the backoff
-       * @default "exponential"
-       */
-      strategy?: 'exponential' | 'linear';
-      /**
-       * Initial delay in milliseconds
-       */
-      initial?: number;
-      /**
-       * Multiplier/exponent for the backoff
-       */
-      multiplier?: number;
-      /**
-       * Maximum delay in milliseconds
-       * @default 5000
-       */
-      maxDelay?: number;
-    };
-    /**
-     * List of error codes that are considered retryable
-     */
-    retryableErrors?: string[];
-  };
-  /**
-   * Timeout policy configuration
-   */
-  timeout?: {
-    /**
-     * Timeout in milliseconds
-     * @default 10000
-     */
-    timeout?: number;
-  };
+export function getStepType(step: Step): string {
+  if (step.request) return 'request';
+  if (step.loop) return 'loop';
+  if (step.condition) return 'condition';
+  if (step.transform) return 'transform';
+  if (step.stop) return 'stop';
+  return 'unknown';
 }

@@ -47,17 +47,6 @@ export class ExecutionError extends FlowError {
 }
 
 /**
- * Error class for timeout errors
- */
-export class TimeoutError extends FlowError {
-  constructor(message: string, context: Record<string, any>) {
-    super(message, ErrorCode.TIMEOUT_ERROR, context);
-    this.name = 'TimeoutError';
-    Object.setPrototypeOf(this, TimeoutError.prototype);
-  }
-}
-
-/**
  * Error class for state errors
  */
 export class StateError extends FlowError {

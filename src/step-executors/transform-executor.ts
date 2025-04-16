@@ -10,7 +10,8 @@ import { Logger } from '../util/logger';
 import { SafeExpressionEvaluator } from '../expression-evaluator/safe-evaluator';
 import { ReferenceResolver } from '../reference-resolver';
 import { DEFAULT_TIMEOUTS } from '../constants/timeouts';
-import { EnhancedTimeoutError } from '../errors/timeout-error';
+import { TimeoutError } from '../errors/timeout-error';
+import { PolicyResolver } from '../util/policy-resolver';
 
 /**
  * Core transform executor that handles all transformation operations
@@ -307,12 +308,14 @@ export class TransformExecutor {
 export class TransformStepExecutor implements StepExecutor {
   private logger: Logger;
   private transformExecutor: TransformExecutor;
+  private policyResolver: PolicyResolver;
 
   constructor(
     expressionEvaluator: SafeExpressionEvaluator,
     referenceResolver: ReferenceResolver,
     context: Record<string, any>,
     logger: Logger,
+    policyResolver: PolicyResolver,
   ) {
     this.logger = logger.createNested('TransformStepExecutor');
     this.transformExecutor = new TransformExecutor(
@@ -321,6 +324,7 @@ export class TransformStepExecutor implements StepExecutor {
       context,
       logger,
     );
+    this.policyResolver = policyResolver;
   }
 
   canExecute(step: Step): step is TransformStep {
@@ -344,8 +348,8 @@ export class TransformStepExecutor implements StepExecutor {
     });
 
     try {
-      // Get timeout from context or use step-level timeout or default
-      const timeout = step.timeout ?? (context as any).timeout ?? DEFAULT_TIMEOUTS.transform;
+      // Get timeout using PolicyResolver
+      const timeout = this.policyResolver.resolveTimeout(step, StepType.Transform);
 
       this.logger.debug('Using timeout for transform step', {
         stepName: step.name,
@@ -406,8 +410,8 @@ export class TransformStepExecutor implements StepExecutor {
       });
 
       // Enhance timeout errors with step context
-      if (error instanceof EnhancedTimeoutError) {
-        throw new EnhancedTimeoutError(
+      if (error instanceof TimeoutError) {
+        throw new TimeoutError(
           `Transform step "${step.name}" timed out: ${error.message}`,
           error.timeout,
           error.executionTime,

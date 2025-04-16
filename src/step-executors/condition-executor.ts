@@ -39,6 +39,7 @@ export class ConditionStepExecutor implements StepExecutor {
       const conditionValue = context.expressionEvaluator.evaluate(
         conditionStep.condition.if,
         extraContext,
+        step,
       );
 
       this.logger.debug('Condition evaluated', {

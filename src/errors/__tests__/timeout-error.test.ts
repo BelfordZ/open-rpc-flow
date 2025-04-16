@@ -1,8 +1,8 @@
-import { EnhancedTimeoutError } from '../timeout-error';
+import { TimeoutError } from '../timeout-error';
 import { StepType } from '../../step-executors/types';
 import { Step } from '../../types';
 
-describe('EnhancedTimeoutError', () => {
+describe('TimeoutError', () => {
   const mockStep: Step = {
     name: 'TestStep',
   };
@@ -16,7 +16,7 @@ describe('EnhancedTimeoutError', () => {
       const stepType = StepType.Request;
       const isExpressionTimeout = false;
 
-      const error = new EnhancedTimeoutError(
+      const error = new TimeoutError(
         message,
         timeout,
         executionTime,
@@ -25,18 +25,18 @@ describe('EnhancedTimeoutError', () => {
         isExpressionTimeout,
       );
 
-      expect(error).toBeInstanceOf(EnhancedTimeoutError);
+      expect(error).toBeInstanceOf(TimeoutError);
       expect(error.message).toBe(message);
       expect(error.timeout).toBe(timeout);
       expect(error.executionTime).toBe(executionTime);
       expect(error.step).toBe(step);
       expect(error.stepType).toBe(stepType);
       expect(error.isExpressionTimeout).toBe(isExpressionTimeout);
-      expect(error.name).toBe('EnhancedTimeoutError');
+      expect(error.name).toBe('TimeoutError');
     });
 
     it('should set isExpressionTimeout to false by default', () => {
-      const error = new EnhancedTimeoutError(
+      const error = new TimeoutError(
         'Timeout occurred',
         5000,
         6000,
@@ -48,7 +48,7 @@ describe('EnhancedTimeoutError', () => {
     });
 
     it('should set step and stepType to undefined when not provided', () => {
-      const error = new EnhancedTimeoutError('Timeout occurred', 5000, 6000);
+      const error = new TimeoutError('Timeout occurred', 5000, 6000);
 
       expect(error.step).toBeUndefined();
       expect(error.stepType).toBeUndefined();
@@ -62,9 +62,9 @@ describe('EnhancedTimeoutError', () => {
       const timeout = 5000;
       const executionTime = 6000;
 
-      const error = EnhancedTimeoutError.forStep(step, stepType, timeout, executionTime);
+      const error = TimeoutError.forStep(step, stepType, timeout, executionTime);
 
-      expect(error).toBeInstanceOf(EnhancedTimeoutError);
+      expect(error).toBeInstanceOf(TimeoutError);
       expect(error.message).toContain(`Step "${step.name}"`);
       expect(error.message).toContain(`timed out after ${executionTime}ms`);
       expect(error.message).toContain(`Configured timeout: ${timeout}ms`);
@@ -82,9 +82,9 @@ describe('EnhancedTimeoutError', () => {
       const timeout = 1000;
       const executionTime = 1200;
 
-      const error = EnhancedTimeoutError.forExpression(expression, timeout, executionTime);
+      const error = TimeoutError.forExpression(expression, timeout, executionTime);
 
-      expect(error).toBeInstanceOf(EnhancedTimeoutError);
+      expect(error).toBeInstanceOf(TimeoutError);
       expect(error.message).toContain('Expression evaluation timed out');
       expect(error.message).toContain(`after ${executionTime}ms`);
       expect(error.message).toContain(`Configured timeout: ${timeout}ms`);
@@ -101,7 +101,7 @@ describe('EnhancedTimeoutError', () => {
       const timeout = 1000;
       const executionTime = 1200;
 
-      const error = EnhancedTimeoutError.forExpression(longExpression, timeout, executionTime);
+      const error = TimeoutError.forExpression(longExpression, timeout, executionTime);
 
       expect(error.message).toContain('x'.repeat(50));
       expect(error.message).toContain('...');
@@ -114,7 +114,7 @@ describe('EnhancedTimeoutError', () => {
       const executionTime = 1200;
       const step = mockStep;
 
-      const error = EnhancedTimeoutError.forExpression(expression, timeout, executionTime, step);
+      const error = TimeoutError.forExpression(expression, timeout, executionTime, step);
 
       expect(error.step).toBe(step);
     });

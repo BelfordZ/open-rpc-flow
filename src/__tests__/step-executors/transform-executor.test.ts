@@ -5,6 +5,7 @@ import { SafeExpressionEvaluator } from '../../expression-evaluator/safe-evaluat
 import { ReferenceResolver } from '../../reference-resolver';
 import { TestLogger } from '../../util/logger';
 import { createMockContext } from '../test-utils';
+import { PolicyResolver } from '../../util/policy-resolver';
 
 describe('Transform Executors', () => {
   describe('TransformExecutor', () => {
@@ -315,11 +316,14 @@ describe('Transform Executors', () => {
 
       const referenceResolver = new ReferenceResolver(stepResults, contextObj, logger);
       const expressionEvaluator = new SafeExpressionEvaluator(logger, referenceResolver);
+      const flow = { name: 'test', description: '', steps: [] };
+      const policyResolver = new PolicyResolver(flow, logger);
       stepExecutor = new TransformStepExecutor(
         expressionEvaluator,
         referenceResolver,
         contextObj,
         logger,
+        policyResolver,
       );
       context = createMockContext();
     });

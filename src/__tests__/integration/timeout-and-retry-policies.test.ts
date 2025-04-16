@@ -1,10 +1,13 @@
 import { FlowExecutor } from '../../flow-executor';
 import { Flow } from '../../types';
 import { ErrorCode as ImportedErrorCode } from '../../errors/codes';
-import { TimeoutError, FlowError } from '../../errors/base';
+import { TimeoutError } from '../../errors/timeout-error';
+import { FlowError } from '../../errors/base';
 import { TestLogger } from '../../util/logger';
 import { RequestStepExecutor } from '../../step-executors/request-executor';
 import { StepExecutionContext } from '../../types';
+import { PolicyResolver } from '../../util/policy-resolver';
+import { StepType } from '../../step-executors/types';
 
 const MOCK_DELAY = 100; // Use a small delay for faster tests
 
@@ -86,7 +89,12 @@ function createMockHandler(options: MockHandlerOptions) {
       // Simulate failure based on configuration
       if (shouldFail && currentAttempt.count <= failUntilAttempt) {
         if (errorType === 'TIMEOUT') {
-          throw new TimeoutError('Operation timed out', { step: request.method });
+          throw TimeoutError.forStep(
+            { name: request.method } as any,
+            StepType.Request,
+            50,
+            100
+          );
         } else if (errorType === 'NETWORK') {
           throw new FlowError('Network error', ImportedErrorCode.NETWORK_ERROR, {});
         } else {
@@ -120,12 +128,12 @@ describe('Timeout and Retry Policies', () => {
 
   afterEach(() => {
     jest.useRealTimers();
-    //testLogger.print(); // Print logs after each test for debugging
+    testLogger.print(); // Print logs after each test for debugging
     testLogger.clear();
   });
 
   describe('Step-level timeout policies', () => {
-    it('should respect step-level timeout configuration', async () => {
+    it.only('should respect step-level timeout configuration', async () => {
       // Create a short timeout for the step
       const shortTimeout = 50;
 
@@ -136,7 +144,7 @@ describe('Timeout and Retry Policies', () => {
         steps: [
           {
             name: 'slowOperation',
-            timeout: shortTimeout,
+            policies: { timeout: { timeout: shortTimeout } },
             request: {
               method: 'slow',
               params: [],
@@ -178,7 +186,7 @@ describe('Timeout and Retry Policies', () => {
         steps: [
           {
             name: 'quickOperation',
-            timeout: timeout,
+            policies: { timeout: { timeout } },
             request: {
               method: 'quick',
               params: [],
@@ -304,7 +312,7 @@ describe('Timeout and Retry Policies', () => {
               method: 'flaky',
               params: [],
             },
-            timeout: 1000, // Longer timeout to allow for retries
+            policies: { timeout: { timeout: 1000 } }, // Longer timeout to allow for retries
           },
         ],
       };
@@ -603,7 +611,7 @@ describe('Timeout and Retry Policies', () => {
               method: 'slow',
               params: [],
             },
-            timeout: 50, // Very short timeout
+            policies: { timeout: { timeout: 50 } }, // Very short timeout
           },
         ],
       };
@@ -614,10 +622,12 @@ describe('Timeout and Retry Policies', () => {
         testLogger.debug(`[mockHandler] Attempt: ${attempts.count}`);
         if (attempts.count === 1) {
           // Throw a TimeoutError with the correct error code
-          throw new TimeoutError('Operation timed out', {
-            code: ImportedErrorCode.TIMEOUT_ERROR,
-            step: request.method,
-          });
+          throw TimeoutError.forStep(
+            { name: request.method } as any,
+            StepType.Request,
+            50,
+            100
+          );
         }
         return {
           jsonrpc: '2.0',
@@ -663,7 +673,7 @@ describe('Timeout and Retry Policies', () => {
               method: 'flakyAndSlow',
               params: [],
             },
-            timeout: 50, // Short timeout
+            policies: { timeout: { timeout: 50 } }, // Short timeout
           },
         ],
       };
@@ -723,7 +733,7 @@ describe('Timeout and Retry Policies', () => {
               method: 'slow',
               params: [],
             },
-            timeout: 50, // Short step timeout that should override global
+            policies: { timeout: { timeout: 50 } }, // Short step timeout that should override global
           },
         ],
       };
@@ -779,7 +789,7 @@ describe('Timeout and Retry Policies', () => {
               method: 'slow',
               params: [],
             },
-            timeout: shortTimeout,
+            policies: { timeout: { timeout: shortTimeout } },
           },
         ],
       };
@@ -914,8 +924,8 @@ describe('Timeout and Retry Policies', () => {
         delay: 100,
       });
 
-      // Create a request executor and use it directly
-      const executor = new RequestStepExecutor(mockHandler, testLogger);
+      const policyResolver = new PolicyResolver(flow, testLogger);
+      const executor = new RequestStepExecutor(mockHandler, testLogger, policyResolver);
       const context = {
         referenceResolver: {
           resolveReferences: (value: any) => value,

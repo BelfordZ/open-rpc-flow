@@ -16,9 +16,10 @@ import { Logger, defaultLogger } from './util/logger';
 import { FlowExecutorEvents, FlowEventOptions } from './util/flow-executor-events';
 import { RetryPolicy } from './errors/recovery';
 import { ErrorCode } from './errors/codes';
-import { EnhancedTimeoutError } from './errors/timeout-error';
-import { TimeoutError, ExecutionError } from './errors/base';
+import { TimeoutError } from './errors/timeout-error';
+import { ExecutionError } from './errors/base';
 import { TimeoutResolver } from './util/timeout-resolver';
+import { PolicyResolver } from './util/policy-resolver';
 
 /**
  * Default retry policy
@@ -65,6 +66,7 @@ export class FlowExecutor {
   private retryPolicy: RetryPolicy | null;
   private enableRetries: boolean;
   private timeoutResolver: TimeoutResolver;
+  private policyResolver: PolicyResolver;
 
   constructor(
     private flow: Flow,
@@ -160,6 +162,12 @@ export class FlowExecutor {
       flow: this.flow,
     };
 
+    // Initialize TimeoutResolver for resolving timeouts
+    this.timeoutResolver = new TimeoutResolver(this.flow, undefined, this.logger);
+
+    // Initialize PolicyResolver for policy-based execution
+    this.policyResolver = new PolicyResolver(this.flow, this.logger);
+
     // Initialize step executors in order of specificity
     this.stepExecutors = [
       this.createRequestStepExecutor(),
@@ -170,12 +178,10 @@ export class FlowExecutor {
         this.referenceResolver,
         this.context,
         this.logger,
+        this.policyResolver,
       ),
       new StopStepExecutor(this.logger),
     ];
-
-    // Initialize TimeoutResolver for resolving timeouts
-    this.timeoutResolver = new TimeoutResolver(this.flow, undefined, this.logger);
   }
 
   /**
@@ -185,7 +191,7 @@ export class FlowExecutor {
     return new RequestStepExecutor(
       this.jsonRpcHandler,
       this.logger,
-      this.enableRetries ? this.retryPolicy : null,
+      this.policyResolver,
     );
   }
 
@@ -316,7 +322,7 @@ export class FlowExecutor {
         const flowTimeout = this.flow.timeouts?.global || 0;
 
         // Create a detailed timeout error for the flow
-        const timeoutError = new EnhancedTimeoutError(
+        const timeoutError = new TimeoutError(
           `Flow execution timed out after ${duration}ms. Configured timeout: ${flowTimeout}ms.`,
           flowTimeout,
           duration,
@@ -386,7 +392,6 @@ export class FlowExecutor {
 
       // Do not wrap custom errors
       if (
-        error instanceof EnhancedTimeoutError ||
         error instanceof TimeoutError ||
         error instanceof ExecutionError
       ) {

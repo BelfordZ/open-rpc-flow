@@ -123,7 +123,9 @@ describe('TestLogger', () => {
     logger.log('test message');
     logger.print();
 
-    expect(mockLog).toHaveBeenCalledWith('[LOG] [Test] test message', '');
+    expect(mockLog).toHaveBeenCalledTimes(1);
+    const output = mockLog.mock.calls[0][0];
+    expect(output).toContain('[LOG] [Test] test message');
 
     Object.assign(console, originalConsole);
   });
@@ -137,8 +139,9 @@ describe('TestLogger', () => {
     logger.clear();
     logger.print();
 
-    // Since print() will not print anything if there are no logs, we check that nothing was printed
-    expect(mockLog).not.toHaveBeenCalled();
+    // If there are no logs, print() will print an empty string
+    expect(mockLog).toHaveBeenCalledTimes(1);
+    expect(mockLog.mock.calls[0][0]).toBe('');
 
     Object.assign(console, originalConsole);
   });

@@ -3,20 +3,23 @@ import { StepExecutor, StepExecutionResult, JsonRpcRequestError, StepType } from
 import { Logger } from '../util/logger';
 import { RequestStep } from './types';
 import { RetryPolicy, RetryableOperation } from '../errors/recovery';
-import { ExecutionError, TimeoutError } from '../errors/base';
-import { EnhancedTimeoutError } from '../errors/timeout-error';
+import { ExecutionError } from '../errors/base';
+import { TimeoutError } from '../errors/timeout-error';
 import { ErrorCode } from '../errors/codes';
+import { PolicyResolver } from '../util/policy-resolver';
 
 export class RequestStepExecutor implements StepExecutor {
   private requestId: number = 0;
   private logger: Logger;
+  private policyResolver: PolicyResolver;
 
   constructor(
     private jsonRpcHandler: JsonRpcHandler,
     logger: Logger,
-    private retryPolicy: RetryPolicy | null = null,
+    policyResolver: PolicyResolver,
   ) {
     this.logger = logger.createNested('RequestStepExecutor');
+    this.policyResolver = policyResolver;
   }
 
   private getNextRequestId(): number {
@@ -37,39 +40,9 @@ export class RequestStepExecutor implements StepExecutor {
    * @param context The execution context with flow-level timeouts
    * @returns Timeout in milliseconds or undefined if no timeout is set
    */
-  private getStepTimeout(step: RequestStep, context: StepExecutionContext): number | undefined {
-    // Check step-level timeout in policies (highest priority)
-    if (step.policies?.timeout?.timeout !== undefined) {
-      return step.policies.timeout.timeout;
-    }
-
-    // Check deprecated step-level timeout
-    if (step.timeout !== undefined) {
-      return step.timeout;
-    }
-
-    // Check for flow-level step policies (applies to all steps)
-    if (context.flow?.policies?.step?.timeout?.timeout !== undefined) {
-      return context.flow.policies.step.timeout.timeout;
-    }
-
-    // Check for request type timeout in flow timeouts
-    if (context.flow?.timeouts?.request !== undefined) {
-      return context.flow.timeouts.request;
-    }
-
-    // Check for global timeout in policies
-    if (context.flow?.policies?.global?.timeout?.timeout !== undefined) {
-      return context.flow.policies.global.timeout.timeout;
-    }
-
-    // Fall back to global timeout
-    if (context.flow?.timeouts?.global !== undefined) {
-      return context.flow.timeouts.global;
-    }
-
-    // No timeout configured
-    return undefined;
+  private getStepTimeout(step: RequestStep, context: StepExecutionContext): number {
+    // Use PolicyResolver for timeout resolution
+    return this.policyResolver.resolveTimeout(step, StepType.Request);
   }
 
   /**
@@ -78,54 +51,8 @@ export class RequestStepExecutor implements StepExecutor {
    * @returns RetryPolicy or null if retries are disabled
    */
   private getStepRetryPolicy(step: RequestStep, context: StepExecutionContext): RetryPolicy | null {
-    // If retries are disabled globally, return null
-    if (!this.retryPolicy) {
-      return null;
-    }
-
-    // Check for step-level retry policy (new structure)
-    if (step.policies?.retryPolicy) {
-      const stepPolicy = step.policies.retryPolicy;
-
-      // Convert to RetryPolicy format
-      return {
-        maxAttempts: stepPolicy.maxAttempts ?? this.retryPolicy.maxAttempts,
-        backoff: {
-          initial: stepPolicy.backoff?.initial ?? this.retryPolicy.backoff.initial,
-          multiplier: stepPolicy.backoff?.multiplier ?? this.retryPolicy.backoff.multiplier,
-          maxDelay: stepPolicy.backoff?.maxDelay ?? this.retryPolicy.backoff.maxDelay,
-          strategy: stepPolicy.backoff?.strategy ?? this.retryPolicy.backoff.strategy,
-        },
-        retryableErrors:
-          (stepPolicy.retryableErrors as ErrorCode[]) ?? this.retryPolicy.retryableErrors,
-      };
-    }
-
-    // Check for deprecated step-level retry policy
-    if (step.retryPolicy) {
-      return step.retryPolicy;
-    }
-
-    // Check for flow-level step policy (applies to all steps)
-    if (context.flow?.policies?.step?.retryPolicy) {
-      const stepPolicy = context.flow.policies.step.retryPolicy;
-
-      // Convert to RetryPolicy format
-      return {
-        maxAttempts: stepPolicy.maxAttempts ?? this.retryPolicy.maxAttempts,
-        backoff: {
-          initial: stepPolicy.backoff?.initial ?? this.retryPolicy.backoff.initial,
-          multiplier: stepPolicy.backoff?.multiplier ?? this.retryPolicy.backoff.multiplier,
-          maxDelay: stepPolicy.backoff?.maxDelay ?? this.retryPolicy.backoff.maxDelay,
-          strategy: stepPolicy.backoff?.strategy ?? this.retryPolicy.backoff.strategy,
-        },
-        retryableErrors:
-          (stepPolicy.retryableErrors as ErrorCode[]) ?? this.retryPolicy.retryableErrors,
-      };
-    }
-
-    // Otherwise use the global retry policy
-    return this.retryPolicy;
+    // Use PolicyResolver for retry policy resolution
+    return this.policyResolver.resolveRetryPolicy(step, StepType.Request) ?? null;
   }
 
   async execute(
@@ -219,7 +146,7 @@ export class RequestStepExecutor implements StepExecutor {
         // If the request was aborted due to timeout, throw a timeout error
         if (abortController?.signal.aborted) {
           const executionTime = timeout || 0;
-          const timeoutError = EnhancedTimeoutError.forStep(
+          const timeoutError = TimeoutError.forStep(
             step,
             StepType.Request,
             timeout || 0,
@@ -254,7 +181,7 @@ export class RequestStepExecutor implements StepExecutor {
           ) {
             // Create a detailed timeout error
             const executionTime = timeout || 0; // We hit the timeout exactly
-            const timeoutError = EnhancedTimeoutError.forStep(
+            const timeoutError = TimeoutError.forStep(
               step,
               StepType.Request,
               timeout || 0,
@@ -304,7 +231,7 @@ export class RequestStepExecutor implements StepExecutor {
           requestId,
           maxAttempts: stepRetryPolicy.maxAttempts,
           retryableErrors: stepRetryPolicy.retryableErrors,
-          isStepLevel: stepRetryPolicy !== this.retryPolicy,
+          isStepLevel: stepRetryPolicy !== null,
         });
 
         // Execute with retry

@@ -18,145 +18,19 @@ A flexible and type-safe execution engine for JSON-RPC based workflows. This eng
 
 ### 1. Team Member Processing
 
-Process team members with nested operations and dynamic notifications:
+Process team members with nested operations and dynamic notifications. See the full example here:
 
-```typescript
-const teamFlow: Flow = {
-  name: 'team-member-processing',
-  description: 'Process team members and send notifications',
-  context: {
-    notificationTypes: {
-      welcome: 'WELCOME',
-      update: 'UPDATE',
-    },
-  },
-  steps: [
-    {
-      name: 'getTeams',
-      request: {
-        method: 'teams.list',
-        params: { active: true },
-      },
-    },
-    {
-      name: 'processTeams',
-      loop: {
-        over: '${getTeams.result}',
-        as: 'team',
-        step: {
-          name: 'processMembers',
-          loop: {
-            over: '${team.members}',
-            as: 'member',
-            step: {
-              name: 'processMember',
-              condition: {
-                if: '${member.active}',
-                then: {
-                  name: 'notifyMember',
-                  request: {
-                    method: 'notify',
-                    params: {
-                      teamId: '${team.id}',
-                      memberId: '${member.id}',
-                      type: '${context.notificationTypes.welcome}',
-                      data: {
-                        teamName: '${team.name}',
-                        memberRole: '${member.role}',
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
-  ],
-};
-```
+[**src/examples/03-nested-loops.json**](src/examples/03-nested-loops.json)
+
+---
 
 ### 2. Data Pipeline with Error Recovery
 
-Process data with validation, transformation, and error handling:
+Process data with validation, transformation, and error handling. See the full example here:
 
-```typescript
-const dataPipelineFlow: Flow = {
-  name: 'data-pipeline',
-  description: 'Process and transform data with error handling',
-  context: {
-    batchSize: 2,
-    minValue: 10,
-    retryCount: 3,
-  },
-  steps: [
-    {
-      name: 'getData',
-      request: {
-        method: 'data.fetch',
-        params: { source: 'test' },
-      },
-    },
-    {
-      name: 'validateData',
-      condition: {
-        if: '${getData.error}',
-        then: {
-          name: 'retryData',
-          loop: {
-            over: 'Array.from({ length: ${context.retryCount} })',
-            as: 'attempt',
-            step: {
-              name: 'retryFetch',
-              request: {
-                method: 'data.fetch',
-                params: {
-                  source: 'test',
-                  attempt: '${metadata.current.index + 1}',
-                },
-              },
-            },
-          },
-        },
-        else: {
-          name: 'processData',
-          transform: {
-            input: '${getData.result}',
-            operations: [
-              {
-                type: 'filter',
-                using: '${item.value > context.minValue}',
-              },
-              {
-                type: 'map',
-                using: '{ ...item, processed: true }',
-              },
-            ],
-          },
-        },
-      },
-    },
-    {
-      name: 'processBatches',
-      loop: {
-        over: '${validateData.result.result}',
-        as: 'batch',
-        step: {
-          name: 'processBatch',
-          request: {
-            method: 'batch.process',
-            params: {
-              data: '${batch}',
-              index: '${metadata.current.index}',
-            },
-          },
-        },
-      },
-    },
-  ],
-};
-```
+[**src/examples/05-complex-data-pipeline.json**](src/examples/05-complex-data-pipeline.json)
+
+---
 
 ### 3. API Data Aggregation
 

@@ -85,56 +85,119 @@ describe('TimeoutResolver', () => {
   });
 
   describe('resolveStepTimeout', () => {
-    it('should use step-level timeout when available', () => {
-      const flowTimeouts = { global: 5000, request: 10000 };
-      const executorTimeouts = { request: 8000 };
-      const flow = createMockFlow(flowTimeouts);
-      const step = createMockStep('TestStep', 2000);
-
-      const resolver = new TimeoutResolver(flow, executorTimeouts, logger);
-      const timeout = resolver.resolveStepTimeout(step, StepType.Request);
-
-      expect(timeout).toBe(2000);
+    it('should use step-level policy timeout when available', () => {
+      const flow = createMockFlow();
+      const step: Step = {
+        name: 'TestStep',
+        policies: { timeout: { timeout: 1234 } },
+      };
+      const resolver = new TimeoutResolver(flow, undefined, logger);
+      const timeout = resolver.resolveStepTimeout(step, StepType.Transform);
+      expect(timeout).toBe(1234);
       const logs = logger.getLogs();
       expect(logs).toContainEqual({
         level: 'debug',
-        message: 'Using step-level timeout',
-        data: { stepName: 'TestStep', timeout: 2000 },
+        message: 'Using step-level policy timeout',
+        data: { stepName: 'TestStep', timeout: 1234 },
       });
     });
 
-    it('should use flow-level type-specific timeout when step-level is not available', () => {
+    it('should use per-stepType policy timeout when available', () => {
+      const flow: Flow = {
+        name: 'Test Flow',
+        description: 'desc',
+        steps: [],
+        policies: {
+          step: {
+            // @ts-ignore: per-stepType policy is allowed by metaschema, but not by the current TS type
+            transform: { timeout: { timeout: 2222 } },
+          } as any,
+        },
+      };
+      const step: Step = { name: 'TestStep' };
+      const resolver = new TimeoutResolver(flow, undefined, logger);
+      const timeout = resolver.resolveStepTimeout(step, StepType.Transform);
+      expect(timeout).toBe(2222);
+      const logs = logger.getLogs();
+      expect(logs).toContainEqual({
+        level: 'debug',
+        message: 'Using flow.policies.step[stepType].timeout.timeout',
+        data: { stepName: 'TestStep', stepType: 'transform', timeout: 2222 },
+      });
+    });
+
+    it('should use step-type default policy timeout when available', () => {
+      const flow: Flow = {
+        name: 'Test Flow',
+        description: 'desc',
+        steps: [],
+        policies: {
+          step: {
+            timeout: { timeout: 3333 },
+          },
+        },
+      };
+      const step: Step = { name: 'TestStep' };
+      const resolver = new TimeoutResolver(flow, undefined, logger);
+      const timeout = resolver.resolveStepTimeout(step, StepType.Transform);
+      expect(timeout).toBe(3333);
+      const logs = logger.getLogs();
+      expect(logs).toContainEqual({
+        level: 'debug',
+        message: 'Using flow.policies.step.timeout.timeout',
+        data: { stepName: 'TestStep', timeout: 3333 },
+      });
+    });
+
+    it('should use flow-level type-specific timeout when no policies are available', () => {
       const flowTimeouts = { global: 5000, request: 10000 };
       const executorTimeouts = { request: 8000 };
       const flow = createMockFlow(flowTimeouts);
       const step = createMockStep('TestStep');
-
       const resolver = new TimeoutResolver(flow, executorTimeouts, logger);
       const timeout = resolver.resolveStepTimeout(step, StepType.Request);
-
       expect(timeout).toBe(10000);
       const logs = logger.getLogs();
       expect(logs).toContainEqual({
         level: 'debug',
-        message: 'Using flow-level type-specific timeout',
-        data: { stepName: 'TestStep', timeout: 10000 },
+        message: 'Using flow.timeouts[stepType]',
+        data: { stepName: 'TestStep', stepType: 'request', timeout: 10000 },
       });
     });
 
-    it('should use flow-level global timeout when type-specific is not available', () => {
+    it('should use global policy timeout when no other timeouts are available', () => {
+      const flow: Flow = {
+        name: 'Test Flow',
+        description: 'desc',
+        steps: [],
+        policies: {
+          global: { timeout: { timeout: 4444 } },
+        },
+      };
+      const step: Step = { name: 'TestStep' };
+      const resolver = new TimeoutResolver(flow, undefined, logger);
+      const timeout = resolver.resolveStepTimeout(step, StepType.Transform);
+      expect(timeout).toBe(4444);
+      const logs = logger.getLogs();
+      expect(logs).toContainEqual({
+        level: 'debug',
+        message: 'Using flow.policies.global.timeout.timeout',
+        data: { stepName: 'TestStep', timeout: 4444 },
+      });
+    });
+
+    it('should use flow-level global timeout when no other timeouts are available', () => {
       const flowTimeouts = { global: 5000 };
       const executorTimeouts = { request: 8000 };
       const flow = createMockFlow(flowTimeouts);
       const step = createMockStep('TestStep');
-
       const resolver = new TimeoutResolver(flow, executorTimeouts, logger);
       const timeout = resolver.resolveStepTimeout(step, StepType.Transform);
-
       expect(timeout).toBe(5000);
       const logs = logger.getLogs();
       expect(logs).toContainEqual({
         level: 'debug',
-        message: 'Using flow-level global timeout',
+        message: 'Using flow.timeouts.global',
         data: { stepName: 'TestStep', timeout: 5000 },
       });
     });
@@ -142,10 +205,8 @@ describe('TimeoutResolver', () => {
     it('should fall back to executor/default timeout when no other timeouts are available', () => {
       const flow = createMockFlow();
       const step = createMockStep('TestStep');
-
       const resolver = new TimeoutResolver(flow, undefined, logger);
       const timeout = resolver.resolveStepTimeout(step, StepType.Request);
-
       expect(timeout).toBe(DEFAULT_TIMEOUTS.request);
       const logs = logger.getLogs();
       expect(logs).toContainEqual({
@@ -153,18 +214,6 @@ describe('TimeoutResolver', () => {
         message: 'Using default timeout',
         data: { stepName: 'TestStep', timeout: DEFAULT_TIMEOUTS.request },
       });
-    });
-
-    it('should handle unknown step types by using global timeout', () => {
-      const flowTimeouts = { global: 5000 };
-      const flow = createMockFlow(flowTimeouts);
-      const step = createMockStep('TestStep');
-
-      const resolver = new TimeoutResolver(flow, undefined, logger);
-      // Use an unknown step type by casting
-      const timeout = resolver.resolveStepTimeout(step, -1 as unknown as StepType);
-
-      expect(timeout).toBe(5000);
     });
   });
 

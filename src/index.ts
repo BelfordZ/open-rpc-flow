@@ -43,7 +43,6 @@ export {
   FlowError,
   ExecutionError,
   ValidationError,
-  TimeoutError,
   StateError,
 } from './errors/base';
 export { ErrorCode, ErrorCategory } from './errors/codes';

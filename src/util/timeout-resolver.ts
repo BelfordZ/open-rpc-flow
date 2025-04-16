@@ -93,61 +93,111 @@ export class TimeoutResolver {
       stepType,
     });
 
-    // 1. Check step-level timeout
+    // 1. Step-level policy timeout
+    if (step.policies?.timeout?.timeout !== undefined) {
+      const validatedTimeout = TimeoutValidator.validateTimeout(
+        step.policies.timeout.timeout,
+        this.getDefaultTimeoutForType(stepType),
+      );
+      this.logger.debug('Using step-level policy timeout', {
+        stepName: step.name,
+        timeout: validatedTimeout,
+      });
+      return validatedTimeout;
+    }
+
+    // 2. Deprecated step.timeout
     if (typeof step.timeout === 'number') {
       const validatedTimeout = TimeoutValidator.validateTimeout(
         step.timeout,
         this.getDefaultTimeoutForType(stepType),
       );
-
-      this.logger.debug('Using step-level timeout', {
+      this.logger.debug('Using deprecated step.timeout', {
         stepName: step.name,
         timeout: validatedTimeout,
       });
+      return validatedTimeout;
+    }
 
+    // 3. Per-stepType policy (flow.policies.step[stepType].timeout.timeout)
+    if (
+      this.flow.policies?.step &&
+      (this.flow.policies.step as any)[stepType]?.timeout?.timeout !== undefined
+    ) {
+      const timeout = (this.flow.policies.step as any)[stepType].timeout.timeout;
+      const validatedTimeout = TimeoutValidator.validateTimeout(
+        timeout,
+        this.getDefaultTimeoutForType(stepType),
+      );
+      this.logger.debug('Using flow.policies.step[stepType].timeout.timeout', {
+        stepName: step.name,
+        stepType,
+        timeout: validatedTimeout,
+      });
+      return validatedTimeout;
+    }
+
+    // 4. Step-type default policy (flow.policies.step.timeout.timeout)
+    if (this.flow.policies?.step?.timeout?.timeout !== undefined) {
+      const validatedTimeout = TimeoutValidator.validateTimeout(
+        this.flow.policies.step.timeout.timeout,
+        this.getDefaultTimeoutForType(stepType),
+      );
+      this.logger.debug('Using flow.policies.step.timeout.timeout', {
+        stepName: step.name,
+        timeout: validatedTimeout,
+      });
       return validatedTimeout;
     }
 
     const timeoutKey = this.getTimeoutKey(stepType);
 
-    // 2. Check flow-level type-specific timeout
+    // 5. Legacy: flow.timeouts[stepType]
     if (this.flow.timeouts && timeoutKey in this.flow.timeouts) {
       const validatedTimeout = TimeoutValidator.validateTimeout(
         this.flow.timeouts[timeoutKey],
         this.getDefaultTimeoutForType(stepType),
       );
-
-      this.logger.debug('Using flow-level type-specific timeout', {
+      this.logger.debug('Using flow.timeouts[stepType]', {
         stepName: step.name,
+        stepType,
         timeout: validatedTimeout,
       });
-
       return validatedTimeout;
     }
 
-    // 3. Check flow-level global timeout
+    // 6. Global policy (flow.policies.global.timeout.timeout)
+    if (this.flow.policies?.global?.timeout?.timeout !== undefined) {
+      const validatedTimeout = TimeoutValidator.validateTimeout(
+        this.flow.policies.global.timeout.timeout,
+        this.getDefaultTimeoutForType(stepType),
+      );
+      this.logger.debug('Using flow.policies.global.timeout.timeout', {
+        stepName: step.name,
+        timeout: validatedTimeout,
+      });
+      return validatedTimeout;
+    }
+
+    // 7. Legacy: flow.timeouts.global
     if (this.flow.timeouts && this.flow.timeouts.global !== undefined) {
       const validatedTimeout = TimeoutValidator.validateTimeout(
         this.flow.timeouts.global,
         this.getDefaultTimeoutForType(stepType),
       );
-
-      this.logger.debug('Using flow-level global timeout', {
+      this.logger.debug('Using flow.timeouts.global', {
         stepName: step.name,
         timeout: validatedTimeout,
       });
-
       return validatedTimeout;
     }
 
-    // 4. Fall back to executor/default timeout
+    // 8. Fallback to default
     const defaultTimeout = this.getDefaultTimeoutForType(stepType);
-
     this.logger.debug('Using default timeout', {
       stepName: step.name,
       timeout: defaultTimeout,
     });
-
     return defaultTimeout;
   }
 

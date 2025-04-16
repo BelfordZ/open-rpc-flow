@@ -1,12 +1,13 @@
-import { TimeoutError as BaseTimeoutError } from './base';
+import { FlowError } from './base';
+import { ErrorCode } from './codes';
 import { Step } from '../types';
 import { StepType } from '../step-executors/types';
 
 /**
- * Enhanced error thrown when a step or expression exceeds its configured timeout.
- * Extends the base TimeoutError with additional context about the timeout.
+ * TimeoutError thrown when a step or expression exceeds its configured timeout.
+ * Extends FlowError with additional context about the timeout.
  */
-export class EnhancedTimeoutError extends BaseTimeoutError {
+export class TimeoutError extends FlowError {
   /**
    * The step that timed out
    */
@@ -33,7 +34,7 @@ export class EnhancedTimeoutError extends BaseTimeoutError {
   readonly isExpressionTimeout: boolean;
 
   /**
-   * Creates a new EnhancedTimeoutError
+   * Creates a new TimeoutError
    *
    * @param message - Error message
    * @param timeout - The configured timeout value in milliseconds
@@ -58,7 +59,7 @@ export class EnhancedTimeoutError extends BaseTimeoutError {
       isExpressionTimeout,
     };
 
-    super(message, context);
+    super(message, ErrorCode.TIMEOUT_ERROR, context);
 
     this.timeout = timeout;
     this.executionTime = executionTime;
@@ -66,26 +67,26 @@ export class EnhancedTimeoutError extends BaseTimeoutError {
     this.stepType = stepType;
     this.isExpressionTimeout = isExpressionTimeout;
 
-    this.name = 'EnhancedTimeoutError';
-    Object.setPrototypeOf(this, EnhancedTimeoutError.prototype);
+    this.name = 'TimeoutError';
+    Object.setPrototypeOf(this, TimeoutError.prototype);
   }
 
   /**
-   * Factory method to create a EnhancedTimeoutError for a step execution
+   * Factory method to create a TimeoutError for a step execution
    *
    * @param step - The step that timed out
    * @param stepType - The type of step that timed out
    * @param timeout - The configured timeout value in milliseconds
    * @param executionTime - The execution time before timeout in milliseconds
-   * @returns A new EnhancedTimeoutError
+   * @returns A new TimeoutError
    */
   static forStep(
     step: Step,
     stepType: StepType,
     timeout: number,
     executionTime: number,
-  ): EnhancedTimeoutError {
-    return new EnhancedTimeoutError(
+  ): TimeoutError {
+    return new TimeoutError(
       `Step "${step.name}" execution timed out after ${executionTime}ms. ` +
         `Configured timeout: ${timeout}ms.`,
       timeout,
@@ -96,21 +97,21 @@ export class EnhancedTimeoutError extends BaseTimeoutError {
   }
 
   /**
-   * Factory method to create a EnhancedTimeoutError for an expression evaluation
+   * Factory method to create a TimeoutError for an expression evaluation
    *
    * @param expression - The expression that timed out
    * @param timeout - The configured timeout value in milliseconds
    * @param executionTime - The execution time before timeout in milliseconds
    * @param step - The step context (if applicable)
-   * @returns A new EnhancedTimeoutError
+   * @returns A new TimeoutError
    */
   static forExpression(
     expression: string,
     timeout: number,
     executionTime: number,
     step?: Step,
-  ): EnhancedTimeoutError {
-    return new EnhancedTimeoutError(
+  ): TimeoutError {
+    return new TimeoutError(
       `Expression evaluation timed out after ${executionTime}ms. ` +
         `Configured timeout: ${timeout}ms. Expression: "${expression.substring(0, 50)}${expression.length > 50 ? '...' : ''}"`,
       timeout,

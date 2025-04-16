@@ -31,8 +31,12 @@ describe('TransformStepExecutor Timeout Tests', () => {
       name: 'Test Flow',
       description: 'Test flow description',
       steps: [],
-      timeouts: {
-        transform: 5000,
+      policies: {
+        step: {
+          transform: {
+            timeout: { timeout: 5000 },
+          },
+        },
       },
     };
 
@@ -157,7 +161,9 @@ describe('TransformStepExecutor Timeout Tests', () => {
   it('should respect step-level timeout override', async () => {
     const step: TransformStep = {
       name: 'TestTransform',
-      timeout: 3000, // Step-level timeout override
+      policies: {
+        timeout: { timeout: 3000 },
+      },
       transform: {
         input: '${items}',
         operations: [
@@ -171,7 +177,7 @@ describe('TransformStepExecutor Timeout Tests', () => {
 
     // Mock only the evaluate method to throw a timeout error immediately
     jest.spyOn(expressionEvaluator, 'evaluate').mockImplementation((expression, context, step) => {
-      const timeout = step?.timeout || 10000;
+      const timeout = step?.policies?.timeout?.timeout || 10000;
       throw TimeoutError.forExpression(
         expression,
         timeout,

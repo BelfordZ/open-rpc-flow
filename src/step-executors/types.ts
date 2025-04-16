@@ -161,6 +161,7 @@ export interface LoopResult<T> extends LoopResultBase {
 export type LoopStepResult<T> = StepExecutionResult<LoopResult<T>>;
 
 export interface TransformStep extends Step {
+  timeout?: number;
   transform: {
     input: string | any[];
     operations: TransformOperation[];

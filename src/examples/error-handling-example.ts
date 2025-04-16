@@ -78,9 +78,6 @@ const executor = new FlowExecutor(flow, jsonRpcHandler, {
     retryableErrors: [ErrorCode.NETWORK_ERROR, ErrorCode.TIMEOUT_ERROR],
   },
 
-  // Enable retries
-  enableRetries: true,
-
   // Also enable event emitter for logging
   eventOptions: {
     emitFlowEvents: true,
@@ -122,42 +119,9 @@ async function runFlow() {
   }
 }
 
-// Demonstrate updating error handling options
-function updateErrorOptions() {
-  // Update error handling options
-  executor.updateErrorHandlingOptions({
-    enableRetries: true,
-    retryPolicy: {
-      maxAttempts: 5, // Increase max attempts
-      backoff: {
-        initial: 200, // Increase initial delay
-        multiplier: 1.5, // Decrease multiplier
-        maxDelay: 2000, // Increase max delay
-      },
-      retryableErrors: [
-        ErrorCode.NETWORK_ERROR,
-        ErrorCode.TIMEOUT_ERROR,
-        ErrorCode.RESOURCE_ERROR, // Add more retryable errors
-      ],
-    },
-  });
-
-  console.log('Updated error handling options');
-}
-
 // Run the example when this file is executed directly
 if (require.main === module) {
   runFlow()
-    .then(() => {
-      console.log('Updating error handling options...');
-      updateErrorOptions();
-
-      // Reset counter for second run
-      requestCounter = 0;
-
-      // Run the flow again with new settings
-      return runFlow();
-    })
     .then(() => {
       console.log('Example completed.');
     });

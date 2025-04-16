@@ -1,6 +1,7 @@
 import { Flow, Step, StepType } from '../types';
 import { Logger, defaultLogger } from '../util/logger';
 import { DEFAULT_TIMEOUTS } from '../constants/timeouts';
+import { DEFAULT_RETRY_POLICY } from '../flow-executor';
 
 /**
  * Resolves policies (timeout, retryPolicy, etc.) for steps and flows according to metaschema precedence.
@@ -86,7 +87,18 @@ export class PolicyResolver {
    * Helper to resolve retryPolicy (returns the retryPolicy object or undefined)
    */
   resolveRetryPolicy(step: Step, stepType: StepType, fallback?: any): any {
-    return this.resolvePolicy<any>(step, stepType, 'retryPolicy', fallback);
+    const userPolicy = this.resolvePolicy<any>(step, stepType, 'retryPolicy', fallback);
+    if (!userPolicy) return undefined;
+    // Merge with defaults, including nested backoff
+    return {
+      ...DEFAULT_RETRY_POLICY,
+      ...userPolicy,
+      backoff: {
+        ...DEFAULT_RETRY_POLICY.backoff,
+        ...(userPolicy.backoff || {}),
+      },
+      retryableErrors: userPolicy.retryableErrors ?? DEFAULT_RETRY_POLICY.retryableErrors,
+    };
   }
 
   /**

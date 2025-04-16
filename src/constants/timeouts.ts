@@ -1,10 +1,8 @@
-import { TimeoutOptions } from '../types';
-
 /**
  * Default timeout values (in milliseconds) for different step types.
  * These values are used when no explicit timeouts are configured.
  */
-export const DEFAULT_TIMEOUTS: TimeoutOptions = {
+export const DEFAULT_TIMEOUTS = {
   /**
    * Default global timeout (30s)
    * Rationale: A reasonable default for most operations

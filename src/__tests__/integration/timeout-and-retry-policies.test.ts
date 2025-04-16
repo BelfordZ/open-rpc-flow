@@ -2,7 +2,7 @@ import { FlowExecutor } from '../../flow-executor';
 import { Flow } from '../../types';
 import { ErrorCode as ImportedErrorCode } from '../../errors/codes';
 import { TimeoutError } from '../../errors/timeout-error';
-import { FlowError } from '../../errors/base';
+import { FlowError, ExecutionError } from '../../errors/base';
 import { TestLogger } from '../../util/logger';
 import { RequestStepExecutor } from '../../step-executors/request-executor';
 import { StepExecutionContext } from '../../types';
@@ -112,24 +112,50 @@ function createMockHandler(options: MockHandlerOptions) {
   };
 }
 
+// Enhanced helper to DRY up error assertions for various error types
+interface ExpectErrorOptions {
+  errorClass?: any; // e.g., TimeoutError, ExecutionError, Error
+  messageIncludes?: string | RegExp;
+}
+
+async function expectError(promise: Promise<any>, options: ExpectErrorOptions = {}) {
+  const { errorClass = TimeoutError, messageIncludes = 'timed out' } = options;
+  try {
+    await promise;
+    throw new Error(`Should have thrown ${errorClass?.name || 'an error'}`);
+  } catch (error) {
+    if (errorClass) {
+      console.log(error);
+      expect(error).toBeInstanceOf(errorClass);
+    }
+    if (messageIncludes) {
+      if (typeof messageIncludes === 'string') {
+        expect(String(error)).toContain(messageIncludes);
+      } else {
+        expect(String(error)).toMatch(messageIncludes);
+      }
+    }
+  }
+}
+
 describe('Timeout and Retry Policies', () => {
   let testLogger: TestLogger;
 
   beforeEach(() => {
-    testLogger = new TestLogger('TestFlow');
+    testLogger = new TestLogger('TimeoutAndRetryPolicies');
     jest.useFakeTimers({ advanceTimers: true });
-    // Print logs before each test for debugging
   });
 
   afterEach(() => {
     jest.useRealTimers();
-    testLogger.print(); // Print logs after each test for debugging
+    //testLogger.print(); // Print logs after each test for debugging
     testLogger.clear();
   });
 
-  describe('Step-level timeout policies', () => {
-    it('should respect step-level timeout configuration', async () => {
-      // Create a short timeout for the step
+  describe('timeout policies', () => {
+    describe('Step-level timeout policies', () => {
+      it('should respect step-level timeout configuration', async () => {
+        // Create a short timeout for the step
       const shortTimeout = 50;
 
       // Create a flow with JSON-RPC compliant interface
@@ -155,19 +181,8 @@ describe('Timeout and Retry Policies', () => {
       const executor = new FlowExecutor(flow, mockHandler, testLogger);
 
       // Execute and expect timeout error
-      try {
-        // Fast-forward time to trigger timeout
-        jest.advanceTimersByTime(shortTimeout);
-        await executor.execute();
-        throw new Error('Should have thrown TimeoutError');
-      } catch (error) {
-        expect(error).toBeInstanceOf(TimeoutError);
-        if (error instanceof Error) {
-          expect(error.message).toContain('timed out');
-        } else {
-          expect(String(error)).toContain('timed out');
-        }
-      }
+      jest.advanceTimersByTime(shortTimeout);
+      await expectError(executor.execute(), { errorClass: ExecutionError, messageIncludes: 'timed out' });
     });
 
     it('should allow a step to complete within its timeout', async () => {
@@ -201,9 +216,9 @@ describe('Timeout and Retry Policies', () => {
       expect(results).toBeDefined();
       expect(results.get('quickOperation').result.result).toBe('Result for quick');
     });
-  });
+    });
 
-  describe('Global timeout policies', () => {
+    describe('Global timeout policies', () => {
     it('should respect global timeout configuration', async () => {
       // Set a global timeout
       const globalTimeout = 100;
@@ -238,19 +253,8 @@ describe('Timeout and Retry Policies', () => {
       const executor = new FlowExecutor(flow, mockHandler, testLogger);
 
       // Execute and expect timeout error
-      try {
-        // Fast-forward time to trigger timeout
-        jest.advanceTimersByTime(globalTimeout);
-        await executor.execute();
-        throw new Error('Should have thrown TimeoutError');
-      } catch (error) {
-        expect(error).toBeInstanceOf(TimeoutError);
-        if (error instanceof Error) {
-          expect(error.message).toContain('timed out');
-        } else {
-          expect(String(error)).toContain('timed out');
-        }
-      }
+      jest.advanceTimersByTime(globalTimeout);
+      await expectError(executor.execute(), { errorClass: ExecutionError, messageIncludes: 'timed out' });
     });
 
     it('should allow a flow with multiple steps to complete within global timeout', async () => {
@@ -289,304 +293,297 @@ describe('Timeout and Retry Policies', () => {
       expect(results.get('step1')).toBeDefined();
       expect(results.get('step2')).toBeDefined();
     });
+    });
   });
 
-  describe('Step-level retry policies', () => {
-    it('should retry a step based on its retry policy', async () => {
-      // Track retry attempts
-      const attempts = { count: 0 };
+  describe('retry policies', () => {
+    describe('Step-level retry policies', () => {
+      it('should retry a step based on its retry policy', async () => {
+        // Track retry attempts
+        const attempts = { count: 0 };
 
-      // Create a flow with retry policy
-      const flow: Flow = {
-        name: 'step-retry-test',
-        description: 'Test step-level retry policy',
-        steps: [
-          {
-            name: 'retryableStep',
-            request: {
-              method: 'flaky',
-              params: [],
+        // Create a flow with retry policy
+        const flow: Flow = {
+          name: 'step-retry-test',
+          description: 'Test step-level retry policy',
+          steps: [
+            {
+              name: 'retryableStep',
+              request: {
+                method: 'flaky',
+                params: [],
+              },
+              policies: { retryPolicy: { maxAttempts: 3 } }, // Longer timeout to allow for retries
             },
-            policies: { timeout: { timeout: 1000 } }, // Longer timeout to allow for retries
-          },
-        ],
-      };
+          ],
+        };
 
-      // Create a handler that fails for the first 2 attempts
-      const mockHandler = createMockHandler({
-        shouldFail: true,
-        errorType: 'NETWORK',
-        failUntilAttempt: 2,
-        currentAttempt: attempts,
-      });
+        // Create a handler that fails for the first 2 attempts
+        const mockHandler = createMockHandler({
+          shouldFail: true,
+          errorType: 'NETWORK',
+          failUntilAttempt: 2,
+          currentAttempt: attempts,
+        });
 
-      const executor = new FlowExecutor(flow, mockHandler, {
-        logger: testLogger,
-        enableRetries: true,
-        retryPolicy: {
-          maxAttempts: 3,
-          backoff: {
-            initial: MOCK_DELAY,
-            multiplier: 2,
-            maxDelay: 1000,
-          },
-          retryableErrors: [ImportedErrorCode.NETWORK_ERROR],
-        },
-      });
+        const executor = new FlowExecutor(flow, mockHandler, testLogger);
 
-      // Execute and expect success after retries
-      const results = await executor.execute();
-      expect(results).toBeDefined();
-      expect(attempts.count).toBe(3); // Initial + 2 retries
-    });
-
-    it('should fail after max attempts are reached', async () => {
-      // Track retry attempts
-      const attempts = { count: 0 };
-
-      // Create a step with retry policy
-      const flow: Flow = {
-        name: 'step-retry-failure-test',
-        description: 'Test step-level retry failure',
-        steps: [
-          {
-            name: 'retryableStep',
-            request: {
-              method: 'alwaysFails',
-              params: [],
-            },
-          },
-        ],
-      };
-
-      // Create a handler that always fails
-      const mockHandler = createMockHandler({
-        shouldFail: true,
-        errorType: 'NETWORK',
-        failUntilAttempt: 999, // Always fail
-        currentAttempt: attempts,
-      });
-
-      const executor = new FlowExecutor(flow, mockHandler, {
-        logger: testLogger,
-        enableRetries: true,
-        retryPolicy: {
-          maxAttempts: 3,
-          backoff: {
-            initial: MOCK_DELAY,
-            multiplier: 2,
-            maxDelay: 1000,
-          },
-          retryableErrors: [ImportedErrorCode.NETWORK_ERROR],
-        },
-      });
-
-      // Execute and expect failure after max retries
-      try {
-        await executor.execute();
-        throw new Error('Should have thrown an error');
-      } catch (error) {
-        expect(error).toBeDefined();
+        // Execute and expect success after retries
+        const results = await executor.execute();
+        expect(results).toBeDefined();
         expect(attempts.count).toBe(3); // Initial + 2 retries
-      }
-    });
-  });
-
-  describe('Global retry policies', () => {
-    it('should apply global retry policy to all steps', async () => {
-      // Track retry attempts per step
-      const attempts: Record<string, number> = {};
-
-      // Create a flow with global retry policy
-      const flow: Flow = {
-        name: 'global-retry-test',
-        description: 'Test global retry policy',
-        timeouts: {
-          global: 1000, // Long global timeout
-        },
-        steps: [
-          {
-            name: 'step1',
-            request: { method: 'flaky1', params: [] },
-          },
-          {
-            name: 'step2',
-            request: { method: 'flaky2', params: [] },
-          },
-        ],
-      };
-
-      // Create a handler that fails for the first attempt of each step
-      const mockHandler = async (request: any) => {
-        const stepName = request.method;
-        attempts[stepName] = (attempts[stepName] || 0) + 1;
-        if (attempts[stepName] === 1) {
-          throw new FlowError('Network error', ImportedErrorCode.NETWORK_ERROR, {});
-        }
-        return {
-          jsonrpc: '2.0',
-          id: request.id,
-          result: `Result for ${request.method}`,
-        };
-      };
-
-      const executor = new FlowExecutor(flow, mockHandler, {
-        logger: testLogger,
-        enableRetries: true,
-        retryPolicy: {
-          maxAttempts: 3,
-          backoff: {
-            initial: MOCK_DELAY,
-            multiplier: 2,
-            maxDelay: 1000,
-          },
-          retryableErrors: [ImportedErrorCode.NETWORK_ERROR],
-        },
       });
 
-      // Execute and expect success after retries
-      const results = await executor.execute();
-      expect(results).toBeDefined();
-      expect(attempts['flaky1']).toBe(2);
-      expect(attempts['flaky2']).toBe(2);
-      // Total attempts should be 4
-      expect(attempts['flaky1'] + attempts['flaky2']).toBe(4);
+      it('should fail after max attempts are reached', async () => {
+        // Track retry attempts
+        const attempts = { count: 0 };
+
+        // Create a step with retry policy
+        const flow: Flow = {
+          name: 'step-retry-failure-test',
+          description: 'Test step-level retry failure',
+          steps: [
+            {
+              name: 'retryableStep',
+              request: {
+                method: 'alwaysFails',
+                params: [],
+              },
+              policies: { retryPolicy: { maxAttempts: 3 } },
+            },
+          ],
+        };
+
+        // Create a handler that always fails
+        const mockHandler = createMockHandler({
+          shouldFail: true,
+          errorType: 'NETWORK',
+          failUntilAttempt: 999, // Always fail
+          currentAttempt: attempts,
+        });
+
+        const executor = new FlowExecutor(flow, mockHandler, testLogger);
+
+        // Execute and expect failure after max retries
+        try {
+          await executor.execute();
+          throw new Error('Should have thrown an error');
+        } catch (error) {
+          expect(error).toBeDefined();
+          expect(attempts.count).toBe(3); // Initial + 2 retries
+        }
+      });
     });
-  });
 
-  describe('Backoff strategies', () => {
-    it('should use exponential backoff strategy correctly', async () => {
-      // Track retry attempts and timing
-      const attempts = { count: 0 };
-      const retryTimes: number[] = [];
-      const startTime = Date.now();
+    describe('Global retry policies', () => {
+      it('should apply global retry policy to all steps', async () => {
+        // Track retry attempts per step
+        const attempts: Record<string, number> = {};
 
-      // Function to record retry times
-      const recordRetryTime = () => {
-        retryTimes.push(Date.now() - startTime);
-      };
-
-      // Create a step with exponential backoff
-      const flow: Flow = {
-        name: 'exponential-backoff-test',
-        description: 'Test exponential backoff',
-        steps: [
-          {
-            name: 'exponentialRetry',
-            request: {
-              method: 'flaky',
-              params: [],
+        // Create a flow with global retry policy
+        const flow: Flow = {
+          name: 'global-retry-test',
+          description: 'Test global retry policy',
+          policies: {
+            global: {
+              timeout: {
+                timeout: 1000, // Long global timeout
+              },
+              retryPolicy: {
+                maxAttempts: 3,
+              },
             },
           },
-        ],
-      };
-
-      // Create a handler that fails for 2 attempts and records timing
-      const mockHandler = async (request: any) => {
-        attempts.count++;
-        recordRetryTime();
-
-        if (attempts.count <= 2) {
-          throw new FlowError('Network error', ImportedErrorCode.NETWORK_ERROR, {});
-        }
-
-        return {
-          jsonrpc: '2.0',
-          id: request.id,
-          result: `Result for ${request.method}`,
+          steps: [
+            {
+              name: 'step1',
+              request: { method: 'flaky1', params: [] },
+            },
+            {
+              name: 'step2',
+              request: { method: 'flaky2', params: [] },
+            },
+          ],
         };
-      };
 
-      const executor = new FlowExecutor(flow, mockHandler, {
-        logger: testLogger,
-        enableRetries: true,
-        retryPolicy: {
-          maxAttempts: 3,
-          backoff: {
-            initial: MOCK_DELAY,
-            multiplier: 2,
-            maxDelay: 1000,
-          },
-          retryableErrors: [ImportedErrorCode.NETWORK_ERROR],
-        },
+        // Create a handler that fails for the first attempt of each step
+        const mockHandler = async (request: any) => {
+          const stepName = request.method;
+          attempts[stepName] = (attempts[stepName] || 0) + 1;
+          if (attempts[stepName] === 1) {
+            throw new FlowError('Network error', ImportedErrorCode.NETWORK_ERROR, {});
+          }
+          return {
+            jsonrpc: '2.0',
+            id: request.id,
+            result: `Result for ${request.method}`,
+          };
+        };
+
+        const executor = new FlowExecutor(flow, mockHandler, testLogger);
+
+        // Execute and expect success after retries
+        const results = await executor.execute();
+        expect(results).toBeDefined();
+        expect(attempts['flaky1']).toBe(2);
+        expect(attempts['flaky2']).toBe(2);
+        // Total attempts should be 4
+        expect(attempts['flaky1'] + attempts['flaky2']).toBe(4);
       });
-
-      // Execute and verify exponential backoff timing
-      await executor.execute();
-
-      // First retry should be around initial delay (MOCK_DELAY)
-      // Second retry should be around initial * multiplier^1 (MOCK_DELAY * 2)
-      expect(attempts.count).toBe(3);
-      expect(retryTimes[1] - retryTimes[0]).toBeGreaterThanOrEqual(MOCK_DELAY);
-      expect(retryTimes[2] - retryTimes[1]).toBeGreaterThanOrEqual(MOCK_DELAY * 2);
     });
 
-    it('should use linear backoff strategy correctly', async () => {
-      // Track retry attempts and timing
-      const attempts = { count: 0 };
-      const retryTimes: number[] = [];
-      const startTime = Date.now();
+    describe('Backoff strategies', () => {
+      it('should use exponential backoff strategy correctly', async () => {
+        // Track retry attempts and timing
+        const attempts = { count: 0 };
+        const retryTimes: number[] = [];
+        const startTime = Date.now();
 
-      // Function to record retry times
-      const recordRetryTime = () => {
-        retryTimes.push(Date.now() - startTime);
-      };
+        // Function to record retry times
+        const recordRetryTime = () => {
+          retryTimes.push(Date.now() - startTime);
+        };
 
-      // Create a step with linear backoff
-      const flow: Flow = {
-        name: 'linear-backoff-test',
-        description: 'Test linear backoff',
-        steps: [
-          {
-            name: 'linearRetry',
-            request: {
-              method: 'flaky',
-              params: [],
+        const INITIAL_BACKOFF = 200;
+        const MULTIPLIER = 2;
+        // Create a step with exponential backoff
+        const flow: Flow = {
+          name: 'exponential-backoff-test',
+          description: 'Test exponential backoff',
+          policies: {
+            global: {
+              retryPolicy: {
+                maxAttempts: 4,
+                backoff: {
+                  initial: INITIAL_BACKOFF,
+                  strategy: 'exponential',
+                },
+              },
             },
           },
-        ],
-      };
-
-      // Create a handler that fails for 2 attempts and records timing
-      const mockHandler = async (request: any) => {
-        attempts.count++;
-        recordRetryTime();
-
-        if (attempts.count <= 2) {
-          throw new FlowError('Network error', ImportedErrorCode.NETWORK_ERROR, {});
-        }
-
-        return {
-          jsonrpc: '2.0',
-          id: request.id,
-          result: `Result for ${request.method}`,
+          steps: [
+            {
+              name: 'exponentialRetry',
+              request: {
+                method: 'flaky',
+                params: [],
+              },
+            },
+          ],
         };
-      };
 
-      const executor = new FlowExecutor(flow, mockHandler, {
-        logger: testLogger,
-        enableRetries: true,
-        retryPolicy: {
-          maxAttempts: 3,
-          backoff: {
-            initial: MOCK_DELAY,
-            multiplier: 1,
-            maxDelay: 1000,
-          },
-          retryableErrors: [ImportedErrorCode.NETWORK_ERROR],
-        },
+        // Create a handler that fails for 2 attempts and records timing
+        const mockHandler = async (request: any) => {
+          attempts.count++;
+          recordRetryTime();
+
+          if (attempts.count <= 3) {
+            throw new FlowError('Network error', ImportedErrorCode.NETWORK_ERROR, {});
+          }
+
+          return {
+            jsonrpc: '2.0',
+            id: request.id,
+            result: `Result for ${request.method}`,
+          };
+        };
+
+        const executor = new FlowExecutor(flow, mockHandler, testLogger);
+
+        // Execute and verify exponential backoff timing
+        await executor.execute();
+
+        // First retry should be around initial delay (INITIAL_BACKOFF)
+        // Second retry should be around initial * multiplier^1 (INITIAL_BACKOFF * 2)
+        // Third retry should be around initial * multiplier^2 (INITIAL_BACKOFF * 4)
+        expect(attempts.count).toBe(4);
+        const firstInterval = retryTimes[1] - retryTimes[0];
+        const secondInterval = retryTimes[2] - retryTimes[1];
+        const thirdInterval = retryTimes[3] - retryTimes[2];
+        // The first retry is attempt=2, so exponent is 1, etc.
+        const expectedFirst = INITIAL_BACKOFF * Math.pow(MULTIPLIER, 1); // 400
+        const expectedSecond = INITIAL_BACKOFF * Math.pow(MULTIPLIER, 2); // 800
+        const expectedThird = INITIAL_BACKOFF * Math.pow(MULTIPLIER, 3); // 1600
+        // Allow ±50% jitter
+        expect(firstInterval).toBeGreaterThanOrEqual(expectedFirst * 0.5);
+        expect(firstInterval).toBeLessThanOrEqual(expectedFirst * 1.5);
+        expect(secondInterval).toBeGreaterThanOrEqual(expectedSecond * 0.5);
+        expect(secondInterval).toBeLessThanOrEqual(expectedSecond * 1.5);
+        expect(thirdInterval).toBeGreaterThanOrEqual(expectedThird * 0.5);
+        expect(thirdInterval).toBeLessThanOrEqual(expectedThird * 1.5);
+        // Optionally, check that each interval is roughly double the previous
+        expect(secondInterval).toBeGreaterThanOrEqual(firstInterval * 1.5);
+        expect(secondInterval).toBeLessThanOrEqual(firstInterval * 2.5);
+        expect(thirdInterval).toBeGreaterThanOrEqual(secondInterval * 1.5);
+        expect(thirdInterval).toBeLessThanOrEqual(secondInterval * 2.5);
       });
 
-      // Execute and verify linear backoff timing
-      await executor.execute();
+      it('should use linear backoff strategy correctly', async () => {
+        // Track retry attempts and timing
+        const attempts = { count: 0 };
+        const retryTimes: number[] = [];
+        const startTime = Date.now();
 
-      // With linear backoff, retries should be at consistent intervals
-      expect(attempts.count).toBe(3);
-      const firstInterval = retryTimes[1] - retryTimes[0];
-      const secondInterval = retryTimes[2] - retryTimes[1];
+        // Function to record retry times
+        const recordRetryTime = () => {
+          retryTimes.push(Date.now() - startTime);
+        };
 
-      // The intervals should be approximately the same with linear backoff
-      expect(Math.abs(secondInterval - firstInterval)).toBeLessThan(MOCK_DELAY / 2);
+        // Create a step with linear backoff
+        const flow: Flow = {
+          name: 'linear-backoff-test',
+          description: 'Test linear backoff',
+          policies: {
+            global: {
+              retryPolicy: {
+                maxAttempts: 3,
+                backoff: {
+                  initial: 2,
+                  strategy: 'linear',
+                },
+              },
+            },
+          },
+          steps: [
+            {
+              name: 'linearRetry',
+              request: {
+                method: 'flaky',
+                params: [],
+              },
+            },
+          ],
+        };
+
+        // Create a handler that fails for 2 attempts and records timing
+        const mockHandler = async (request: any) => {
+          attempts.count++;
+          recordRetryTime();
+
+          if (attempts.count <= 2) {
+            throw new FlowError('Network error', ImportedErrorCode.NETWORK_ERROR, {});
+          }
+
+          return {
+            jsonrpc: '2.0',
+            id: request.id,
+            result: `Result for ${request.method}`,
+          };
+        };
+
+        const executor = new FlowExecutor(flow, mockHandler, testLogger);
+
+        // Execute and verify linear backoff timing
+        await executor.execute();
+
+        // With linear backoff, retries should be at consistent intervals
+        expect(attempts.count).toBe(3);
+        const firstInterval = retryTimes[1] - retryTimes[0];
+        const secondInterval = retryTimes[2] - retryTimes[1];
+
+        // The intervals should be approximately the same with linear backoff
+        expect(Math.abs(secondInterval - firstInterval)).toBeLessThan(MOCK_DELAY / 2);
+      });
     });
   });
 
@@ -606,7 +603,13 @@ describe('Timeout and Retry Policies', () => {
               method: 'slow',
               params: [],
             },
-            policies: { timeout: { timeout: 50 } }, // Very short timeout
+            policies: { 
+              timeout: { timeout: 50 },
+              retryPolicy: { 
+                maxAttempts: 3,
+                retryableErrors: [ImportedErrorCode.TIMEOUT_ERROR],
+              },
+            }, // Very short timeout
           },
         ],
       };
@@ -626,19 +629,7 @@ describe('Timeout and Retry Policies', () => {
         };
       };
 
-      const executor = new FlowExecutor(flow, mockHandler, {
-        logger: testLogger,
-        enableRetries: true,
-        retryPolicy: {
-          maxAttempts: 3,
-          backoff: {
-            initial: MOCK_DELAY,
-            multiplier: 2,
-            maxDelay: 1000,
-          },
-          retryableErrors: [ImportedErrorCode.TIMEOUT_ERROR],
-        },
-      });
+      const executor = new FlowExecutor(flow, mockHandler, testLogger);
 
       // Execute and expect success after timeout retry
       const results = await executor.execute();
@@ -656,6 +647,13 @@ describe('Timeout and Retry Policies', () => {
       const flow: Flow = {
         name: 'combined-policies-test',
         description: 'Test combined step timeout and retry',
+        policies: {
+          global: {
+            retryPolicy: {
+              maxAttempts: 3,
+            },
+          },
+        },
         steps: [
           {
             name: 'combinedPolicies',
@@ -685,19 +683,7 @@ describe('Timeout and Retry Policies', () => {
         }
       };
 
-      const executor = new FlowExecutor(flow, mockHandler, {
-        logger: testLogger,
-        enableRetries: true,
-        retryPolicy: {
-          maxAttempts: 3,
-          backoff: {
-            initial: MOCK_DELAY,
-            multiplier: 2,
-            maxDelay: 1000,
-          },
-          retryableErrors: [ImportedErrorCode.TIMEOUT_ERROR, ImportedErrorCode.NETWORK_ERROR],
-        },
-      });
+      const executor = new FlowExecutor(flow, mockHandler, testLogger);
 
       // Execute and check handling of different errors
       const results = await executor.execute();
@@ -713,8 +699,15 @@ describe('Timeout and Retry Policies', () => {
       const flow: Flow = {
         name: 'policy-priority-test',
         description: 'Test policy priority',
-        timeouts: {
-          global: 1000, // Long global timeout
+        policies: {
+          global: {
+            timeout: {
+              timeout: 1000, // Long global timeout
+            },
+            retryPolicy: {
+              maxAttempts: 1,
+            },
+          },
         },
         steps: [
           {
@@ -723,7 +716,12 @@ describe('Timeout and Retry Policies', () => {
               method: 'slow',
               params: [],
             },
-            policies: { timeout: { timeout: 50 } }, // Short step timeout that should override global
+            policies: { 
+              timeout: { timeout: 50 },
+              retryPolicy: {
+                maxAttempts: 3,
+              },
+            }, 
           },
         ],
       };
@@ -734,28 +732,11 @@ describe('Timeout and Retry Policies', () => {
         currentAttempt: attempts,
       });
 
-      const executor = new FlowExecutor(flow, mockHandler, {
-        logger: testLogger,
-        enableRetries: true,
-        retryPolicy: {
-          maxAttempts: 3,
-          backoff: {
-            initial: MOCK_DELAY,
-            multiplier: 2,
-            maxDelay: 1000,
-          },
-          retryableErrors: [ImportedErrorCode.TIMEOUT_ERROR],
-        },
-      });
+      const executor = new FlowExecutor(flow, mockHandler, testLogger);
 
       // Execute and check that step-level policies are used
-      try {
-        await executor.execute();
-        throw new Error('Should have thrown TimeoutError');
-      } catch (error) {
-        expect(error).toBeDefined();
-        expect(attempts.count).toBe(3); // Should use retry policy (3 attempts)
-      }
+      await expectError(executor.execute(), { errorClass: ExecutionError, messageIncludes: 'timed out' });
+      expect(attempts.count).toBe(3); // Should use retry policy (3 attempts)
     });
   });
 
@@ -789,7 +770,7 @@ describe('Timeout and Retry Policies', () => {
       });
 
       const executor = new FlowExecutor(flow, handler, testLogger);
-      await expect(executor.execute()).rejects.toThrow(/timed out|TimeoutError/);
+      await expectError(executor.execute(), { errorClass: ExecutionError, messageIncludes: 'timed out' });
       expect(abortHandlerCalled).toBe(true);
     });
 
@@ -849,61 +830,39 @@ describe('Timeout and Retry Policies', () => {
         testLogger.debug('[test] Called externalController.abort()');
       }, 10);
 
-      await expect(promise).rejects.toThrow(/timed out|TimeoutError/);
+      await expectError(promise, { errorClass: ExecutionError, messageIncludes: /timed out|TimeoutError/ });
     });
 
     it('should abort a request if the promise is aborted', async () => {
+      let abortCalled = false;
+      const mockHandler = jest.fn((request, opts) => {
+        return new Promise((_, reject) => {
+          if (opts?.signal) {
+            opts.signal.addEventListener('abort', () => {
+              abortCalled = true;
+              reject(new Error('Aborted by signal'));
+            });
+          }
+          // Never resolve, only reject on abort
+        });
+      });
+
       const flow: Flow = {
-        name: 'abort-test',
-        description: 'Test abort behavior',
+        name: 'timeout-abort-signal-test',
+        description: 'Should abort handler on timeout',
         steps: [
           {
-            name: 'abortableStep',
-            request: { method: 'test.method', params: {} },
+            name: 'timeoutStep',
+            policies: { timeout: { timeout: 50 } },
+            request: { method: 'slow', params: [] },
           },
         ],
       };
 
-      // Create a promise and controller that we can use to test abort
-      const abortController = new AbortController();
+      const executor = new FlowExecutor(flow, mockHandler, testLogger);
 
-      // Abort after a short delay to simulate a timeout
-      setTimeout(() => {
-        abortController.abort();
-        testLogger.debug('[test] AbortController aborted');
-      }, 10);
-
-      // Create a mock handler with debug logging and a delay
-      const mockHandler = createMockHandler({
-        onAbort: () => testLogger.debug('[mockHandler] onAbort called'),
-        delay: 100,
-      });
-
-      const policyResolver = new PolicyResolver(flow, testLogger);
-      const executor = new RequestStepExecutor(mockHandler, testLogger, policyResolver);
-      const context = {
-        referenceResolver: {
-          resolveReferences: (value: any) => value,
-        },
-        signal: abortController.signal,
-        flow,
-        stepResults: new Map(),
-      } as unknown as StepExecutionContext;
-
-      try {
-        await executor.execute(flow.steps[0], context);
-        // If we reach here, the request was not aborted or timed out as expected
-        throw new Error(
-          'Expected the request to be aborted or timed out, but it completed successfully',
-        );
-      } catch (error) {
-        testLogger.debug(`[test] Caught error: ${String(error)}`);
-        if (!/timed out|TimeoutError/.test(String(error))) {
-          throw new Error(
-            `Expected error to match /timed out|TimeoutError/, but got: ${String(error)}`,
-          );
-        }
-      }
+      await expect(executor.execute()).rejects.toThrow(/timed out|TimeoutError/);
+      expect(abortCalled).toBe(true);
     });
   });
 
@@ -933,12 +892,7 @@ describe('Timeout and Retry Policies', () => {
       const mockHandler = createMockHandler({ delay: 100 });
       const executor = new FlowExecutor(flow, mockHandler, { logger: testLogger });
 
-      try {
-        await executor.execute();
-        throw new Error('Should have thrown an error');
-      } catch (error) {
-        expect(String(error)).toContain('timed out');
-      }
+      await expectError(executor.execute(), { errorClass: ExecutionError, messageIncludes: 'timed out' });
     });
   });
 
@@ -971,12 +925,7 @@ describe('Timeout and Retry Policies', () => {
       const controller = new AbortController();
 
       // Pass the signal to executor.execute
-      try {
-        await executor.execute({ signal: controller.signal });
-        throw new Error('Should have thrown an error');
-      } catch (error) {
-        expect(String(error)).toContain('timed out');
-      }
+      await expectError(executor.execute({ signal: controller.signal }), { errorClass: ExecutionError, messageIncludes: 'timed out' });
     });
   });
 });

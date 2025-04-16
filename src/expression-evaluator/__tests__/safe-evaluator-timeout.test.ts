@@ -5,7 +5,6 @@ import { TimeoutError } from '../../errors/timeout-error';
 import { defaultLogger } from '../../util/logger';
 
 // Mock dependencies
-jest.mock('../../util/timeout-resolver');
 jest.mock('../../reference-resolver');
 jest.mock('../tokenizer', () => {
   return {

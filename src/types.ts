@@ -93,25 +93,9 @@ export interface Flow {
   steps: Step[];
   context?: Record<string, any>;
   /**
-   * @deprecated Use policies.global and policies.step instead
-   */
-  timeouts?: TimeoutOptions;
-  /**
    * Global and step-level policies for the flow (metaschema-compliant)
    */
   policies?: FlowPolicies;
-  /**
-   * @deprecated Use policies.global.retryPolicy instead
-   */
-  retryPolicy?: {
-    maxAttempts?: number;
-    backoff?: {
-      initial?: number;
-      multiplier?: number;
-      maxDelay?: number;
-    };
-    retryableErrors?: string[];
-  };
 }
 
 export interface Step {
@@ -145,31 +129,7 @@ export interface Step {
   stop?: {
     endWorkflow?: boolean;
   };
-  /**
-   * Timeout for this specific step in milliseconds.
-   * Takes precedence over flow-level timeouts.
-   * @minimum 50 - Must be at least 50ms
-   * @maximum 3600000 - Cannot exceed 1 hour (3600000ms)
-   */
   timeout?: number;
-  /**
-   * Fallback configuration for when this step times out
-   */
-  timeoutFallback?: {
-    /**
-     * Static value to use as the step result if timeout occurs
-     */
-    value?: any;
-    /**
-     * Expression to evaluate to get the fallback value
-     */
-    expression?: string;
-    /**
-     * Whether to continue executing the flow after a timeout occurs
-     * @default false
-     */
-    continueExecution?: boolean;
-  };
 }
 
 export interface JsonRpcRequest {
@@ -240,53 +200,6 @@ export interface DependencyGraph {
     from: string;
     to: string;
   }>;
-}
-
-/**
- * Timeout configuration options for different step types
- */
-export interface TimeoutOptions {
-  /**
-   * Global timeout for all steps (ms)
-   * @minimum 50 - Must be at least 50ms
-   * @maximum 3600000 - Cannot exceed 1 hour (3600000ms)
-   */
-  global?: number;
-
-  /**
-   * Timeout for all request steps (ms)
-   * @minimum 50 - Must be at least 50ms
-   * @maximum 3600000 - Cannot exceed 1 hour (3600000ms)
-   */
-  request?: number;
-
-  /**
-   * Timeout for all transform steps (ms)
-   * @minimum 50 - Must be at least 50ms
-   * @maximum 3600000 - Cannot exceed 1 hour (3600000ms)
-   */
-  transform?: number;
-
-  /**
-   * Timeout for all condition steps (ms)
-   * @minimum 50 - Must be at least 50ms
-   * @maximum 3600000 - Cannot exceed 1 hour (3600000ms)
-   */
-  condition?: number;
-
-  /**
-   * Timeout for all loop steps (ms)
-   * @minimum 50 - Must be at least 50ms
-   * @maximum 3600000 - Cannot exceed 1 hour (3600000ms)
-   */
-  loop?: number;
-
-  /**
-   * Timeout for expression evaluation (ms)
-   * @minimum 50 - Must be at least 50ms
-   * @maximum 3600000 - Cannot exceed 1 hour (3600000ms)
-   */
-  expression?: number;
 }
 
 /**

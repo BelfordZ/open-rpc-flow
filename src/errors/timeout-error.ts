@@ -1,13 +1,13 @@
-import { FlowError } from './base';
+import { ExecutionError } from './base';
 import { ErrorCode } from './codes';
 import { Step } from '../types';
 import { StepType } from '../step-executors/types';
 
 /**
  * TimeoutError thrown when a step or expression exceeds its configured timeout.
- * Extends FlowError with additional context about the timeout.
+ * Extends ExecutionError with additional context about the timeout.
  */
-export class TimeoutError extends FlowError {
+export class TimeoutError extends ExecutionError {
   /**
    * The step that timed out
    */
@@ -42,6 +42,7 @@ export class TimeoutError extends FlowError {
    * @param step - The step that timed out (if applicable)
    * @param stepType - The type of step that timed out (if applicable)
    * @param isExpressionTimeout - Whether the timeout occurred in an expression evaluation
+   * @param cause - The cause of the error (if applicable)
    */
   constructor(
     message: string,
@@ -50,24 +51,20 @@ export class TimeoutError extends FlowError {
     step?: Step,
     stepType?: StepType,
     isExpressionTimeout: boolean = false,
+    cause?: Error,
   ) {
-    const context = {
-      timeout,
-      executionTime,
+    super(message, {
+      code: 'TIMEOUT_ERROR',
       step: step ? { name: step.name } : undefined,
       stepType,
-      isExpressionTimeout,
-    };
+    }, cause);
 
-    super(message, ErrorCode.TIMEOUT_ERROR, context);
-
+    this.name = 'TimeoutError';
     this.timeout = timeout;
     this.executionTime = executionTime;
     this.step = step;
     this.stepType = stepType;
     this.isExpressionTimeout = isExpressionTimeout;
-
-    this.name = 'TimeoutError';
     Object.setPrototypeOf(this, TimeoutError.prototype);
   }
 
@@ -122,5 +119,9 @@ export class TimeoutError extends FlowError {
       stepType,
       true,
     );
+  }
+
+  toString(options?: { includeStack?: boolean }): string {
+    return super.toString(options);
   }
 }

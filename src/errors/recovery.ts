@@ -1,4 +1,4 @@
-import { FlowError, ExecutionError } from './base';
+import { FlowError, ExecutionError, MaxRetriesExceededError } from './base';
 import { ErrorCode } from './codes';
 import { Logger } from '../util/logger';
 
@@ -26,6 +26,7 @@ export interface RetryPolicy {
  */
 export class RetryableOperation<T> {
   private logger: Logger;
+  private allErrors: any[] = [];
 
   constructor(
     private operation: () => Promise<T>,
@@ -56,6 +57,7 @@ export class RetryableOperation<T> {
         this.logger.debug('Operation succeeded', { attempt });
         return result;
       } catch (error: unknown) {
+        this.allErrors.push(error);
         // Add detailed debugging
         if (error instanceof FlowError) {
           this.logger.debug('Caught FlowError', {
@@ -96,7 +98,7 @@ export class RetryableOperation<T> {
             maxAttempts: this.policy.maxAttempts,
             lastError: error instanceof Error ? error.message : String(error),
           });
-          throw new ExecutionError(
+          throw new MaxRetriesExceededError(
             'Max retry attempts exceeded',
             {
               code: ErrorCode.MAX_RETRIES_EXCEEDED,
@@ -111,6 +113,7 @@ export class RetryableOperation<T> {
                     : 'unknown',
               policy: this.policy,
             },
+            [...this.allErrors],
             toError(error),
           );
         }

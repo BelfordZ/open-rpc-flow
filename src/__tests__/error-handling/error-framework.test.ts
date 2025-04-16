@@ -138,7 +138,7 @@ describe('Error Framework', () => {
       const error = (await retryable.execute().catch((e) => e)) as FlowError;
 
       // Check by constructor name instead of instanceof
-      expect(error.constructor.name).toBe('ExecutionError');
+      expect(error.constructor.name).toBe('MaxRetriesExceededError');
       expect(error.message).toBe('Max retry attempts exceeded');
       expect(error.context.code).toBe(ErrorCode.MAX_RETRIES_EXCEEDED);
       expect(operation).toHaveBeenCalledTimes(3);

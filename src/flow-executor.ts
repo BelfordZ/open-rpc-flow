@@ -18,7 +18,6 @@ import { RetryPolicy } from './errors/recovery';
 import { ErrorCode } from './errors/codes';
 import { TimeoutError } from './errors/timeout-error';
 import { ExecutionError } from './errors/base';
-import { TimeoutResolver } from './util/timeout-resolver';
 import { PolicyResolver } from './util/policy-resolver';
 
 /**
@@ -45,8 +44,6 @@ export interface FlowExecutorOptions {
   eventOptions?: Partial<FlowEventOptions>;
   /** Retry policy for request steps */
   retryPolicy?: RetryPolicy;
-  /** Whether to enable retries */
-  enableRetries?: boolean;
 }
 
 /**
@@ -64,8 +61,6 @@ export class FlowExecutor {
   private stepExecutors: StepExecutor[];
   private logger: Logger;
   private retryPolicy: RetryPolicy | null;
-  private enableRetries: boolean;
-  private timeoutResolver: TimeoutResolver;
   private policyResolver: PolicyResolver;
 
   constructor(
@@ -93,55 +88,24 @@ export class FlowExecutor {
     this.events = new FlowExecutorEvents(options?.eventOptions);
 
     // Initialize error handling options
-    this.enableRetries = options?.enableRetries ?? false;
-
-    // Initialize retry policy if enabled
-    if (this.enableRetries) {
-      // Priority: options.retryPolicy > flow.policies.global > flow.retryPolicy > DEFAULT_RETRY_POLICY
-      if (options?.retryPolicy) {
-        this.retryPolicy = options.retryPolicy;
-      } else if (flow.policies?.global?.retryPolicy) {
-        // Convert flow.policies.global.retryPolicy to RetryPolicy format
-        this.retryPolicy = {
-          maxAttempts:
-            flow.policies.global.retryPolicy.maxAttempts ?? DEFAULT_RETRY_POLICY.maxAttempts,
-          backoff: {
-            initial:
-              flow.policies.global.retryPolicy.backoff?.initial ??
-              DEFAULT_RETRY_POLICY.backoff.initial,
-            multiplier:
-              flow.policies.global.retryPolicy.backoff?.multiplier ??
-              DEFAULT_RETRY_POLICY.backoff.multiplier,
-            maxDelay:
-              flow.policies.global.retryPolicy.backoff?.maxDelay ??
-              DEFAULT_RETRY_POLICY.backoff.maxDelay,
-            strategy: flow.policies.global.retryPolicy.backoff?.strategy ?? 'exponential',
-          },
-          // Cast string[] to ErrorCode[] since we're sure they're valid error codes
-          retryableErrors: (flow.policies.global.retryPolicy.retryableErrors ??
-            DEFAULT_RETRY_POLICY.retryableErrors) as ErrorCode[],
-        };
-      } else if (flow.retryPolicy) {
-        // Deprecated but still supported for backward compatibility
-        // Convert flow.retryPolicy to RetryPolicy format
-        this.retryPolicy = {
-          maxAttempts: flow.retryPolicy.maxAttempts ?? DEFAULT_RETRY_POLICY.maxAttempts,
-          backoff: {
-            initial: flow.retryPolicy.backoff?.initial ?? DEFAULT_RETRY_POLICY.backoff.initial,
-            multiplier:
-              flow.retryPolicy.backoff?.multiplier ?? DEFAULT_RETRY_POLICY.backoff.multiplier,
-            maxDelay: flow.retryPolicy.backoff?.maxDelay ?? DEFAULT_RETRY_POLICY.backoff.maxDelay,
-            strategy: 'exponential', // Default for backward compatibility
-          },
-          // Cast string[] to ErrorCode[] since we're sure they're valid error codes
-          retryableErrors: (flow.retryPolicy.retryableErrors ??
-            DEFAULT_RETRY_POLICY.retryableErrors) as ErrorCode[],
-        };
-      } else {
-        this.retryPolicy = DEFAULT_RETRY_POLICY;
-      }
+    if (options?.retryPolicy) {
+      this.retryPolicy = options.retryPolicy;
+    } else if (flow.policies?.global?.retryPolicy) {
+      this.retryPolicy = {
+        maxAttempts: flow.policies.global.retryPolicy.maxAttempts ?? 1,
+        backoff: {
+          initial: flow.policies.global.retryPolicy.backoff?.initial ?? DEFAULT_RETRY_POLICY.backoff.initial,
+          multiplier: flow.policies.global.retryPolicy.backoff?.multiplier ?? DEFAULT_RETRY_POLICY.backoff.multiplier,
+          maxDelay: flow.policies.global.retryPolicy.backoff?.maxDelay ?? DEFAULT_RETRY_POLICY.backoff.maxDelay,
+          strategy: flow.policies.global.retryPolicy.backoff?.strategy ?? 'exponential',
+        },
+        retryableErrors: (flow.policies.global.retryPolicy.retryableErrors ?? DEFAULT_RETRY_POLICY.retryableErrors) as ErrorCode[],
+      };
     } else {
-      this.retryPolicy = null;
+      this.retryPolicy = {
+        ...DEFAULT_RETRY_POLICY,
+        maxAttempts: 1,
+      };
     }
 
     // Initialize shared execution context
@@ -161,9 +125,6 @@ export class FlowExecutor {
       logger: this.logger,
       flow: this.flow,
     };
-
-    // Initialize TimeoutResolver for resolving timeouts
-    this.timeoutResolver = new TimeoutResolver(this.flow, undefined, this.logger);
 
     // Initialize PolicyResolver for policy-based execution
     const policyOverrides: Record<string, any> = {};
@@ -203,38 +164,6 @@ export class FlowExecutor {
   }
 
   /**
-   * Update error handling options
-   */
-  updateErrorHandlingOptions(options: {
-    retryPolicy?: RetryPolicy;
-    enableRetries?: boolean;
-  }): void {
-    // Update enable flags if provided
-    if (options.enableRetries !== undefined) {
-      this.enableRetries = options.enableRetries;
-    }
-
-    // Update retry policy if provided
-    if (options.retryPolicy) {
-      this.retryPolicy = options.retryPolicy;
-    }
-
-    // Replace the request step executor with updated options
-    const requestExecutorIndex = this.stepExecutors.findIndex(
-      (executor) => executor instanceof RequestStepExecutor,
-    );
-
-    if (requestExecutorIndex >= 0) {
-      this.stepExecutors[requestExecutorIndex] = this.createRequestStepExecutor();
-    }
-
-    this.logger.debug('Updated error handling options', {
-      enableRetries: this.enableRetries,
-      retryPolicy: this.retryPolicy,
-    });
-  }
-
-  /**
    * Execute the flow and return all step results
    */
   async execute(options?: { signal?: AbortSignal }): Promise<Map<string, any>> {
@@ -242,29 +171,6 @@ export class FlowExecutor {
     let globalTimeoutId: NodeJS.Timeout | undefined;
     const globalAbortController = new AbortController();
     try {
-      // Set up global timeout if configured in the flow
-      // Use TimeoutResolver to get the global timeout
-      const globalTimeout = this.timeoutResolver.resolveGlobalTimeout();
-
-      // Combine external signal with our timeout signal if provided
-      if (options?.signal) {
-        // Forward abort from external signal to our controller
-        options.signal.addEventListener('abort', () => {
-          globalAbortController.abort(options.signal?.reason);
-        });
-      }
-
-      // Add abort signal to execution context
-      this.executionContext.signal = globalAbortController.signal;
-
-      if (globalTimeout && globalTimeout > 0) {
-        this.logger.debug('Setting global flow timeout', { timeout: globalTimeout });
-        globalTimeoutId = setTimeout(() => {
-          this.logger.debug('Global flow timeout reached', { timeout: globalTimeout });
-          globalAbortController.abort(new Error('Global flow timeout reached'));
-        }, globalTimeout);
-      }
-
       // Get steps in dependency order
       const orderedSteps = this.dependencyResolver.getExecutionOrder();
       const orderedStepNames = orderedSteps.map((s) => s.name);
@@ -319,7 +225,7 @@ export class FlowExecutor {
         error.name === 'AbortError'
       ) {
         const duration = Date.now() - startTime;
-        const flowTimeout = this.flow.timeouts?.global || 0;
+        const flowTimeout = this.flow.policies?.global?.timeout?.timeout || 0;
 
         // Create a detailed timeout error for the flow
         const timeoutError = new TimeoutError(

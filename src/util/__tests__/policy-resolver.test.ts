@@ -97,34 +97,48 @@ describe('PolicyResolver', () => {
 
   it('resolveRetryPolicy works for all levels', () => {
     const retryObj = { maxAttempts: 7 };
+    const expectedMerged = {
+      maxAttempts: 7,
+      backoff: {
+        initial: 100,
+        multiplier: 2,
+        maxDelay: 5000,
+        strategy: 'exponential',
+      },
+      retryableErrors: [
+        'NETWORK_ERROR',
+        'TIMEOUT_ERROR',
+        'OPERATION_TIMEOUT',
+      ],
+    };
     // Step-level
     const step: Step = { ...baseStep, policies: { retryPolicy: retryObj } };
     let resolver = new PolicyResolver(baseFlow, logger);
-    expect(resolver.resolveRetryPolicy(step, 'transform')).toBe(retryObj);
+    expect(resolver.resolveRetryPolicy(step, 'transform')).toEqual(expectedMerged);
     // Per-stepType
     let flow: Flow = {
       ...baseFlow,
       policies: { step: { transform: { retryPolicy: retryObj } } as any },
     };
     resolver = new PolicyResolver(flow, logger);
-    expect(resolver.resolveRetryPolicy(baseStep, 'transform')).toBe(retryObj);
+    expect(resolver.resolveRetryPolicy(baseStep, 'transform')).toEqual(expectedMerged);
     // Step-type default
     flow = {
       ...baseFlow,
       policies: { step: { retryPolicy: retryObj } },
     };
     resolver = new PolicyResolver(flow, logger);
-    expect(resolver.resolveRetryPolicy(baseStep, 'transform')).toBe(retryObj);
+    expect(resolver.resolveRetryPolicy(baseStep, 'transform')).toEqual(expectedMerged);
     // Global
     flow = {
       ...baseFlow,
       policies: { global: { retryPolicy: retryObj } },
     };
     resolver = new PolicyResolver(flow, logger);
-    expect(resolver.resolveRetryPolicy(baseStep, 'transform')).toBe(retryObj);
+    expect(resolver.resolveRetryPolicy(baseStep, 'transform')).toEqual(expectedMerged);
     // Fallback
     resolver = new PolicyResolver(baseFlow, logger);
-    expect(resolver.resolveRetryPolicy(baseStep, 'transform', retryObj)).toBe(retryObj);
+    expect(resolver.resolveRetryPolicy(baseStep, 'transform', retryObj)).toEqual(expectedMerged);
   });
 
   it('returns undefined if nothing found and no fallback', () => {

@@ -85,21 +85,24 @@ export class RequestStepExecutor implements StepExecutor {
     // Create a function that captures all the request logic
     const executeRequest = async () => {
       // Create an AbortController for this request if we have a timeout
-      let abortController: AbortController | undefined;
+      const TIMEOUT_SYMBOL = Symbol('timeout');
+      let timedOut = false;
       let timeoutId: NodeJS.Timeout | undefined;
-
+      let abortController: AbortController | undefined;
       if (timeout) {
         abortController = new AbortController();
+      }
 
-        // Set up timeout to abort the request
-        timeoutId = setTimeout(() => {
-          this.logger.debug(`Step timeout exceeded`, {
-            stepName: step.name,
-            timeout,
-          });
-
-          abortController?.abort();
-        }, timeout);
+      // Set up timeout to abort the request
+      let timeoutPromise: Promise<any> | undefined = undefined;
+      if (timeout && abortController) {
+        timeoutPromise = new Promise((resolve) => {
+          timeoutId = setTimeout(() => {
+            timedOut = true;
+            abortController.abort();
+            resolve(TIMEOUT_SYMBOL);
+          }, timeout);
+        });
       }
 
       try {
@@ -135,8 +138,7 @@ export class RequestStepExecutor implements StepExecutor {
           options.signal = _context.signal;
         }
 
-        // Pass AbortSignal to JSON-RPC handler
-        const result = await this.jsonRpcHandler(
+        const handlerPromise = this.jsonRpcHandler(
           {
             jsonrpc: '2.0',
             method: requestStep.request.method,
@@ -146,35 +148,49 @@ export class RequestStepExecutor implements StepExecutor {
           Object.keys(options).length > 0 ? options : undefined,
         );
 
-        // If the request was aborted due to timeout, throw a timeout error
-        if (abortController?.signal.aborted) {
-          const executionTime = timeout || 0;
-          const timeoutError = TimeoutError.forStep(
+        let raceResult;
+        try {
+          raceResult = timeoutPromise
+            ? await Promise.race([handlerPromise, timeoutPromise])
+            : await handlerPromise;
+        } catch (error) {
+          if (timedOut) {
+            throw TimeoutError.forStep(
+              step,
+              StepType.Request,
+              timeout || 0,
+              timeout || 0
+            );
+          }
+          throw error;
+        }
+
+        if (raceResult === TIMEOUT_SYMBOL) {
+          throw TimeoutError.forStep(
             step,
             StepType.Request,
             timeout || 0,
-            executionTime,
+            timeout || 0
           );
-          throw timeoutError;
         }
 
         this.logger.debug('Request completed successfully', {
           stepName: step.name,
           requestId,
-          result,
+          result: raceResult,
         });
 
         return {
-          result,
+          result: raceResult,
           type: StepType.Request,
           metadata: {
-            hasError: result && 'error' in result,
+            hasError: raceResult && 'error' in raceResult,
             method: requestStep.request.method,
             requestId,
             timestamp: new Date().toISOString(),
           },
         };
-      } catch (error: unknown) {
+      } catch (error) {
         // Handle different error types
         if (error instanceof Error) {
           // Handle AbortError for timeouts

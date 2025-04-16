@@ -1,4 +1,4 @@
-import { Step, StepExecutionContext, JsonRpcRequest, JsonRpcHandler } from '../types';
+import { Step, StepExecutionContext, JsonRpcHandler } from '../types';
 import { StepExecutor, StepExecutionResult, JsonRpcRequestError, StepType } from './types';
 import { Logger } from '../util/logger';
 import { RequestStep } from './types';

@@ -4,7 +4,7 @@ import { ReferenceResolver } from '../../reference-resolver';
 import { TimeoutResolver } from '../../util/timeout-resolver';
 import { EnhancedTimeoutError } from '../../errors/timeout-error';
 import { TestLogger } from '../../util/logger';
-import { Flow, Step } from '../../types';
+import { Flow } from '../../types';
 import { TransformStep, StepType } from '../../step-executors/types';
 
 describe('TransformStepExecutor Timeout Tests', () => {

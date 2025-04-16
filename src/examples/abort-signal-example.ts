@@ -1,6 +1,5 @@
 import { JsonRpcHandler, JsonRpcRequest, JsonRpcHandlerOptions } from '../types';
 import { Flow } from '../index';
-import { ErrorCode } from '../errors/codes';
 
 /**
  * Example implementation of a JsonRpcHandler with AbortSignal support

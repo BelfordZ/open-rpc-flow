@@ -40,7 +40,6 @@ export class RetryableOperation<T> {
    */
   async execute(): Promise<T> {
     let attempt = 1;
-    let lastError: unknown;
 
     const strategy = this.policy.backoff.strategy || 'exponential';
 
@@ -57,9 +56,6 @@ export class RetryableOperation<T> {
         this.logger.debug('Operation succeeded', { attempt });
         return result;
       } catch (error: unknown) {
-        // Preserve the original error object for retry checks
-        lastError = error;
-
         // Add detailed debugging
         if (error instanceof FlowError) {
           this.logger.debug('Caught FlowError', {

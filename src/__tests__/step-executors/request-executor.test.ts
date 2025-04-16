@@ -2,11 +2,10 @@ import { StepExecutionContext, Step } from '../../types';
 import { JsonRpcRequestError } from '../../step-executors/types';
 import { createMockContext } from '../test-utils';
 import { TestLogger } from '../../util/logger';
-import { RetryPolicy, RetryableOperation } from '../../errors/recovery';
+import { RetryPolicy } from '../../errors/recovery';
 import { ErrorCode } from '../../errors/codes';
 import { ExecutionError } from '../../errors/base';
 import { RequestStepExecutor } from '../../step-executors';
-import { json } from 'stream/consumers';
 
 interface RequestStep extends Step {
   request: {

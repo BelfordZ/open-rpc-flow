@@ -1,6 +1,6 @@
 import { FlowExecutor } from '../../flow-executor';
-import { Flow, Step } from '../../types';
-import { ErrorCode } from '../../errors/codes';
+import { Flow } from '../../types';
+import { ErrorCode as ImportedErrorCode } from '../../errors/codes';
 import { TimeoutError, FlowError } from '../../errors/base';
 import { TestLogger } from '../../util/logger';
 import { RequestStepExecutor } from '../../step-executors/request-executor';
@@ -16,7 +16,6 @@ interface MockHandlerOptions {
   failUntilAttempt?: number;
   currentAttempt?: { count: number };
   onAbort?: () => void;
-  delayedExecution?: boolean;
 }
 
 // Helper function to create a mock JSON-RPC handler
@@ -28,7 +27,6 @@ function createMockHandler(options: MockHandlerOptions) {
     failUntilAttempt = 1,
     currentAttempt = { count: 0 },
     onAbort = () => {},
-    delayedExecution = false,
   } = options;
 
   return async (request: any, opts?: { signal?: AbortSignal }) => {
@@ -90,7 +88,7 @@ function createMockHandler(options: MockHandlerOptions) {
         if (errorType === 'TIMEOUT') {
           throw new TimeoutError('Operation timed out', { step: request.method });
         } else if (errorType === 'NETWORK') {
-          throw new FlowError('Network error', ErrorCode.NETWORK_ERROR, {});
+          throw new FlowError('Network error', ImportedErrorCode.NETWORK_ERROR, {});
         } else {
           throw new Error('Generic error');
         }
@@ -329,7 +327,7 @@ describe('Timeout and Retry Policies', () => {
             multiplier: 2,
             maxDelay: 1000,
           },
-          retryableErrors: [ErrorCode.NETWORK_ERROR],
+          retryableErrors: [ImportedErrorCode.NETWORK_ERROR],
         },
       });
 
@@ -376,7 +374,7 @@ describe('Timeout and Retry Policies', () => {
             multiplier: 2,
             maxDelay: 1000,
           },
-          retryableErrors: [ErrorCode.NETWORK_ERROR],
+          retryableErrors: [ImportedErrorCode.NETWORK_ERROR],
         },
       });
 
@@ -420,11 +418,7 @@ describe('Timeout and Retry Policies', () => {
         const stepName = request.method;
         attempts[stepName] = (attempts[stepName] || 0) + 1;
         if (attempts[stepName] === 1) {
-          throw new (require('../../errors/base').FlowError)(
-            'Network error',
-            require('../../errors/codes').ErrorCode.NETWORK_ERROR,
-            {},
-          );
+          throw new FlowError('Network error', ImportedErrorCode.NETWORK_ERROR, {});
         }
         return {
           jsonrpc: '2.0',
@@ -443,7 +437,7 @@ describe('Timeout and Retry Policies', () => {
             multiplier: 2,
             maxDelay: 1000,
           },
-          retryableErrors: [ErrorCode.NETWORK_ERROR],
+          retryableErrors: [ImportedErrorCode.NETWORK_ERROR],
         },
       });
 
@@ -490,7 +484,7 @@ describe('Timeout and Retry Policies', () => {
         recordRetryTime();
 
         if (attempts.count <= 2) {
-          throw new FlowError('Network error', ErrorCode.NETWORK_ERROR, {});
+          throw new FlowError('Network error', ImportedErrorCode.NETWORK_ERROR, {});
         }
 
         return {
@@ -510,7 +504,7 @@ describe('Timeout and Retry Policies', () => {
             multiplier: 2,
             maxDelay: 1000,
           },
-          retryableErrors: [ErrorCode.NETWORK_ERROR],
+          retryableErrors: [ImportedErrorCode.NETWORK_ERROR],
         },
       });
 
@@ -556,7 +550,7 @@ describe('Timeout and Retry Policies', () => {
         recordRetryTime();
 
         if (attempts.count <= 2) {
-          throw new FlowError('Network error', ErrorCode.NETWORK_ERROR, {});
+          throw new FlowError('Network error', ImportedErrorCode.NETWORK_ERROR, {});
         }
 
         return {
@@ -576,7 +570,7 @@ describe('Timeout and Retry Policies', () => {
             multiplier: 1,
             maxDelay: 1000,
           },
-          retryableErrors: [ErrorCode.NETWORK_ERROR],
+          retryableErrors: [ImportedErrorCode.NETWORK_ERROR],
         },
       });
 
@@ -615,13 +609,13 @@ describe('Timeout and Retry Policies', () => {
       };
 
       // Create a handler that times out for the first attempt, then speeds up
-      const mockHandler = async (request: any, opts?: { signal?: AbortSignal }) => {
+      const mockHandler = async (request: any) => {
         attempts.count++;
         testLogger.debug(`[mockHandler] Attempt: ${attempts.count}`);
         if (attempts.count === 1) {
           // Throw a TimeoutError with the correct error code
           throw new TimeoutError('Operation timed out', {
-            code: ErrorCode.TIMEOUT_ERROR,
+            code: ImportedErrorCode.TIMEOUT_ERROR,
             step: request.method,
           });
         }
@@ -642,7 +636,7 @@ describe('Timeout and Retry Policies', () => {
             multiplier: 2,
             maxDelay: 1000,
           },
-          retryableErrors: [ErrorCode.TIMEOUT_ERROR],
+          retryableErrors: [ImportedErrorCode.TIMEOUT_ERROR],
         },
       });
 
@@ -684,7 +678,7 @@ describe('Timeout and Retry Policies', () => {
           return { jsonrpc: '2.0', id: request.id, result: 'Should not reach here' };
         } else if (attempts.count === 2) {
           // Second attempt: network error
-          throw new FlowError('Network error', ErrorCode.NETWORK_ERROR, {});
+          throw new FlowError('Network error', ImportedErrorCode.NETWORK_ERROR, {});
         } else {
           // Third attempt: success
           return { jsonrpc: '2.0', id: request.id, result: 'Success after retries' };
@@ -701,7 +695,7 @@ describe('Timeout and Retry Policies', () => {
             multiplier: 2,
             maxDelay: 1000,
           },
-          retryableErrors: [ErrorCode.TIMEOUT_ERROR, ErrorCode.NETWORK_ERROR],
+          retryableErrors: [ImportedErrorCode.TIMEOUT_ERROR, ImportedErrorCode.NETWORK_ERROR],
         },
       });
 
@@ -750,7 +744,7 @@ describe('Timeout and Retry Policies', () => {
             multiplier: 2,
             maxDelay: 1000,
           },
-          retryableErrors: [ErrorCode.TIMEOUT_ERROR],
+          retryableErrors: [ImportedErrorCode.TIMEOUT_ERROR],
         },
       });
 

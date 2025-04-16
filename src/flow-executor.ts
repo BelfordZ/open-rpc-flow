@@ -1,7 +1,7 @@
 import { ReferenceResolver } from './reference-resolver';
 import { SafeExpressionEvaluator } from './expression-evaluator/safe-evaluator';
 import { DependencyResolver } from './dependency-resolver';
-import { Flow, Step, JsonRpcRequest, StepExecutionContext, JsonRpcHandler } from './types';
+import { Flow, Step, StepExecutionContext, JsonRpcHandler } from './types';
 import {
   StepExecutor,
   StepExecutionResult,

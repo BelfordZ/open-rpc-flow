@@ -1,6 +1,6 @@
 import { Flow, FlowExecutor, JsonRpcRequest } from '../index';
 import { StepType } from '../step-executors/types';
-import { TestLogger, noLogger } from '../util/logger';
+import { TestLogger } from '../util/logger';
 
 const testLogger = new TestLogger('FlowExecutorTest');
 

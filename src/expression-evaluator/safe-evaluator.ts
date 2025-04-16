@@ -111,7 +111,9 @@ export class SafeExpressionEvaluator {
   } as const;
 
   // Add whitelist of allowed global functions
-  private static readonly ALLOWED_FUNCTIONS = {
+  private static readonly ALLOWED_FUNCTIONS: {
+    [key: string]: (...args: any[]) => any;
+  } = {
     Number,
     String,
     Boolean,
@@ -750,7 +752,7 @@ export class SafeExpressionEvaluator {
         const argVals = ast.args.map((arg: AstNode) =>
           this.evaluateAst(arg, context, startTime, expression, step),
         );
-        return (fn as Function).apply(null, argVals);
+        return fn(...argVals);
       }
 
       default:

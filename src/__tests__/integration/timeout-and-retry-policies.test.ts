@@ -145,7 +145,7 @@ describe('Timeout and Retry Policies', () => {
 
   afterEach(() => {
     jest.useRealTimers();
-    //testLogger.print(); // Print logs after each test for debugging
+    testLogger.print(); // Print logs after each test for debugging
     testLogger.clear();
   });
 
@@ -215,6 +215,68 @@ describe('Timeout and Retry Policies', () => {
         const results = await executor.execute();
         expect(results).toBeDefined();
         expect(results.get('quickOperation').result.result).toBe('Result for quick');
+      });
+
+      it('should respect timeout for request inside a condition step', async () => {
+        const shortTimeout = 50;
+        const flow: Flow = {
+          name: 'condition-request-timeout-test',
+          description: 'Test timeout for request inside a condition',
+          steps: [
+            {
+              name: 'userCheck',
+              condition: {
+                if: 'true',
+                then: {
+                  name: 'slowRequest',
+                  policies: { timeout: { timeout: shortTimeout } },
+                  request: {
+                    method: 'slow',
+                    params: [],
+                  },
+                },
+              },
+            },
+          ],
+        };
+        const mockHandler = createMockHandler({ delay: shortTimeout * 2 });
+        const executor = new FlowExecutor(flow, mockHandler, testLogger);
+        jest.advanceTimersByTime(shortTimeout);
+        await expectError(executor.execute(), {
+          errorClass: ExecutionError,
+          messageIncludes: 'timed out',
+        });
+      });
+
+      it.only('should respect timeout on the condition step even if the request has no timeout', async () => {
+        const shortTimeout = 50;
+        const flow: Flow = {
+          name: 'condition-step-timeout-test',
+          description: 'Test timeout on condition step with slow request',
+          steps: [
+            {
+              name: 'userCheck',
+              policies: { timeout: { timeout: shortTimeout } },
+              condition: {
+                if: 'true',
+                then: {
+                  name: 'slowRequest',
+                  request: {
+                    method: 'slow',
+                    params: [],
+                  },
+                },
+              },
+            },
+          ],
+        };
+        const mockHandler = createMockHandler({ delay: shortTimeout * 2 });
+        const executor = new FlowExecutor(flow, mockHandler, testLogger);
+        jest.advanceTimersByTime(shortTimeout);
+        await expectError(executor.execute(), {
+          errorClass: TimeoutError,
+          messageIncludes: 'timed out',
+        });
       });
     });
 

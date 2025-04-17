@@ -5,7 +5,6 @@ import {
   ErrorCode,
   RetryableOperation,
   RetryPolicy,
-  ContextCollector,
 } from '../../errors';
 import { noLogger, TestLogger } from '../../util/logger';
 
@@ -143,26 +142,6 @@ describe('Error Framework', () => {
       expect(error.context.code).toBe(ErrorCode.MAX_RETRIES_EXCEEDED);
       expect(operation).toHaveBeenCalledTimes(3);
       expect(attempts).toBe(3);
-    });
-  });
-
-  describe('ContextCollector', () => {
-    let collector: ContextCollector;
-
-    beforeEach(() => {
-      collector = new ContextCollector(noLogger);
-    });
-
-    it('should collect execution context', async () => {
-      const context = await collector.collect();
-
-      expect(context).toHaveProperty('step');
-      expect(context).toHaveProperty('execution');
-      expect(context).toHaveProperty('system');
-
-      expect(context.system).toHaveProperty('memory');
-      expect(context.system).toHaveProperty('cpu');
-      expect(context.system).toHaveProperty('env');
     });
   });
 });

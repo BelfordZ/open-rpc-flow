@@ -262,6 +262,7 @@ export class FlowExecutor {
   private async executeStep(
     step: Step,
     extraContext: Record<string, any> = {},
+    signal?: AbortSignal
   ): Promise<StepExecutionResult> {
     const stepStartTime = Date.now();
 
@@ -287,7 +288,7 @@ export class FlowExecutor {
         executor: executor.constructor.name,
       });
 
-      const result = await executor.execute(step, this.executionContext, extraContext);
+      const result = await executor.execute(step, this.executionContext, extraContext, signal);
 
       // Only emit step complete for nested steps
       if (Object.keys(extraContext).length > 0) {

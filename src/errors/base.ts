@@ -117,3 +117,14 @@ export class MaxRetriesExceededError extends ExecutionError {
     return str;
   }
 }
+
+/**
+ * Error class for loop step execution errors
+ */
+export class LoopStepExecutionError extends ExecutionError {
+  constructor(message: string, context: Record<string, any>, cause?: Error) {
+    super(message, { ...context, code: ErrorCode.EXECUTION_ERROR }, cause);
+    this.name = 'LoopStepExecutionError';
+    Object.setPrototypeOf(this, LoopStepExecutionError.prototype);
+  }
+}

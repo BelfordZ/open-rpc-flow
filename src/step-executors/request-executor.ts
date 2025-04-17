@@ -3,7 +3,7 @@ import { StepExecutor, StepExecutionResult, JsonRpcRequestError, StepType } from
 import { Logger } from '../util/logger';
 import { RequestStep } from './types';
 import { RetryPolicy, RetryableOperation } from '../errors/recovery';
-import { ExecutionError } from '../errors/base';
+import { ExecutionError, ValidationError } from '../errors/base';
 import { TimeoutError } from '../errors/timeout-error';
 import { ErrorCode } from '../errors/codes';
 import { PolicyResolver } from '../util/policy-resolver';
@@ -62,9 +62,10 @@ export class RequestStepExecutor implements StepExecutor {
     step: Step,
     _context: StepExecutionContext,
     extraContext: Record<string, any> = {},
+    signal?: AbortSignal
   ): Promise<StepExecutionResult> {
     if (!this.canExecute(step)) {
-      throw new Error('Invalid step type for RequestStepExecutor');
+      throw new ValidationError('Invalid step type for RequestStepExecutor', { step });
     }
 
     const requestStep = step as RequestStep;
@@ -108,12 +109,12 @@ export class RequestStepExecutor implements StepExecutor {
       try {
         // Validate method name
         if (typeof requestStep.request.method !== 'string' || !requestStep.request.method.trim()) {
-          throw new Error('Invalid method name: must be a non-empty string');
+          throw new ValidationError('Invalid method name: must be a non-empty string', { method: requestStep.request.method, stepName: step.name });
         }
 
         // Validate params
         if (requestStep.request.params !== null && typeof requestStep.request.params !== 'object') {
-          throw new Error('Invalid params: must be an object, array, or null');
+          throw new ValidationError('Invalid params: must be an object, array, or null', { params: requestStep.request.params, stepName: step.name });
         }
 
         // Resolve references in params
@@ -131,11 +132,13 @@ export class RequestStepExecutor implements StepExecutor {
         // Create options object with AbortSignal if available
         const options: Record<string, any> = {};
 
-        // Use either our timeout's abort signal or the one from context
+        // Use either our timeout's abort signal or the one from context or the passed signal
         if (abortController?.signal) {
           options.signal = abortController.signal;
         } else if (_context.signal) {
           options.signal = _context.signal;
+        } else if (signal) {
+          options.signal = signal;
         }
 
         const handlerPromise = this.jsonRpcHandler(

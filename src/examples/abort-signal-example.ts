@@ -57,11 +57,15 @@ export const exampleJsonRpcHandler: JsonRpcHandler = async function (
 export const exampleFlow: Flow = {
   name: 'example-flow-with-timeouts',
   description: 'Flow with timeout configuration',
-  timeouts: {
-    // Global timeout applies to the entire flow
-    global: 30000, // 30 seconds
-    // Step type-specific timeouts apply to all steps of that type
-    request: 5000, // 5 seconds for all request steps by default
+  policies: {
+    global: {
+      timeout: { timeout: 30000 }, // 30 seconds for the whole flow
+    },
+    step: {
+      request: {
+        timeout: { timeout: 5000 }, // 5 seconds for all request steps by default
+      },
+    },
   },
   steps: [
     {
@@ -78,12 +82,8 @@ export const exampleFlow: Flow = {
         method: 'example.slowMethod',
         params: { operation: 'complex-calculation' },
       },
-      // Step-specific timeout overrides the default
-      timeout: 10000, // 10 seconds
-      // Fallback configuration in case of timeout
-      timeoutFallback: {
-        value: { status: 'timeout', result: null },
-        continueExecution: true, // Continue flow execution even if this step times out
+      policies: {
+        timeout: { timeout: 10000 }, // 10 seconds for this step
       },
     },
   ],

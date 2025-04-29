@@ -82,7 +82,7 @@ export interface StepExecutor<
     step: TStep,
     context: TContext,
     extraContext?: Record<string, any>,
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<StepExecutionResult<TResult>>;
 }
 

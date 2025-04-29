@@ -2,6 +2,7 @@ import { PolicyResolver } from '../policy-resolver';
 import { Step, Flow } from '../../types';
 import { Logger } from '../logger';
 import { DEFAULT_TIMEOUTS } from '../../constants/timeouts';
+import { ErrorCode } from '../../errors/codes';
 
 describe('PolicyResolver', () => {
   const baseStep: Step = { name: 'myStep' };
@@ -105,7 +106,11 @@ describe('PolicyResolver', () => {
         maxDelay: 5000,
         strategy: 'exponential',
       },
-      retryableErrors: ['NETWORK_ERROR', 'TIMEOUT_ERROR', 'OPERATION_TIMEOUT'],
+      retryableErrors: [
+        ErrorCode.NETWORK_ERROR,
+        ErrorCode.TIMEOUT_ERROR,
+        ErrorCode.OPERATION_TIMEOUT,
+      ],
     };
     // Step-level
     const step: Step = { ...baseStep, policies: { retryPolicy: retryObj } };

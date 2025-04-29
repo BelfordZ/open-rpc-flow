@@ -1,19 +1,30 @@
 import { ConditionStepExecutor } from '../../step-executors';
 import { ConditionStep, StepType } from '../../step-executors/types';
 import { StepExecutionResult } from '../../step-executors';
-import { noLogger } from '../../util/logger';
+import { TestLogger } from '../../util/logger';
 import { createMockContext } from '../test-utils';
 import { StepExecutionContext } from '../../types';
+import { PolicyResolver } from '../../util/policy-resolver';
 
 describe('ConditionStepExecutor', () => {
   let executor: ConditionStepExecutor;
   let context: StepExecutionContext;
   let executeStep: jest.Mock;
+  let testLogger: TestLogger;
 
   beforeEach(() => {
+    testLogger = new TestLogger('ConditionStepExecutor');
     executeStep = jest.fn();
-    executor = new ConditionStepExecutor(executeStep, noLogger);
+    // Provide a minimal PolicyResolver instance
+    const dummyFlow = { name: 'dummy', description: '', steps: [] };
+    const policyResolver = new PolicyResolver(dummyFlow, testLogger);
+    executor = new ConditionStepExecutor(executeStep, testLogger, policyResolver);
     context = createMockContext();
+  });
+
+  afterEach(() => {
+    //testLogger.print();
+    testLogger.clear();
   });
 
   it('executes then branch when condition is true', async () => {

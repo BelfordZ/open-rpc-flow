@@ -145,7 +145,7 @@ describe('Timeout and Retry Policies', () => {
 
   afterEach(() => {
     jest.useRealTimers();
-    testLogger.print(); // Print logs after each test for debugging
+    //testLogger.print(); // Print logs after each test for debugging
     testLogger.clear();
   });
 

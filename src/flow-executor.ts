@@ -62,6 +62,7 @@ export class FlowExecutor {
   private logger: Logger;
   private retryPolicy: RetryPolicy | null;
   private policyResolver: PolicyResolver;
+  private globalAbortController: AbortController;
 
   constructor(
     private flow: Flow,
@@ -140,11 +141,14 @@ export class FlowExecutor {
     }
     this.policyResolver = new PolicyResolver(this.flow, this.logger, policyOverrides);
 
+    // Initialize global abort controller
+    const globalAbortController = new AbortController();
+
     // Initialize step executors in order of specificity
     this.stepExecutors = [
       this.createRequestStepExecutor(),
       new LoopStepExecutor(this.executeStep.bind(this), this.logger),
-      new ConditionStepExecutor(this.executeStep.bind(this), this.logger),
+      new ConditionStepExecutor(this.executeStep.bind(this), this.logger, this.policyResolver),
       new TransformStepExecutor(
         this.expressionEvaluator,
         this.referenceResolver,
@@ -152,8 +156,9 @@ export class FlowExecutor {
         this.logger,
         this.policyResolver,
       ),
-      new StopStepExecutor(this.logger),
+      new StopStepExecutor(this.logger, globalAbortController),
     ];
+    this.globalAbortController = globalAbortController;
   }
 
   /**
@@ -177,7 +182,6 @@ export class FlowExecutor {
     this.logger.log('Executing flow with options:', options);
     const startTime = Date.now();
     let globalTimeoutId: NodeJS.Timeout | undefined;
-    const globalAbortController = new AbortController();
     try {
       // Get steps in dependency order
       const orderedSteps = this.dependencyResolver.getExecutionOrder();
@@ -193,8 +197,8 @@ export class FlowExecutor {
 
         try {
           // Check if we've been aborted before executing step
-          if (globalAbortController.signal.aborted) {
-            const reason = globalAbortController.signal.reason || 'Flow execution aborted';
+          if (this.globalAbortController.signal.aborted) {
+            const reason = this.globalAbortController.signal.reason || 'Flow execution aborted';
             this.logger.debug('Skipping step due to abort', {
               stepName: step.name,
               reason: String(reason),
@@ -229,7 +233,7 @@ export class FlowExecutor {
     } catch (error: any) {
       // Enhance error with flow context if it's an abort due to timeout
       if (
-        (globalAbortController.signal.aborted && error.message?.includes('timeout')) ||
+        (this.globalAbortController.signal.aborted && error.message?.includes('timeout')) ||
         error.name === 'AbortError'
       ) {
         const duration = Date.now() - startTime;
@@ -262,7 +266,7 @@ export class FlowExecutor {
   private async executeStep(
     step: Step,
     extraContext: Record<string, any> = {},
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<StepExecutionResult> {
     const stepStartTime = Date.now();
 

@@ -62,7 +62,7 @@ export class RequestStepExecutor implements StepExecutor {
     step: Step,
     _context: StepExecutionContext,
     extraContext: Record<string, any> = {},
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<StepExecutionResult> {
     if (!this.canExecute(step)) {
       throw new ValidationError('Invalid step type for RequestStepExecutor', { step });
@@ -109,12 +109,18 @@ export class RequestStepExecutor implements StepExecutor {
       try {
         // Validate method name
         if (typeof requestStep.request.method !== 'string' || !requestStep.request.method.trim()) {
-          throw new ValidationError('Invalid method name: must be a non-empty string', { method: requestStep.request.method, stepName: step.name });
+          throw new ValidationError('Invalid method name: must be a non-empty string', {
+            method: requestStep.request.method,
+            stepName: step.name,
+          });
         }
 
         // Validate params
         if (requestStep.request.params !== null && typeof requestStep.request.params !== 'object') {
-          throw new ValidationError('Invalid params: must be an object, array, or null', { params: requestStep.request.params, stepName: step.name });
+          throw new ValidationError('Invalid params: must be an object, array, or null', {
+            params: requestStep.request.params,
+            stepName: step.name,
+          });
         }
 
         // Resolve references in params

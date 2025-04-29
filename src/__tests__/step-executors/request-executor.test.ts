@@ -440,7 +440,7 @@ describe('RequestStepExecutor', () => {
               maxDelay: 2000,
               strategy: 'linear',
             },
-            retryableErrors: ['NETWORK_ERROR', 'VALIDATION_ERROR'],
+            retryableErrors: [ErrorCode.NETWORK_ERROR, ErrorCode.VALIDATION_ERROR],
           },
         },
       };

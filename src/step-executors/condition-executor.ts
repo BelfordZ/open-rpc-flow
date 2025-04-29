@@ -20,7 +20,7 @@ export class ConditionStepExecutor implements StepExecutor {
     private executeStep: (
       step: Step,
       extraContext?: Record<string, any>,
-      signal?: AbortSignal
+      signal?: AbortSignal,
     ) => Promise<StepExecutionResult>,
     logger: Logger,
     policyResolver: any,
@@ -37,7 +37,7 @@ export class ConditionStepExecutor implements StepExecutor {
     step: Step,
     context: StepExecutionContext,
     extraContext: Record<string, any> = {},
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<StepExecutionResult> {
     if (!this.canExecute(step)) {
       throw new ValidationError('Invalid step type for ConditionStepExecutor', { step });
@@ -87,7 +87,11 @@ export class ConditionStepExecutor implements StepExecutor {
             _nestedStep: true,
             _parentStep: step.name,
           };
-          value = await this.executeStep(conditionStep.condition.then, nestedContext, abortController.signal);
+          value = await this.executeStep(
+            conditionStep.condition.then,
+            nestedContext,
+            abortController.signal,
+          );
           branchTaken = 'then';
         } else if (conditionStep.condition.else) {
           this.logger.debug('Executing else branch', { stepName: step.name });
@@ -96,7 +100,11 @@ export class ConditionStepExecutor implements StepExecutor {
             _nestedStep: true,
             _parentStep: step.name,
           };
-          value = await this.executeStep(conditionStep.condition.else, nestedContext, abortController.signal);
+          value = await this.executeStep(
+            conditionStep.condition.else,
+            nestedContext,
+            abortController.signal,
+          );
           branchTaken = 'else';
         } else {
           branchTaken = 'else';
@@ -126,7 +134,7 @@ export class ConditionStepExecutor implements StepExecutor {
         throw new ConditionStepExecutionError(
           `Failed to execute condition step "${step.name}": ${error?.message || 'Unknown error'}`,
           { stepName: step.name, condition: conditionStep.condition, originalError: error },
-          error
+          error,
         );
       }
     })();
@@ -135,14 +143,7 @@ export class ConditionStepExecutor implements StepExecutor {
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => {
         abortController.abort();
-        reject(
-          TimeoutError.forStep(
-            step,
-            StepType.Condition,
-            timeout,
-            timeout
-          )
-        );
+        reject(TimeoutError.forStep(step, StepType.Condition, timeout, timeout));
       }, timeout);
     });
 

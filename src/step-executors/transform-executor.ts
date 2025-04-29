@@ -32,7 +32,7 @@ export class TransformExecutor {
     operations: TransformOperation[],
     input: string | any[],
     step?: Step,
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<any> {
     this.logger.debug('Starting transform execution', {
       operationCount: operations.length,
@@ -86,7 +86,12 @@ export class TransformExecutor {
     return data;
   }
 
-  private async executeOperation(op: TransformOperation, data: any, step?: Step, signal?: AbortSignal): Promise<any> {
+  private async executeOperation(
+    op: TransformOperation,
+    data: any,
+    step?: Step,
+    signal?: AbortSignal,
+  ): Promise<any> {
     this.logger.debug('Executing operation', {
       type: op.type,
       using: op.using,
@@ -123,7 +128,12 @@ export class TransformExecutor {
     }
   }
 
-  private async executeMap(op: TransformOperation, data: any[], step?: Step, signal?: AbortSignal): Promise<any[]> {
+  private async executeMap(
+    op: TransformOperation,
+    data: any[],
+    step?: Step,
+    signal?: AbortSignal,
+  ): Promise<any[]> {
     this.validateArray(data, 'map');
     this.logger.debug('Executing map operation', {
       inputLength: data.length,
@@ -166,7 +176,12 @@ export class TransformExecutor {
     return result;
   }
 
-  private async executeFilter(op: TransformOperation, data: any[], step?: Step, signal?: AbortSignal): Promise<any[]> {
+  private async executeFilter(
+    op: TransformOperation,
+    data: any[],
+    step?: Step,
+    signal?: AbortSignal,
+  ): Promise<any[]> {
     this.validateArray(data, 'filter');
     this.logger.debug('Executing filter operation', {
       inputLength: data.length,
@@ -176,6 +191,10 @@ export class TransformExecutor {
 
     const keepArr = await Promise.all(
       data.map(async (item, index) => {
+        if (signal?.aborted) {
+          this.logger.warn('Transform filter aborted by signal', { stepName: step?.name });
+          throw new Error('Transform filter operation aborted');
+        }
         const context = { item, index };
         const keep = await this.expressionEvaluator.evaluate(op.using, context, step);
         this.logger.debug('Filter evaluation', { index, keep });
@@ -192,7 +211,12 @@ export class TransformExecutor {
     return result;
   }
 
-  private async executeReduce(op: TransformOperation, data: any[], step?: Step, signal?: AbortSignal): Promise<any> {
+  private async executeReduce(
+    op: TransformOperation,
+    data: any[],
+    step?: Step,
+    signal?: AbortSignal,
+  ): Promise<any> {
     this.validateArray(data, 'reduce');
     this.logger.debug('Executing reduce operation', {
       inputLength: data.length,
@@ -240,7 +264,12 @@ export class TransformExecutor {
     return result;
   }
 
-  private async executeSort(op: TransformOperation, data: any[], step?: Step, signal?: AbortSignal): Promise<any[]> {
+  private async executeSort(
+    op: TransformOperation,
+    data: any[],
+    step?: Step,
+    signal?: AbortSignal,
+  ): Promise<any[]> {
     this.validateArray(data, 'sort');
     this.logger.debug('Executing sort operation', {
       inputLength: data.length,
@@ -293,7 +322,12 @@ export class TransformExecutor {
     return result;
   }
 
-  private async executeGroup(op: TransformOperation, data: any[], step?: Step, signal?: AbortSignal): Promise<any[]> {
+  private async executeGroup(
+    op: TransformOperation,
+    data: any[],
+    step?: Step,
+    signal?: AbortSignal,
+  ): Promise<any[]> {
     this.validateArray(data, 'group');
     this.logger.debug('Executing group operation', {
       inputLength: data.length,
@@ -339,7 +373,10 @@ export class TransformExecutor {
 
   private validateArray(data: any, operation: string): void {
     if (!Array.isArray(data)) {
-      throw new ValidationError(`Input to ${operation} operation must be an array`, { receivedType: typeof data, operation });
+      throw new ValidationError(`Input to ${operation} operation must be an array`, {
+        receivedType: typeof data,
+        operation,
+      });
     }
   }
 }
@@ -377,7 +414,7 @@ export class TransformStepExecutor implements StepExecutor {
     step: Step,
     context: StepExecutionContext,
     extraContext: Record<string, any> = {},
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<StepExecutionResult> {
     if (!this.canExecute(step)) {
       throw new Error('Invalid step type for TransformStepExecutor');

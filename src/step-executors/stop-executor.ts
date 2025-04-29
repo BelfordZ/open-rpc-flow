@@ -11,20 +11,23 @@ export interface StopStep extends Step {
 
 export class StopStepExecutor implements StepExecutor {
   private logger: Logger;
+  private globalAbortController?: AbortController;
 
-  constructor(logger: Logger) {
+  constructor(logger: Logger, globalAbortController?: AbortController) {
     this.logger = logger.createNested('StopStepExecutor');
+    this.globalAbortController = globalAbortController;
   }
 
   canExecute(step: Step): step is StopStep {
     return 'stop' in step;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async execute(
     step: Step,
-    context: any,
-    extraContext?: Record<string, any>,
-    signal?: AbortSignal
+    context: any, // eslint-disable-line @typescript-eslint/no-unused-vars
+    extraContext?: Record<string, any>, // eslint-disable-line @typescript-eslint/no-unused-vars
+    signal?: AbortSignal, // eslint-disable-line @typescript-eslint/no-unused-vars
   ): Promise<StepExecutionResult> {
     if (!this.canExecute(step)) {
       throw new ValidationError('Invalid step type for StopStepExecutor', { step });
@@ -41,7 +44,9 @@ export class StopStepExecutor implements StepExecutor {
     // Perform cleanup and termination logic here
     if (endWorkflow) {
       this.logger.log('Terminating entire workflow', { stepName: step.name });
-      // Add logic to terminate all running steps and end the workflow
+      if (this.globalAbortController && !this.globalAbortController.signal.aborted) {
+        this.globalAbortController.abort('Stopped by stop step');
+      }
     } else {
       this.logger.log('Terminating current branch', { stepName: step.name });
       // Add logic to terminate the current branch of the workflow

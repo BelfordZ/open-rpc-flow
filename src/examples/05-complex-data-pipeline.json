@@ -1,4 +1,5 @@
 {
+  "$schema": "../meta-schema.json",
   "name": "complex-data-pipeline",
   "description": "Demonstrates a complex data processing pipeline combining multiple operations",
   "context": {

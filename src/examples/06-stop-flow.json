@@ -1,4 +1,5 @@
 {
+  "$schema": "../meta-schema.json",
   "name": "stop-flow",
   "description": "A flow that demonstrates stopping execution based on a condition",
   "steps": [
@@ -16,6 +17,7 @@
       "condition": {
         "if": "${checkPermissions.result.role} != 'admin'",
         "then": {
+          "name": "stopExecution",
           "stop": {
             "endWorkflow": true
           }

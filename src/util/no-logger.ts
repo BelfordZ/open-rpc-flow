@@ -20,6 +20,7 @@ export class NoLogger implements Logger {
   }
 
   log(_message: string, ..._args: any[]): void {}
+  info(_message: string, ..._args: any[]): void {}
   error(_message: string, ..._args: any[]): void {}
   warn(_message: string, ..._args: any[]): void {}
   info(_message: string, ..._args: any[]): void {}

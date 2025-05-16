@@ -1,6 +1,13 @@
 export { NoLogger, noLogger } from './no-logger';
 
 export interface Logger {
+  /**
+   * General informational messages.
+   */
+  info(message: string, ...args: any[]): void;
+  /**
+   * @deprecated Use `info` instead.
+   */
   log(message: string, ...args: any[]): void;
   error(message: string, ...args: any[]): void;
   warn(message: string, ...args: any[]): void;
@@ -15,15 +22,19 @@ export class ConsoleLogger implements Logger {
     private _console: Console = console,
   ) {}
 
-  log(message: string, data?: any) {
+  info(message: string, data?: any) {
     if (this.prefix) {
       message = `[${this.prefix}] ${message}`;
     }
     if (data !== undefined) {
-      this._console.log(message, data);
+      this._console.info(message, data);
     } else {
-      this._console.log(message);
+      this._console.info(message);
     }
+  }
+
+  log(message: string, data?: any) {
+    this.info(message, data);
   }
   error(message: string, data?: any) {
     if (this.prefix) {
@@ -75,17 +86,18 @@ export class TestLogger implements Logger {
   private logs: { level: string; message: string; data?: any }[] = [];
   constructor(private name: string = 'TestLogger') {}
 
+  info(message: string, data?: any) {
+    this.logs.push({ level: 'info', message, data });
+  }
+
   log(message: string, data?: any) {
-    this.logs.push({ level: 'log', message, data });
+    this.info(message, data);
   }
   warn(message: string, data?: any) {
     this.logs.push({ level: 'warn', message, data });
   }
   debug(message: string, data?: any) {
     this.logs.push({ level: 'debug', message, data });
-  }
-  info(message: string, data?: any) {
-    this.logs.push({ level: 'info', message, data });
   }
   error(message: string, data?: any) {
     this.logs.push({ level: 'error', message, data });

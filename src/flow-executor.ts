@@ -188,7 +188,7 @@ export class FlowExecutor {
    * Execute the flow and return all step results
    */
   async execute(options?: { signal?: AbortSignal }): Promise<Map<string, any>> {
-    this.logger.log('Executing flow with options:', options);
+    this.logger.info('Executing flow with options:', options);
     const startTime = Date.now();
     let globalTimeoutId: NodeJS.Timeout | undefined;
     try {
@@ -199,7 +199,7 @@ export class FlowExecutor {
       this.events.emitDependencyResolved(orderedStepNames);
       this.events.emitFlowStart(this.flow.name, orderedStepNames);
 
-      this.logger.log('Executing steps in order:', orderedStepNames);
+      this.logger.info('Executing steps in order:', orderedStepNames);
 
       for (const step of orderedSteps) {
         const stepStartTime = Date.now();
@@ -237,7 +237,7 @@ export class FlowExecutor {
           const shouldStop = this.checkForStopResult(result);
 
           if (shouldStop) {
-            this.logger.log('Workflow stopped by step:', step.name);
+            this.logger.info('Workflow stopped by step:', step.name);
             this.events.emitStepSkip(step, 'Workflow stopped by previous step', correlationId);
             break;
           }

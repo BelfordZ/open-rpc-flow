@@ -1,3 +1,10 @@
+## [1.4.3](https://github.com/BelfordZ/open-rpc-flow/compare/v1.4.2...v1.4.3) (2025-05-16)
+
+
+### Bug Fixes
+
+* typo ([#57](https://github.com/BelfordZ/open-rpc-flow/issues/57)) ([c9afcfc](https://github.com/BelfordZ/open-rpc-flow/commit/c9afcfc486d8303533f7019fd39f048e655cc562))
+
 ## [1.4.2](https://github.com/BelfordZ/open-rpc-flow/compare/v1.4.1...v1.4.2) (2025-05-16)
 
 

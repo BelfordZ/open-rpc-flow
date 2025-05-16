@@ -3,11 +3,11 @@ import { ErrorCode } from './codes';
 /**
  * Base error class for all flow-related errors
  */
-export class FlowError extends Error {
+export class FlowError<C extends Record<string, unknown> = Record<string, unknown>> extends Error {
   constructor(
     message: string,
     public readonly code: ErrorCode,
-    public readonly context: Record<string, any>,
+    public readonly context: C,
     public readonly cause?: Error,
   ) {
     super(message);
@@ -26,12 +26,12 @@ export class FlowError extends Error {
     let str = `${this.name}: ${this.message}`;
     if (this.code) str += ` [code=${this.code}]`;
     if (this.context) {
-      for (const [key, value] of Object.entries(this.context)) {
+      for (const [key, value] of Object.entries(this.context as Record<string, unknown>)) {
         if (key === 'cause' || key === 'lastError' || key === 'code' || key === 'lastErrorCode')
           continue; // handled below
-        let val = value;
+        let val = value as unknown;
         if (key === 'step') {
-          val = value.name;
+          val = (value as any).name;
         }
         str += ` [${key}=${val}]`;
       }
@@ -46,8 +46,8 @@ export class FlowError extends Error {
 /**
  * Error class for validation errors
  */
-export class ValidationError extends FlowError {
-  constructor(message: string, context: Record<string, any>) {
+export class ValidationError<C extends Record<string, unknown> = Record<string, unknown>> extends FlowError<C> {
+  constructor(message: string, context: C) {
     super(message, ErrorCode.VALIDATION_ERROR, context);
     this.name = 'ValidationError';
     Object.setPrototypeOf(this, ValidationError.prototype);
@@ -57,9 +57,9 @@ export class ValidationError extends FlowError {
 /**
  * Error class for execution errors
  */
-export class ExecutionError extends FlowError {
-  constructor(message: string, context: Record<string, any>, cause?: Error) {
-    const code = context.code || ErrorCode.EXECUTION_ERROR;
+export class ExecutionError<C extends Record<string, unknown> = Record<string, unknown>> extends FlowError<C> {
+  constructor(message: string, context: C, cause?: Error) {
+    const code = (context as any).code || ErrorCode.EXECUTION_ERROR;
     super(message, code, context, cause);
     this.name = 'ExecutionError';
     Object.setPrototypeOf(this, ExecutionError.prototype);
@@ -69,8 +69,8 @@ export class ExecutionError extends FlowError {
 /**
  * Error class for state errors
  */
-export class StateError extends FlowError {
-  constructor(message: string, context: Record<string, any>) {
+export class StateError<C extends Record<string, unknown> = Record<string, unknown>> extends FlowError<C> {
+  constructor(message: string, context: C) {
     super(message, ErrorCode.STATE_ERROR, context);
     this.name = 'StateError';
     Object.setPrototypeOf(this, StateError.prototype);
@@ -84,10 +84,10 @@ type RetryErrorContext = {
   lastErrorCode: string;
   policy: any;
 };
-export class MaxRetriesExceededError extends ExecutionError {
-  public readonly allErrors: any[];
+export class MaxRetriesExceededError extends ExecutionError<Record<string, unknown>> {
+  public readonly allErrors: unknown[];
 
-  constructor(message: string, context: RetryErrorContext, allErrors: any[], cause?: Error) {
+  constructor(message: string, context: RetryErrorContext, allErrors: unknown[], cause?: Error) {
     super(
       message,
       {
@@ -107,8 +107,9 @@ export class MaxRetriesExceededError extends ExecutionError {
     if (this.allErrors && this.allErrors.length > 0) {
       str += `\nAll errors in retry chain:`;
       this.allErrors.forEach((err, idx) => {
-        if (typeof err?.toString === 'function') {
-          str += `\n  [${idx + 1}] ${err.toString({ ...options, includeStack: false })}`;
+        const errAny = err as any;
+        if (typeof errAny?.toString === 'function') {
+          str += `\n  [${idx + 1}] ${errAny.toString({ ...options, includeStack: false })}`;
         } else {
           str += `\n  [${idx + 1}] ${String(err)}`;
         }
@@ -122,7 +123,7 @@ export class MaxRetriesExceededError extends ExecutionError {
  * Error class for loop step execution errors
  */
 export class LoopStepExecutionError extends ExecutionError {
-  constructor(message: string, context: Record<string, any>, cause?: Error) {
+  constructor(message: string, context: Record<string, unknown>, cause?: Error) {
     super(message, { ...context, code: ErrorCode.EXECUTION_ERROR }, cause);
     this.name = 'LoopStepExecutionError';
     Object.setPrototypeOf(this, LoopStepExecutionError.prototype);

@@ -26,7 +26,7 @@ export interface RetryPolicy {
  */
 export class RetryableOperation<T> {
   private logger: Logger;
-  private allErrors: any[] = [];
+  private allErrors: unknown[] = [];
 
   constructor(
     private operation: () => Promise<T>,

@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/BelfordZ/open-rpc-flow/compare/v1.3.7...v1.4.0) (2025-05-16)
+
+
+### Features
+
+* events ([#48](https://github.com/BelfordZ/open-rpc-flow/issues/48)) ([3ff27f3](https://github.com/BelfordZ/open-rpc-flow/commit/3ff27f377b04d8b6e57a9ded15b1ec7c35357497))
+
 ## [1.3.7](https://github.com/BelfordZ/open-rpc-flow/compare/v1.3.6...v1.3.7) (2025-03-29)
 
 

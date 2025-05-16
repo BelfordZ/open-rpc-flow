@@ -4,6 +4,9 @@
   "description": "A standard way to define JSON-RPC flows with goal-oriented steps",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
+  "engines": {
+    "node": ">=18"
+  },
   "files": [
     "dist",
     "README.md",

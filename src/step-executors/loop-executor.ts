@@ -109,7 +109,7 @@ export class LoopStepExecutor implements StepExecutor {
           ...extraContext,
           [loopStep.loop.as]: item,
           metadata: {
-            iteration: [...iterationHistory], // copy of iterationHistory so that it get changed by later iterations
+            iteration: [...iterationHistory], // copy of iterationHistory so that it isn't changed by later iterations
             current: currentIteration,
           },
         };

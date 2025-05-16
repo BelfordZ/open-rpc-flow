@@ -49,10 +49,21 @@
           "description": "A unique identifier for the step within the flow. Used for referencing step results in expressions.",
           "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
         },
+        "description": {
+          "type": "string",
+          "description": "Optional description for the step."
+        },
         "policies": {
           "$ref": "#/definitions/Policies"
+        },
+        "timeout": {
+          "type": "number",
+          "description": "Optional timeout for the step in milliseconds.",
+          "minimum": 0,
+          "maximum": 3600000
         }
       },
+      "additionalProperties": false,
       "oneOf": [
         { "$ref": "#/definitions/RequestStep" },
         { "$ref": "#/definitions/TransformStep" },
@@ -70,7 +81,7 @@
           "description": "Optional retry policy. If not provided, the default retry policy will be used.",
           "properties": {
             "maxAttempts": {
-              "type": "number",
+              "type": "integer",
               "description": "The maximum number of attempts to retry the step. if the step type has a more specific maxAttempts, the default will be overridden, however, if set, it will override both the default and the step type specific maxAttempts. 0 means unlimited attempts (until timeout)",
               "default": 3,
               "minimum": 0,
@@ -101,11 +112,13 @@
                   "minimum": 0,
                   "maximum": 3600000
                 }
-              }
+              },
+              "additionalProperties": false
             },
             "retryableErrors": {
               "type": "array",
               "description": "An array of error codes that are retryable.",
+              "uniqueItems": true,
               "items": {
                 "type": "string",
                 "enum": [
@@ -149,9 +162,11 @@
               "minimum": 0,
               "maximum": 3600000
             }
-          }
+          },
+          "additionalProperties": false
         }
-      }
+      },
+      "additionalProperties": false
     },
     "RequestStep": {
       "type": "object",
@@ -167,13 +182,17 @@
               "description": "The JSON-RPC method to call."
             },
             "params": {
-              "type": "object",
               "description": "Parameters for the JSON-RPC method. Values can contain template expressions using ${...} syntax to reference other step results or context variables.",
-              "additionalProperties": true
+              "oneOf": [
+                { "type": "object", "additionalProperties": true },
+                { "type": "array", "items": {} }
+              ]
             }
-          }
+          },
+          "additionalProperties": false
         }
-      }
+      },
+      "additionalProperties": false
     },
     "TransformStep": {
       "type": "object",
@@ -229,13 +248,16 @@
                   "initial": {
                     "description": "Initial value for reduce operations."
                   }
-                }
+                },
+                "additionalProperties": false
               },
               "minItems": 1
             }
-          }
+          },
+          "additionalProperties": false
         }
-      }
+      },
+      "additionalProperties": false
     },
     "LoopStep": {
       "type": "object",
@@ -260,7 +282,7 @@
               "description": "Optional condition to determine whether to execute the step for each item."
             },
             "maxIterations": {
-              "type": "number",
+              "type": "integer",
               "description": "Optional maximum number of iterations to perform."
             },
             "step": {
@@ -274,9 +296,15 @@
                 "$ref": "#/definitions/Step"
               }
             }
-          }
+          },
+          "anyOf": [
+            { "required": ["step"] },
+            { "required": ["steps"] }
+          ],
+          "additionalProperties": false
         }
-      }
+      },
+      "additionalProperties": false
     },
     "ConditionStep": {
       "type": "object",
@@ -299,9 +327,11 @@
               "$ref": "#/definitions/Step",
               "description": "Optional step to execute if the condition is false."
             }
-          }
+          },
+          "additionalProperties": false
         }
-      }
+      },
+      "additionalProperties": false
     },
     "StopStep": {
       "type": "object",
@@ -322,9 +352,11 @@
               "description": "Indicates whether to end the entire workflow (true) or just the current branch (false).",
               "default": true
             }
-          }
+          },
+          "additionalProperties": false
         }
-      }
+      },
+      "additionalProperties": false
     }
   }
 }

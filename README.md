@@ -510,6 +510,18 @@ interface RequestStep {
 
 Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
 
+## Development
+
+This project requires **Node.js 22.15.0** as specified in the `.node-version` file. The CI pipeline tests against Node **18.x**, **20.x**, **21.x**, and **22.x**.
+
+After cloning the repository, install dependencies and run the build and tests:
+
+```bash
+npm install
+npm run build
+npm test
+```
+
 ## License
 
 This project is licensed under the MIT License, see the [LICENSE](LICENSE) file for details.

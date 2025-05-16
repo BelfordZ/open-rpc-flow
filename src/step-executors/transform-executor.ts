@@ -478,7 +478,7 @@ export class TransformStepExecutor implements StepExecutor {
             using: op.using,
             initial: 'initial' in op ? op.initial : undefined,
           })),
-          inputType: 'array',
+          inputType: Array.isArray(resolvedInput) ? 'array' : typeof resolvedInput,
           resultType: Array.isArray(result) ? 'array' : typeof result,
           timestamp: new Date().toISOString(),
           timeout,

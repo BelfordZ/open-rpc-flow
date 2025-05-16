@@ -9,10 +9,10 @@ module.exports = {
   coveragePathIgnorePatterns: ['node_modules', 'src/__tests__/test-utils.ts', 'src/examples'],
   coverageThreshold: {
     global: {
-      branches: 92.3,
+      branches: 92.31,
       functions: 88.71,
       lines: 97.84,
-      statements: 97.63,
+      statements: 97.64,
     },
   },
 };

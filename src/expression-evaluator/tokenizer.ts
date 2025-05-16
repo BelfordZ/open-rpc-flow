@@ -270,6 +270,14 @@ function handleReference(state: TokenizerState): Token {
       continue;
     }
 
+    if (isQuote(char)) {
+      flushBufferToArray(textBuffer, referenceTokens);
+      textBuffer = '';
+      const stringToken = handleStringLiteral(state, char);
+      referenceTokens.push(stringToken);
+      continue;
+    }
+
     if (isTemplateExpression(state.expression, state.currentIndex)) {
       flushBufferToArray(textBuffer, referenceTokens);
       textBuffer = '';

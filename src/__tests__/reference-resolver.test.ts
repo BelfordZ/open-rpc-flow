@@ -484,6 +484,14 @@ describe('ReferenceResolver', () => {
         }
       }
     });
+
+    it('throws for direct self-references via resolvePath', () => {
+      const map = new Map<string, any>();
+      map.set('a', '${a}');
+
+      const selfRefResolver = new ReferenceResolver(map, {}, testLogger);
+      expect(() => selfRefResolver.resolvePath('a')).toThrow(CircularReferenceError);
+    });
   });
 
   describe('ReferenceResolver error cases', () => {

@@ -3,6 +3,7 @@ import type { StepType } from '../step-executors/types';
 import { Logger, defaultLogger } from '../util/logger';
 import { DEFAULT_TIMEOUTS } from '../constants/timeouts';
 import { DEFAULT_RETRY_POLICY } from '../flow-executor';
+import { RetryPolicy } from '../errors/recovery';
 
 /**
  * Resolves policies (timeout, retryPolicy, etc.) for steps and flows according to metaschema precedence.
@@ -18,9 +19,9 @@ import { DEFAULT_RETRY_POLICY } from '../flow-executor';
 export class PolicyResolver {
   private flow: Flow;
   private logger: Logger;
-  private overrides: Record<string, any>;
+  private overrides: Record<string, unknown>;
 
-  constructor(flow: Flow, logger: Logger = defaultLogger, overrides: Record<string, any> = {}) {
+  constructor(flow: Flow, logger: Logger = defaultLogger, overrides: Record<string, unknown> = {}) {
     this.flow = flow;
     this.logger = logger.createNested('PolicyResolver');
     this.overrides = overrides;
@@ -33,7 +34,7 @@ export class PolicyResolver {
    * @param policyName The policy name (e.g., 'timeout', 'retryPolicy')
    * @param defaultValue (optional) Fallback value if nothing is found
    */
-  resolvePolicy<T = any>(
+  resolvePolicy<T = unknown>(
     step: Step,
     stepType: StepType,
     policyName: string,
@@ -45,30 +46,37 @@ export class PolicyResolver {
       return this.overrides[policyName] as T;
     }
     // 1. Step-level policy
-    if (step.policies && (step.policies as any)[policyName] !== undefined) {
+    if (step.policies && (step.policies as Record<string, unknown>)[policyName] !== undefined) {
       this.logger.debug('Using step-level policy', { step: step.name, policyName });
-      return (step.policies as any)[policyName] as T;
+      return (step.policies as Record<string, unknown>)[policyName] as T;
     }
     // 2. Per-stepType policy (flow.policies.step[stepType][policyName])
     if (
       this.flow.policies?.step &&
-      (this.flow.policies.step as any)[stepType]?.[policyName] !== undefined
+      (this.flow.policies.step as Record<string, Record<string, unknown>>)[stepType]?.[
+        policyName
+      ] !== undefined
     ) {
       this.logger.debug('Using flow.policies.step[stepType][policyName]', { stepType, policyName });
-      return (this.flow.policies.step as any)[stepType][policyName] as T;
+      return (this.flow.policies.step as Record<string, Record<string, unknown>>)[stepType][
+        policyName
+      ] as T;
     }
     // 3. Step-type default policy (flow.policies.step[policyName])
-    if (this.flow.policies?.step && (this.flow.policies.step as any)[policyName] !== undefined) {
+    if (
+      this.flow.policies?.step &&
+      (this.flow.policies.step as Record<string, unknown>)[policyName] !== undefined
+    ) {
       this.logger.debug('Using flow.policies.step[policyName]', { policyName });
-      return (this.flow.policies.step as any)[policyName] as T;
+      return (this.flow.policies.step as Record<string, unknown>)[policyName] as T;
     }
     // 4. Global policy (flow.policies.global[policyName])
     if (
       this.flow.policies?.global &&
-      (this.flow.policies.global as any)[policyName] !== undefined
+      (this.flow.policies.global as Record<string, unknown>)[policyName] !== undefined
     ) {
       this.logger.debug('Using flow.policies.global[policyName]', { policyName });
-      return (this.flow.policies.global as any)[policyName] as T;
+      return (this.flow.policies.global as Record<string, unknown>)[policyName] as T;
     }
     // 5. Fallback/default
     this.logger.debug('Using fallback/default for policy', { policyName });
@@ -81,14 +89,23 @@ export class PolicyResolver {
   resolveTimeout(step: Step, stepType: StepType): number {
     const timeoutObj = this.resolvePolicy<{ timeout?: number }>(step, stepType, 'timeout');
     // Use the resolved timeout, or the default for the stepType, or the global default
-    return timeoutObj?.timeout ?? (DEFAULT_TIMEOUTS as any)[stepType] ?? DEFAULT_TIMEOUTS.global;
+    return (
+      timeoutObj?.timeout ??
+      (DEFAULT_TIMEOUTS as Record<string, number>)[stepType] ??
+      DEFAULT_TIMEOUTS.global
+    );
   }
 
   /**
    * Helper to resolve retryPolicy (returns the retryPolicy object or undefined)
    */
-  resolveRetryPolicy(step: Step, stepType: StepType, fallback?: any): any {
-    const userPolicy = this.resolvePolicy<any>(step, stepType, 'retryPolicy', fallback);
+  resolveRetryPolicy(step: Step, stepType: StepType, fallback?: unknown): RetryPolicy | undefined {
+    const userPolicy = this.resolvePolicy<RetryPolicy>(
+      step,
+      stepType,
+      'retryPolicy',
+      fallback as RetryPolicy | undefined,
+    );
     if (!userPolicy) return undefined;
     // Merge with defaults, including nested backoff
     return {

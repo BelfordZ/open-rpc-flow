@@ -78,7 +78,7 @@ const apiAggregationFlow: Flow = {
 ## Installation
 
 ```bash
-npm install @open-rpc/flow
+npm install open-rpc-flow
 ```
 
 ## Quick Start
@@ -86,7 +86,7 @@ npm install @open-rpc/flow
 Here's a simple example of defining and executing a flow:
 
 ```typescript
-import { FlowExecutor, Flow } from '@open-rpc/flow';
+import { FlowExecutor, Flow } from 'open-rpc-flow';
 
 // Define your JSON-RPC handler
 const jsonRpcHandler = async (request) => {

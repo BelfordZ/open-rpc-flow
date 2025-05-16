@@ -1,4 +1,10 @@
-import { FlowError, ValidationError, ExecutionError, StateError, MaxRetriesExceededError } from '../base';
+import {
+  FlowError,
+  ValidationError,
+  ExecutionError,
+  StateError,
+  MaxRetriesExceededError,
+} from '../base';
 import { TimeoutError } from '../timeout-error';
 import { ErrorCode } from '../codes';
 
@@ -103,11 +109,10 @@ describe('StateError', () => {
 
 describe('toString methods', () => {
   it('formats FlowError with context and stack', () => {
-    const err = new FlowError(
-      'oops',
-      ErrorCode.INTERNAL_ERROR,
-      { step: { name: 'myStep' }, foo: 'bar' },
-    );
+    const err = new FlowError('oops', ErrorCode.INTERNAL_ERROR, {
+      step: { name: 'myStep' },
+      foo: 'bar',
+    });
     const str = err.toString({ includeStack: true });
     expect(str).toContain('FlowError: oops');
     expect(str).toContain('[code=INTERNAL_ERROR]');

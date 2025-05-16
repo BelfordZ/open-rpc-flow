@@ -4,7 +4,6 @@ import { createMockContext } from '../test-utils';
 import { TestLogger } from '../../util/logger';
 import { ErrorCode } from '../../errors/codes';
 import { ExecutionError } from '../../errors/base';
-import { TimeoutError } from '../../errors/timeout-error';
 import { RequestStepExecutor } from '../../step-executors';
 import { PolicyResolver } from '../../util/policy-resolver';
 
@@ -575,10 +574,7 @@ describe('RequestStepExecutor', () => {
     const argAC = new AbortController();
     const ctx = { ...context, signal: ctxAC.signal };
     await executor.execute(step, ctx, {}, argAC.signal);
-    expect(jsonRpcHandler).toHaveBeenCalledWith(
-      expect.anything(),
-      { signal: ctxAC.signal },
-    );
+    expect(jsonRpcHandler).toHaveBeenCalledWith(expect.anything(), { signal: ctxAC.signal });
   });
 
   it('times out when handler does not respond in time', async () => {

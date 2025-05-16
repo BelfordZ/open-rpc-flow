@@ -332,8 +332,16 @@ describe('ConditionStepExecutor', () => {
   it('uses fallback timeout when no resolver provided', async () => {
     jest.useFakeTimers();
     executor = new ConditionStepExecutor(executeStep, testLogger, undefined as any);
-    const step: ConditionStep = { name: 'timeoutStep', condition: { if: 'true', then: { name: 'noop' } } };
-    executeStep.mockImplementation(() => new Promise((res) => setTimeout(() => res({ result: true, type: StepType.Request, metadata: {} }), 6000)));
+    const step: ConditionStep = {
+      name: 'timeoutStep',
+      condition: { if: 'true', then: { name: 'noop' } },
+    };
+    executeStep.mockImplementation(
+      () =>
+        new Promise((res) =>
+          setTimeout(() => res({ result: true, type: StepType.Request, metadata: {} }), 6000),
+        ),
+    );
     const promise = executor.execute(step, context);
     jest.advanceTimersByTime(5000);
     await Promise.resolve();
@@ -344,7 +352,10 @@ describe('ConditionStepExecutor', () => {
   it('propagates pre-aborted signal', async () => {
     const ac = new AbortController();
     ac.abort();
-    const step: ConditionStep = { name: 'abortTest', condition: { if: 'true', then: { name: 'noop' } } };
+    const step: ConditionStep = {
+      name: 'abortTest',
+      condition: { if: 'true', then: { name: 'noop' } },
+    };
     executeStep.mockImplementation((_s, _ctx, signal) => {
       if (signal?.aborted) throw new Error('aborted');
       return Promise.resolve({ result: true, type: StepType.Request, metadata: {} });
@@ -353,8 +364,13 @@ describe('ConditionStepExecutor', () => {
   });
 
   it('wraps errors from executeStep', async () => {
-    const step: ConditionStep = { name: 'wrapTest', condition: { if: 'true', then: { name: 'noop' } } };
+    const step: ConditionStep = {
+      name: 'wrapTest',
+      condition: { if: 'true', then: { name: 'noop' } },
+    };
     executeStep.mockRejectedValue(new Error('boom'));
-    await expect(executor.execute(step, context)).rejects.toThrow('Failed to execute condition step "wrapTest"');
+    await expect(executor.execute(step, context)).rejects.toThrow(
+      'Failed to execute condition step "wrapTest"',
+    );
   });
 });

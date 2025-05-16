@@ -64,7 +64,7 @@ This directory contains example flows demonstrating various patterns and use cas
 
 ## Usage
 
-Each example can be validated against the schema using:
+Each example includes a `$schema` field referencing `../meta-schema.json` and can be validated using:
 
 ```bash
 ajv validate -s ../meta-schema.json -d example.json

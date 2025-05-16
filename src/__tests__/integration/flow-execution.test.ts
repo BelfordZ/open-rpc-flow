@@ -1,23 +1,20 @@
 import { FlowExecutor } from '../../flow-executor';
 import { Flow } from '../../types';
 import { createMockJsonRpcHandler } from '../test-utils';
-//import { TestLogger } from '../../util/logger';
-import { noLogger } from '../../util/logger';
+import { TestLogger } from '../../util/logger';
 
 describe('Flow Execution Integration', () => {
   let jsonRpcHandler: jest.Mock;
-  //let testLogger: TestLogger;
+  let testLogger: TestLogger;
   beforeEach(() => {
     jsonRpcHandler = createMockJsonRpcHandler();
-    //testLogger = new TestLogger('FlowExecutionTest');
+    testLogger = new TestLogger('FlowExecutionTest');
   });
 
-  /**
   afterEach(() => {
-    testLogger.print();
+    //testLogger.print();
     testLogger.clear();
   });
-  */
 
   it('executes a complex data processing flow', async () => {
     const flow: Flow = {
@@ -110,7 +107,7 @@ describe('Flow Execution Integration', () => {
       }
     });
 
-    const executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
+    const executor = new FlowExecutor(flow, jsonRpcHandler, testLogger);
     const results = await executor.execute();
 
     // Verify the complete execution chain
@@ -196,8 +193,17 @@ describe('Flow Execution Integration', () => {
       });
     });
 
-    const executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
+    const executor = new FlowExecutor(flow, jsonRpcHandler, testLogger);
     const results = await executor.execute();
+
+    // jsonRpcHandler should have been called 2 times
+    expect(jsonRpcHandler).toHaveBeenCalledTimes(2);
+    expect(results.get('getData').result.error).toBeDefined();
+    expect(results.get('getData').result.result).toBeUndefined();
+    // hasError should be true
+    expect(results.get('getData').metadata.hasError).toBe(true);
+    // processData should not have been called
+    expect(results.get('processData')).toBeUndefined();
 
     const getDataResult = results.get('getData').result;
     expect(getDataResult.result).toBeUndefined();
@@ -210,6 +216,9 @@ describe('Flow Execution Integration', () => {
       expect.objectContaining({
         method: 'error.log',
         params: { message: 'Data fetch failed' },
+      }),
+      expect.objectContaining({
+        signal: expect.any(Object),
       }),
     );
   });
@@ -283,7 +292,7 @@ describe('Flow Execution Integration', () => {
       return Promise.resolve({ sent: true });
     });
 
-    const executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
+    const executor = new FlowExecutor(flow, jsonRpcHandler, testLogger);
     await executor.execute();
 
     // Should only notify active members
@@ -297,6 +306,9 @@ describe('Flow Execution Integration', () => {
           message: 'Welcome to Team A',
         },
       }),
+      expect.objectContaining({
+        signal: expect.any(Object),
+      }),
     );
     expect(jsonRpcHandler).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -306,6 +318,9 @@ describe('Flow Execution Integration', () => {
           memberId: 3,
           message: 'Welcome to Team B',
         },
+      }),
+      expect.objectContaining({
+        signal: expect.any(Object),
       }),
     );
   });
@@ -348,7 +363,7 @@ describe('Flow Execution Integration', () => {
       return Promise.resolve({});
     });
 
-    const executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
+    const executor = new FlowExecutor(flow, jsonRpcHandler, testLogger);
     const results = await executor.execute();
 
     // Verify that step1 was executed and step2 was not
@@ -404,7 +419,7 @@ describe('Flow Execution Integration', () => {
       return Promise.resolve({});
     });
 
-    const executor = new FlowExecutor(flow, jsonRpcHandler, noLogger);
+    const executor = new FlowExecutor(flow, jsonRpcHandler, testLogger);
     const results = await executor.execute();
 
     // Verify that step1 and step3 were executed, but step2 was not

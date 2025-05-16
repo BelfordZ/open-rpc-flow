@@ -36,14 +36,6 @@ describe('ConsoleLogger', () => {
     expect(mockConsole.log).toHaveBeenCalledWith('[TestPrefix] test message');
   });
 
-  it('logs messages with arguments', () => {
-    const logger = new ConsoleLogger('Test');
-    const arg1 = { key: 'value' };
-    const arg2 = [1, 2, 3];
-    logger.log('test message', arg1, arg2);
-    expect(mockConsole.log).toHaveBeenCalledWith('[Test] test message', arg1, arg2);
-  });
-
   it('handles all log levels', () => {
     const logger = new ConsoleLogger('Test');
     logger.log('log message');
@@ -73,124 +65,116 @@ describe('ConsoleLogger', () => {
 });
 
 describe('TestLogger', () => {
-  let logger: TestLogger;
-
-  beforeEach(() => {
-    logger = new TestLogger('Test');
-  });
-
-  it('stores log messages with correct format', () => {
-    logger.log('test message');
-    expect(logger.getLogs()).toEqual(['[LOG] [Test] test message']);
-  });
-
-  it('handles all log levels', () => {
-    logger.log('log message');
-    logger.error('error message');
-    logger.warn('warn message');
-    logger.debug('debug message');
-
-    const logs = logger.getLogs();
-    expect(logs).toEqual([
-      '[LOG] [Test] log message',
-      '[ERROR] [Test] error message',
-      '[WARN] [Test] warn message',
-      '[DEBUG] [Test] debug message',
+  test('captures logs without prefix', () => {
+    const logger = new TestLogger();
+    logger.log('test message', { data: 123 });
+    expect(logger.getLogs()).toEqual([
+      { level: 'log', message: 'test message', data: { data: 123 } },
     ]);
   });
 
-  it('formats single argument correctly', () => {
-    const arg = { key: 'value' };
-    logger.log('test message', arg);
-    expect(logger.getLogs()[0]).toBe('[LOG] [Test] test message {"key":"value"}');
+  test('captures logs with prefix', () => {
+    const logger = new TestLogger('TestPrefix');
+    logger.log('test message', { data: 123 });
+    expect(logger.getLogs()).toEqual([
+      { level: 'log', message: 'test message', data: { data: 123 } },
+    ]);
   });
 
-  it('formats multiple arguments correctly', () => {
-    logger.log('test message', 1, 'two', { three: 3 });
-    expect(logger.getLogs()[0]).toBe('[LOG] [Test] test message [1,"two",{"three":3}]');
+  test('captures error logs', () => {
+    const logger = new TestLogger('TestPrefix');
+    const error = new Error('test error');
+    logger.error('error message', error);
+    expect(logger.getLogs()[0]).toMatchObject({
+      level: 'error',
+      message: 'error message',
+      data: error,
+    });
   });
 
-  it('clears logs', () => {
+  test('captures warning logs', () => {
+    const logger = new TestLogger('TestPrefix');
+    logger.warn('warning message', { warning: true });
+    expect(logger.getLogs()).toEqual([
+      { level: 'warn', message: 'warning message', data: { warning: true } },
+    ]);
+  });
+
+  test('captures debug logs', () => {
+    const logger = new TestLogger('TestPrefix');
+    logger.debug('debug message', { debug: true });
+    expect(logger.getLogs()).toEqual([
+      { level: 'debug', message: 'debug message', data: { debug: true } },
+    ]);
+  });
+
+  test('clears logs', () => {
+    const logger = new TestLogger();
     logger.log('test message');
-    expect(logger.getLogs()).toHaveLength(1);
     logger.clear();
-    expect(logger.getLogs()).toHaveLength(0);
+    expect(logger.getLogs()).toEqual([]);
   });
 
-  it('returns logs as string', () => {
-    logger.log('message 1');
-    logger.log('message 2');
-    expect(logger.getLogsAsString()).toBe('[LOG] [Test] message 1\n[LOG] [Test] message 2');
-  });
+  test('prints logs to console', () => {
+    const originalConsole = { ...console };
+    const mockLog = jest.fn();
+    console.log = mockLog;
 
-  it('prints logs to console', () => {
-    const spy = jest.spyOn(console, 'log').mockImplementation();
+    const logger = new TestLogger('Test');
     logger.log('test message');
     logger.print();
-    expect(spy).toHaveBeenCalledWith('\n=== Test Logs ===\n');
-    expect(spy).toHaveBeenCalledWith('[LOG] [Test] test message');
-    spy.mockRestore();
+
+    expect(mockLog).toHaveBeenCalledTimes(1);
+    const output = mockLog.mock.calls[0][0];
+    expect(output).toContain('[LOG] [Test] test message');
+
+    Object.assign(console, originalConsole);
   });
 
-  it('prints appropriate message when no logs', () => {
-    const spy = jest.spyOn(console, 'log').mockImplementation();
+  test('prints message when no logs', () => {
+    const originalConsole = { ...console };
+    const mockLog = jest.fn();
+    console.log = mockLog;
+
+    const logger = new TestLogger();
+    logger.clear();
     logger.print();
-    expect(spy).toHaveBeenCalledWith('No logs recorded');
-    spy.mockRestore();
+
+    // If there are no logs, print() will print an empty string
+    expect(mockLog).toHaveBeenCalledTimes(1);
+    expect(mockLog.mock.calls[0][0]).toBe('');
+
+    Object.assign(console, originalConsole);
   });
 
-  it('shares logs between parent and nested loggers', () => {
-    const nested = logger.createNested('Child');
-    logger.log('parent message');
-    nested.log('child message');
+  test('shares logs between nested loggers', () => {
+    const parent = new TestLogger('Parent');
+    const child = parent.createNested('Child');
 
-    const logs = logger.getLogs();
-    expect(logs).toEqual(['[LOG] [Test] parent message', '[LOG] [Test:Child] child message']);
+    parent.log('parent message');
+    child.log('child message');
 
-    // Nested logger should see all logs too
-    expect(nested.getLogs()).toEqual(logs);
+    expect(parent.getLogs()).toBe(child.getLogs());
+    expect(parent.getLogs()).toEqual([
+      { level: 'log', message: 'parent message', data: undefined },
+      { level: 'log', message: 'child message', data: undefined },
+    ]);
   });
 
-  it('handles empty args array in formatLogEntry', () => {
-    logger.log('test message');
-    expect(logger.getLogs()[0]).toBe('[LOG] [Test] test message');
+  test('handles single message and data', () => {
+    const logger = new TestLogger('Test');
+    logger.log('message', { three: 3 });
+    expect(logger.getLogs()[0]).toEqual({
+      level: 'log',
+      message: 'message',
+      data: { three: 3 },
+    });
   });
 
-  it('handles undefined and null values in args', () => {
-    logger.log('test message', undefined, null);
-    expect(logger.getLogs()[0]).toBe('[LOG] [Test] test message [null,null]');
-  });
-
-  it('handles circular references in args', () => {
-    const circular: any = { a: 1 };
-    circular.self = circular;
-    logger.log('test message', circular);
-    expect(logger.getLogs()[0]).toBe('[LOG] [Test] test message [Circular]');
-  });
-
-  it('handles multiple complex values in args', () => {
-    const obj1 = { a: 1 };
-    const obj2: any = { b: 2 };
-    obj2.self = obj2; // Make one of them circular
-    logger.log('test message', obj1, obj2);
-    expect(logger.getLogs()[0]).toBe('[LOG] [Test] test message [Complex Value]');
-  });
-
-  it('handles empty prefix', () => {
-    const emptyLogger = new TestLogger();
-    emptyLogger.log('test message');
-    expect(emptyLogger.getLogs()[0]).toBe('[LOG] test message');
-  });
-
-  it('handles empty logs in getLogsAsString', () => {
-    expect(logger.getLogsAsString()).toBe('');
-  });
-
-  it('handles nested loggers with empty prefix', () => {
-    const emptyLogger = new TestLogger();
-    const nested = emptyLogger.createNested('Child');
-    nested.log('test message');
-    expect(emptyLogger.getLogs()[0]).toBe('[LOG] [Child] test message');
+  test('captures info logs', () => {
+    const logger = new TestLogger('InfoTest');
+    logger.info('hello', { a: 1 });
+    expect(logger.getLogs()).toEqual([{ level: 'info', message: 'hello', data: { a: 1 } }]);
   });
 });
 

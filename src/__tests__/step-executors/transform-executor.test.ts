@@ -5,6 +5,7 @@ import { SafeExpressionEvaluator } from '../../expression-evaluator/safe-evaluat
 import { ReferenceResolver } from '../../reference-resolver';
 import { TestLogger } from '../../util/logger';
 import { createMockContext } from '../test-utils';
+import { PolicyResolver } from '../../util/policy-resolver';
 
 describe('Transform Executors', () => {
   describe('TransformExecutor', () => {
@@ -30,7 +31,7 @@ describe('Transform Executors', () => {
     });
 
     describe('map operation', () => {
-      test('maps array using expression', () => {
+      test('maps array using expression', async () => {
         const data = [1, 2, 3];
         const operations: TransformOperation[] = [
           {
@@ -39,11 +40,11 @@ describe('Transform Executors', () => {
           },
         ];
 
-        const result = executor.execute(operations, data);
+        const result = await executor.execute(operations, data);
         expect(result).toEqual([2, 4, 6]);
       });
 
-      test('maps objects using expression', () => {
+      test('maps objects using expression', async () => {
         const data = [{ value: 1 }, { value: 2 }];
         const operations: TransformOperation[] = [
           {
@@ -52,13 +53,13 @@ describe('Transform Executors', () => {
           },
         ];
 
-        const result = executor.execute(operations, data);
+        const result = await executor.execute(operations, data);
         expect(result).toEqual([2, 3]);
       });
     });
 
     describe('filter operation', () => {
-      test('filters array using condition', () => {
+      test('filters array using condition', async () => {
         const data = [1, 2, 3, 4];
         const operations: TransformOperation[] = [
           {
@@ -67,11 +68,11 @@ describe('Transform Executors', () => {
           },
         ];
 
-        const result = executor.execute(operations, data);
+        const result = await executor.execute(operations, data);
         expect(result).toEqual([3, 4]);
       });
 
-      test('filters objects using condition', () => {
+      test('filters objects using condition', async () => {
         const data = [{ value: 1 }, { value: 2 }, { value: 3 }];
         const operations: TransformOperation[] = [
           {
@@ -80,13 +81,13 @@ describe('Transform Executors', () => {
           },
         ];
 
-        const result = executor.execute(operations, data);
+        const result = await executor.execute(operations, data);
         expect(result).toEqual([{ value: 2 }, { value: 3 }]);
       });
     });
 
     describe('reduce operation', () => {
-      test('reduces array using expression', () => {
+      test('reduces array using expression', async () => {
         const data = [1, 2, 3];
         const operations: TransformOperation[] = [
           {
@@ -96,11 +97,11 @@ describe('Transform Executors', () => {
           },
         ];
 
-        const result = executor.execute(operations, data);
+        const result = await executor.execute(operations, data);
         expect(result).toBe(6);
       });
 
-      test('reduces objects using expression', () => {
+      test('reduces objects using expression', async () => {
         const data = [{ value: 1 }, { value: 2 }];
         const operations: TransformOperation[] = [
           {
@@ -110,11 +111,11 @@ describe('Transform Executors', () => {
           },
         ];
 
-        const result = executor.execute(operations, data);
+        const result = await executor.execute(operations, data);
         expect(result).toBe(3);
       });
 
-      test('reduces with non-zero initial value', () => {
+      test('reduces with non-zero initial value', async () => {
         const data = [1, 2, 3];
         const operations: TransformOperation[] = [
           {
@@ -124,13 +125,13 @@ describe('Transform Executors', () => {
           },
         ];
 
-        const result = executor.execute(operations, data);
+        const result = await executor.execute(operations, data);
         expect(result).toBe(16); // 10 + 1 + 2 + 3
       });
     });
 
     describe('flatten operation', () => {
-      test('flattens nested arrays', () => {
+      test('flattens nested arrays', async () => {
         const data = [
           [1, 2],
           [3, 4],
@@ -142,13 +143,13 @@ describe('Transform Executors', () => {
           },
         ];
 
-        const result = executor.execute(operations, data);
+        const result = await executor.execute(operations, data);
         expect(result).toEqual([1, 2, 3, 4]);
       });
     });
 
     describe('sort operation', () => {
-      test('sorts array using comparison', () => {
+      test('sorts array using comparison', async () => {
         const data = [3, 1, 4, 2];
         const operations: TransformOperation[] = [
           {
@@ -157,11 +158,11 @@ describe('Transform Executors', () => {
           },
         ];
 
-        const result = executor.execute(operations, data);
+        const result = await executor.execute(operations, data);
         expect(result).toEqual([1, 2, 3, 4]);
       });
 
-      test('sorts objects using comparison', () => {
+      test('sorts objects using comparison', async () => {
         const data = [{ value: 3 }, { value: 1 }, { value: 2 }];
         const operations: TransformOperation[] = [
           {
@@ -170,13 +171,13 @@ describe('Transform Executors', () => {
           },
         ];
 
-        const result = executor.execute(operations, data);
+        const result = await executor.execute(operations, data);
         expect(result).toEqual([{ value: 1 }, { value: 2 }, { value: 3 }]);
       });
     });
 
     describe('unique operation', () => {
-      test('removes duplicates from array', () => {
+      test('removes duplicates from array', async () => {
         const data = [1, 2, 2, 3, 3, 4];
         const operations: TransformOperation[] = [
           {
@@ -185,13 +186,13 @@ describe('Transform Executors', () => {
           },
         ];
 
-        const result = executor.execute(operations, data);
+        const result = await executor.execute(operations, data);
         expect(result).toEqual([1, 2, 3, 4]);
       });
     });
 
     describe('group operation', () => {
-      test('groups array items by key', () => {
+      test('groups array items by key', async () => {
         const data = [
           { type: 'a', value: 1 },
           { type: 'b', value: 2 },
@@ -204,7 +205,7 @@ describe('Transform Executors', () => {
           },
         ];
 
-        const result = executor.execute(operations, data);
+        const result = await executor.execute(operations, data);
         expect(result).toEqual([
           {
             key: 'a',
@@ -222,7 +223,7 @@ describe('Transform Executors', () => {
     });
 
     describe('join operation', () => {
-      test('joins array with separator', () => {
+      test('joins array with separator', async () => {
         const data = ['a', 'b', 'c'];
         const operations: TransformOperation[] = [
           {
@@ -231,13 +232,13 @@ describe('Transform Executors', () => {
           },
         ];
 
-        const result = executor.execute(operations, data);
+        const result = await executor.execute(operations, data);
         expect(result).toBe('a, b, c');
       });
     });
 
     describe('operation chaining', () => {
-      test('chains multiple operations', () => {
+      test('chains multiple operations', async () => {
         const data = [1, 2, 3, 4];
         const operations: TransformOperation[] = [
           {
@@ -255,13 +256,13 @@ describe('Transform Executors', () => {
           },
         ];
 
-        const result = executor.execute(operations, data);
+        const result = await executor.execute(operations, data);
         expect(result).toBe(14); // (2*3 + 2*4) = 6 + 8 = 14
       });
     });
 
     describe('error handling', () => {
-      test('throws on invalid input type', () => {
+      test('throws on invalid input type', async () => {
         const data = 'not an array';
         const operations: TransformOperation[] = [
           {
@@ -269,13 +270,12 @@ describe('Transform Executors', () => {
             using: '${item}',
           },
         ];
-
-        expect(() => executor.execute(operations, data)).toThrow(
-          'map operation requires an array input, got string',
+        await expect(executor.execute(operations, data)).rejects.toThrow(
+          'Did you mean to use a string literal? Wrap your value in quotes',
         );
       });
 
-      test('throws on unknown operation type', () => {
+      test('throws on unknown operation type', async () => {
         const data = [1, 2, 3];
         const operations: TransformOperation[] = [
           {
@@ -283,15 +283,14 @@ describe('Transform Executors', () => {
             using: '${item}',
           },
         ];
-
-        expect(() => executor.execute(operations, data)).toThrow(
+        await expect(executor.execute(operations, data)).rejects.toThrow(
           'Unknown transform operation type',
         );
       });
     });
 
     describe('context assignment', () => {
-      test('assigns result to context using "as"', () => {
+      test('assigns result to context using "as"', async () => {
         const data = [1, 2, 3];
         const operations: TransformOperation[] = [
           {
@@ -301,9 +300,47 @@ describe('Transform Executors', () => {
           },
         ];
 
-        executor.execute(operations, data);
+        await executor.execute(operations, data);
         expect(context.doubled).toEqual([2, 4, 6]);
       });
+    });
+
+    describe('abort handling', () => {
+      test('aborts when signal already aborted', async () => {
+        const ac = new AbortController();
+        ac.abort();
+        const ops: TransformOperation[] = [{ type: 'map', using: '${item}' }];
+        await expect(executor.execute(ops, [1, 2], undefined, ac.signal)).rejects.toThrow(
+          'Transform step aborted',
+        );
+      });
+
+      const cases: Array<[string, TransformOperation, any[]]> = [
+        ['map', { type: 'map', using: '${item}' }, [1, 2]],
+        ['filter', { type: 'filter', using: '${item > 0}' }, [1, -1]],
+        ['reduce', { type: 'reduce', using: '${acc}+${item}', initial: 0 }, [1, 2]],
+        [
+          'sort',
+          { type: 'sort', using: '${a.key} - ${b.key}' },
+          [{ key: 3 }, { key: 2 }, { key: 1 }],
+        ],
+        ['group', { type: 'group', using: '${item.key}' }, [{ key: 'a' }, { key: 'b' }]],
+      ];
+
+      test.each(cases)(
+        'aborts %s operation when signal aborted mid-execution',
+        async (name, op, data) => {
+          const ac = new AbortController();
+          let count = 0;
+          jest.spyOn(expressionEvaluator, 'evaluate').mockImplementation((expr, ctx) => {
+            if (count++ === 0) ac.abort();
+            return ctx.item ?? ctx.a ?? 0;
+          });
+          await expect(executor.execute([op], data as any[], undefined, ac.signal)).rejects.toThrow(
+            `Transform ${name} operation aborted`,
+          );
+        },
+      );
     });
   });
 
@@ -317,11 +354,14 @@ describe('Transform Executors', () => {
 
       const referenceResolver = new ReferenceResolver(stepResults, contextObj, logger);
       const expressionEvaluator = new SafeExpressionEvaluator(logger, referenceResolver);
+      const flow = { name: 'test', description: '', steps: [] };
+      const policyResolver = new PolicyResolver(flow, logger);
       stepExecutor = new TransformStepExecutor(
         expressionEvaluator,
         referenceResolver,
         contextObj,
         logger,
+        policyResolver,
       );
       context = createMockContext();
     });
@@ -368,6 +408,7 @@ describe('Transform Executors', () => {
         ],
         inputType: 'array',
         resultType: 'array',
+        timeout: 10000,
         timestamp: expect.any(String),
       });
     });
@@ -410,6 +451,7 @@ describe('Transform Executors', () => {
         ],
         inputType: 'array',
         resultType: 'array',
+        timeout: 10000,
         timestamp: expect.any(String),
       });
     });
@@ -450,6 +492,7 @@ describe('Transform Executors', () => {
         ],
         inputType: 'array',
         resultType: 'number',
+        timeout: 10000,
         timestamp: expect.any(String),
       });
     });
@@ -568,6 +611,7 @@ describe('Transform Executors', () => {
         ],
         inputType: 'array',
         resultType: 'array',
+        timeout: 10000,
         timestamp: expect.any(String),
       });
     });

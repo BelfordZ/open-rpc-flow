@@ -1,16 +1,15 @@
 # Flow Execution Engine
 
-A flexible and type-safe execution engine for JSON-RPC based workflows. This engine allows you to define complex flows of operations including requests, transformations, conditions, and loops, with full support for data dependencies, parallel execution, and error handling.
+A flexible and type-safe execution engine for JSON-RPC based workflows. This engine allows you to define complex flows of operations including requests, transformations, conditions, and loops, with full support for data dependencies, execution optimization, and error handling.
 
 ## Features
 
 - 🔄 **JSON-RPC Request Handling**: Execute JSON-RPC 2.0 requests with automatic request ID management and error handling
-- 🔀 **Flow Control**: Support for conditional execution, loops, and parallel processing with proper variable scoping
+- 🔀 **Flow Control**: Support for conditional execution and loops with proper variable scoping
 - 🔄 **Data Transformation**: Transform data between steps using map, filter, reduce, and other operations
 - 📊 **Expression Evaluation**: Dynamic expression evaluation with support for template literals and object paths
 - 🔗 **Dependency Resolution**: Automatic handling of data dependencies between steps
 - 🎯 **Type Safety**: Written in TypeScript with comprehensive type definitions
-- ⚡ **Parallel Execution**: Automatic parallel execution of independent steps
 - 🔍 **Error Handling**: Detailed error reporting, validation, and graceful error recovery
 - 🌍 **Context Management**: Global context available to all steps with proper scoping
 - 📦 **Batch Processing**: Support for processing data in configurable batch sizes
@@ -19,149 +18,23 @@ A flexible and type-safe execution engine for JSON-RPC based workflows. This eng
 
 ### 1. Team Member Processing
 
-Process team members with nested operations and dynamic notifications:
+Process team members with nested operations and dynamic notifications. See the full example here:
 
-```typescript
-const teamFlow: Flow = {
-  name: 'team-member-processing',
-  description: 'Process team members and send notifications',
-  context: {
-    notificationTypes: {
-      welcome: 'WELCOME',
-      update: 'UPDATE',
-    },
-  },
-  steps: [
-    {
-      name: 'getTeams',
-      request: {
-        method: 'teams.list',
-        params: { active: true },
-      },
-    },
-    {
-      name: 'processTeams',
-      loop: {
-        over: '${getTeams.result}',
-        as: 'team',
-        step: {
-          name: 'processMembers',
-          loop: {
-            over: '${team.members}',
-            as: 'member',
-            step: {
-              name: 'processMember',
-              condition: {
-                if: '${member.active}',
-                then: {
-                  name: 'notifyMember',
-                  request: {
-                    method: 'notify',
-                    params: {
-                      teamId: '${team.id}',
-                      memberId: '${member.id}',
-                      type: '${context.notificationTypes.welcome}',
-                      data: {
-                        teamName: '${team.name}',
-                        memberRole: '${member.role}',
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
-  ],
-};
-```
+[**src/examples/03-nested-loops.json**](src/examples/03-nested-loops.json)
+
+---
 
 ### 2. Data Pipeline with Error Recovery
 
-Process data with validation, transformation, and error handling:
+Process data with validation, transformation, and error handling. See the full example here:
 
-```typescript
-const dataPipelineFlow: Flow = {
-  name: 'data-pipeline',
-  description: 'Process and transform data with error handling',
-  context: {
-    batchSize: 2,
-    minValue: 10,
-    retryCount: 3,
-  },
-  steps: [
-    {
-      name: 'getData',
-      request: {
-        method: 'data.fetch',
-        params: { source: 'test' },
-      },
-    },
-    {
-      name: 'validateData',
-      condition: {
-        if: '${getData.error}',
-        then: {
-          name: 'retryData',
-          loop: {
-            over: 'Array.from({ length: ${context.retryCount} })',
-            as: 'attempt',
-            step: {
-              name: 'retryFetch',
-              request: {
-                method: 'data.fetch',
-                params: {
-                  source: 'test',
-                  attempt: '${metadata.current.index + 1}',
-                },
-              },
-            },
-          },
-        },
-        else: {
-          name: 'processData',
-          transform: {
-            input: '${getData.result}',
-            operations: [
-              {
-                type: 'filter',
-                using: '${item.value > context.minValue}',
-              },
-              {
-                type: 'map',
-                using: '{ ...item, processed: true }',
-              },
-            ],
-          },
-        },
-      },
-    },
-    {
-      name: 'processBatches',
-      loop: {
-        over: '${validateData.result.result}',
-        as: 'batch',
-        step: {
-          name: 'processBatch',
-          request: {
-            method: 'batch.process',
-            params: {
-              data: '${batch}',
-              index: '${metadata.current.index}',
-            },
-          },
-        },
-      },
-    },
-  ],
-};
-```
+[**src/examples/05-complex-data-pipeline.json**](src/examples/05-complex-data-pipeline.json)
+
+---
 
 ### 3. API Data Aggregation
 
-Aggregate data from multiple API endpoints with parallel processing:
+Aggregate data from multiple API endpoints:
 
 ```typescript
 const apiAggregationFlow: Flow = {
@@ -186,25 +59,6 @@ const apiAggregationFlow: Flow = {
             input: '${user}',
             operations: [
               {
-                type: 'parallel',
-                operations: [
-                  {
-                    name: 'profile',
-                    request: {
-                      method: 'user.profile',
-                      params: { userId: '${user.id}' },
-                    },
-                  },
-                  {
-                    name: 'activity',
-                    request: {
-                      method: 'user.activity',
-                      params: { userId: '${user.id}' },
-                    },
-                  },
-                ],
-              },
-              {
                 type: 'map',
                 using: `{
                   ...user,
@@ -215,26 +69,6 @@ const apiAggregationFlow: Flow = {
             ],
           },
         },
-      },
-    },
-    {
-      name: 'aggregateData',
-      transform: {
-        input: '${fetchUserDetails.result.value}',
-        operations: [
-          {
-            type: 'group',
-            using: 'item.profile.department',
-          },
-          {
-            type: 'map',
-            using: `{
-              department: key,
-              userCount: items.length,
-              activeUsers: items.filter(u => u.recentActivity.length > 0).length
-            }`,
-          },
-        ],
       },
     },
   ],
@@ -430,20 +264,201 @@ The engine supports dynamic expressions using the `${...}` syntax:
 
 ## Error Handling
 
-The engine provides detailed error information and recovery options:
+Flow provides built-in error handling capabilities including automatic retries and circuit breaker patterns for request steps.
+
+#### Error Handling with Retry
+
+Enable automatic retries for failed request steps:
 
 ```typescript
-try {
-  await executor.execute();
-} catch (error) {
-  if (error instanceof JsonRpcRequestError) {
-    // Handle JSON-RPC specific errors
-    console.error('RPC Error:', error.error);
-  } else {
-    // Handle other execution errors
-    console.error('Execution Error:', error.message);
-  }
-}
+const executor = new FlowExecutor(flow, jsonRpcHandler, {
+  // Enable retry policy
+  enableRetries: true,
+  // Configure retry policy (or use DEFAULT_RETRY_POLICY)
+  retryPolicy: {
+    maxAttempts: 3, // Retry up to 3 times
+    backoff: {
+      initial: 100, // 100ms initial delay
+      multiplier: 2, // Exponential backoff
+      maxDelay: 5000, // Maximum 5s delay
+    },
+    retryableErrors: [ErrorCode.NETWORK_ERROR, ErrorCode.TIMEOUT_ERROR],
+  },
+});
+```
+
+##### Error Events
+
+Listen for error events during flow execution:
+
+```typescript
+const executor = new FlowExecutor(flow, jsonRpcHandler, {
+  eventOptions: {
+    emitFlowEvents: true,
+    emitStepEvents: true,
+  },
+});
+
+// Listen for flow-level errors
+executor.events.on('flow:error', (event) => {
+  console.error(`Flow error in ${event.flowName}:`, event.error);
+  console.log(`Execution time before error: ${event.duration}ms`);
+});
+
+// Listen for step-level errors
+executor.events.on('step:error', (event) => {
+  console.error(`Step error in ${event.stepName}:`, event.error);
+});
+```
+
+### Timeout Configuration
+
+Flow provides multi-level timeout configuration to control execution time at various scopes:
+
+#### Step-Level Timeout
+
+Set a timeout for a specific step:
+
+```typescript
+const flow = {
+  name: 'MyFlow',
+  steps: [
+    {
+      name: 'longRunningStep',
+      timeout: 5000, // 5 second timeout for this step
+      request: {
+        method: 'slowOperation',
+        params: {},
+      },
+    },
+  ],
+};
+```
+
+#### Flow-Level Timeouts
+
+Configure timeouts for all steps of a certain type within a flow:
+
+```typescript
+const flow = {
+  name: 'MyFlow',
+  timeouts: {
+    global: 30000, // 30s default for all steps
+    request: 10000, // 10s for request steps
+    transform: 5000, // 5s for transform steps
+    condition: 2000, // 2s for condition steps
+    loop: 60000, // 60s for loop steps
+    expression: 1000, // 1s for expression evaluation
+  },
+  steps: [
+    /* ... */
+  ],
+};
+```
+
+#### Executor-Level Timeouts
+
+Set default timeouts when creating the executor:
+
+```typescript
+const executor = new FlowExecutor(flow, jsonRpcHandler, {
+  timeouts: {
+    global: 30000, // 30s default
+    request: 10000, // 10s for requests
+    transform: 5000, // 5s for transformations
+  },
+});
+```
+
+Timeout resolution follows this precedence order:
+
+1. Step-level timeout (`step.timeout`)
+2. Flow-level type-specific timeout (`flow.timeouts[stepType]`)
+3. Flow-level global timeout (`flow.timeouts.global`)
+4. Executor-level type-specific timeout
+5. Default timeout for the step type
+
+All timeouts must be:
+
+- At least 50ms
+- No more than 1 hour (3,600,000ms)
+- A positive integer
+
+## Event Emitter Interface
+
+The flow executor includes an event emitter that allows you to receive real-time updates during flow execution. This is useful for monitoring progress, logging, and integrating with external systems.
+
+### Using the Event Emitter
+
+```typescript
+import { FlowExecutor, FlowEventType } from '@open-rpc/flow';
+
+// Create a flow executor with event options
+const executor = new FlowExecutor(flow, jsonRpcHandler, {
+  eventOptions: {
+    emitFlowEvents: true,
+    emitStepEvents: true,
+    includeResults: true,
+  },
+});
+
+// Listen for flow start events
+executor.events.on(FlowEventType.FLOW_START, (event) => {
+  console.log(`Flow started: ${event.flowName}`);
+  console.log(`Steps to execute: ${event.orderedSteps.join(', ')}`);
+});
+
+// Listen for step completion events
+executor.events.on(FlowEventType.STEP_COMPLETE, (event) => {
+  console.log(`Step completed: ${event.stepName} in ${event.duration}ms`);
+  console.log('Result:', event.result);
+});
+
+// Execute the flow and receive streamed updates
+const results = await executor.execute();
+```
+
+### Available Events
+
+| Event Type            | Description                                        |
+| --------------------- | -------------------------------------------------- |
+| `flow:start`          | Emitted when flow execution begins                 |
+| `flow:complete`       | Emitted when flow execution completes successfully |
+| `flow:error`          | Emitted when flow execution fails                  |
+| `step:start`          | Emitted when a step execution begins               |
+| `step:complete`       | Emitted when a step execution completes            |
+| `step:error`          | Emitted when a step execution fails                |
+| `step:skip`           | Emitted when a step is skipped                     |
+| `dependency:resolved` | Emitted when dependencies are resolved             |
+
+### Configuration Options
+
+You can configure the event emitter behavior when creating the flow executor:
+
+```typescript
+const executor = new FlowExecutor(flow, jsonRpcHandler, {
+  eventOptions: {
+    // Whether to emit flow-level events
+    emitFlowEvents: true,
+    // Whether to emit step-level events
+    emitStepEvents: true,
+    // Whether to emit dependency resolution events
+    emitDependencyEvents: false,
+    // Whether to include result details in events
+    includeResults: true,
+    // Whether to include context details in events
+    includeContext: false,
+  },
+});
+```
+
+You can also update the event options after creation:
+
+```typescript
+executor.updateEventOptions({
+  emitStepEvents: false,
+  includeResults: false,
+});
 ```
 
 ## Type Safety

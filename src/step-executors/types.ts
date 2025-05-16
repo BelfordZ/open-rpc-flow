@@ -1,5 +1,6 @@
 import { Step } from '../types';
 import { StepExecutionContext } from '../types';
+import { RetryPolicy } from '../errors/recovery';
 
 export { Step };
 
@@ -81,6 +82,7 @@ export interface StepExecutor<
     step: TStep,
     context: TContext,
     extraContext?: Record<string, any>,
+    signal?: AbortSignal,
   ): Promise<StepExecutionResult<TResult>>;
 }
 
@@ -92,6 +94,11 @@ export interface RequestStep extends Step {
     method: string;
     params: Record<string, any> | any[];
   };
+  /**
+   * @deprecated Use step.policies.retryPolicy instead
+   * Retry policy that overrides the global retry policy for this specific step
+   */
+  retryPolicy?: RetryPolicy;
 }
 
 export interface LoopStep extends Step {
@@ -113,13 +120,6 @@ export interface ConditionStep extends Step {
   };
 }
 
-export interface TransformStep extends Step {
-  transform: {
-    input: string;
-    operations: TransformOperation[];
-  };
-}
-
 /**
  * Type guards for each step type
  */
@@ -133,7 +133,7 @@ export const isConditionStep = (step: Step): step is ConditionStep =>
   'condition' in step && step.condition !== undefined;
 
 export const isTransformStep = (step: Step): step is TransformStep =>
-  'transform' in step && typeof step.transform === 'object';
+  !!step.transform && typeof step.transform === 'object';
 
 /**
  * Type guard for loop results
@@ -160,3 +160,11 @@ export interface LoopResult<T> extends LoopResultBase {
  * Utility type for loop step results
  */
 export type LoopStepResult<T> = StepExecutionResult<LoopResult<T>>;
+
+export interface TransformStep extends Step {
+  timeout?: number;
+  transform: {
+    input: string | any[];
+    operations: TransformOperation[];
+  };
+}

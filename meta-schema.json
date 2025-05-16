@@ -12,6 +12,18 @@
       "type": "string",
       "description": "A detailed description of what the flow does, its purpose, and expected outcomes."
     },
+    "policies": {
+      "type": "object",
+      "description": "Policies for the flow. The global policy applies to the workflow as whole. The step policy applies to the steps who do not have their own policy.",
+      "properties": {
+        "global": {
+          "$ref": "#/definitions/Policies"
+        },
+        "step": {
+          "$ref": "#/definitions/Policies"
+        }
+      }
+    },
     "context": {
       "type": "object",
       "description": "Optional global context variables available throughout the flow execution.",
@@ -36,6 +48,9 @@
           "type": "string",
           "description": "A unique identifier for the step within the flow. Used for referencing step results in expressions.",
           "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+        },
+        "policies": {
+          "$ref": "#/definitions/Policies"
         }
       },
       "oneOf": [
@@ -45,6 +60,98 @@
         { "$ref": "#/definitions/ConditionStep" },
         { "$ref": "#/definitions/StopStep" }
       ]
+    },
+    "Policies": {
+      "type": "object",
+      "description": "Optional policies for the step. If not provided, the default policies will be used.",
+      "properties": {
+        "retryPolicy": {
+          "type": "object",
+          "description": "Optional retry policy. If not provided, the default retry policy will be used.",
+          "properties": {
+            "maxAttempts": {
+              "type": "number",
+              "description": "The maximum number of attempts to retry the step. if the step type has a more specific maxAttempts, the default will be overridden, however, if set, it will override both the default and the step type specific maxAttempts. 0 means unlimited attempts (until timeout)",
+              "default": 3,
+              "minimum": 0,
+              "maximum": 100
+            },
+            "backoff": {
+              "type": "object",
+              "description": "The backoff policy for the step. If not provided, the default backoff policy will be used.",
+              "properties": {
+                "strategy": {
+                  "type": "string",
+                  "description": "The strategy to use for the backoff. If not provided, the default backoff strategy will be used.",
+                  "default": "exponential",
+                  "enum": ["exponential", "linear"]
+                },
+                "initial": {
+                  "type": "number",
+                  "description": "The initial delay in milliseconds."
+                },
+                "multiplier": {
+                  "type": "number",
+                  "description": "The multiplier/exponent for the backoff."
+                },
+                "maxDelay": {
+                  "type": "number",
+                  "description": "The maximum delay in milliseconds.",
+                  "default": 5000,
+                  "minimum": 0,
+                  "maximum": 3600000
+                }
+              }
+            },
+            "retryableErrors": {
+              "type": "array",
+              "description": "An array of error codes that are retryable.",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "VALIDATION_ERROR",
+                  "INVALID_INPUT",
+                  "SCHEMA_VALIDATION",
+                  "TYPE_ERROR",
+                  "EXECUTION_ERROR",
+                  "RUNTIME_ERROR",
+                  "NETWORK_ERROR",
+                  "RESOURCE_ERROR",
+                  "MAX_RETRIES_EXCEEDED",
+                  "TIMEOUT_ERROR",
+                  "OPERATION_TIMEOUT",
+                  "DEADLINE_EXCEEDED",
+                  "STATE_ERROR",
+                  "INVALID_STATE",
+                  "MISSING_DEPENDENCY",
+                  "INTERNAL_ERROR",
+                  "CONFIG_ERROR"
+                ]
+              }
+            }
+          }
+        },
+        "timeout": {
+          "type": "object",
+          "description": "Timeout policy. If not provided, the default timeout policy will be used.",
+          "properties": {
+            "timeout": {
+              "type": "number",
+              "description": "Optional timeout for the step in milliseconds. If not provided, the default timeout will be used.",
+              "default": 10000,
+              "minimum": 0,
+              "maximum": 3600000
+            },
+            "expressionEval": {
+              "type": "number",
+              "description": "Optional timeout for expression evaluation in milliseconds. If not provided, the default expression timeout will be used.",
+              "default": 1000,
+              "minimum": 0,
+              "maximum": 3600000
+            }
+          }
+        }
+      }
     },
     "RequestStep": {
       "type": "object",
@@ -78,8 +185,17 @@
           "required": ["input", "operations"],
           "properties": {
             "input": {
-              "type": "string",
-              "description": "Expression that evaluates to the input data for transformation."
+              "oneOf": [
+                {
+                  "type": "string",
+                  "description": "Expression that evaluates to the input data for transformation."
+                },
+                {
+                  "type": "array",
+                  "description": "Array literal to use as input for transformation.",
+                  "items": {}
+                }
+              ]
             },
             "operations": {
               "type": "array",

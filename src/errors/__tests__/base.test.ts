@@ -1,4 +1,11 @@
-import { FlowError, ValidationError, ExecutionError, TimeoutError, StateError } from '../base';
+import {
+  FlowError,
+  ValidationError,
+  ExecutionError,
+  StateError,
+  MaxRetriesExceededError,
+} from '../base';
+import { TimeoutError } from '../timeout-error';
 import { ErrorCode } from '../codes';
 
 describe('FlowError', () => {
@@ -76,12 +83,10 @@ describe('ExecutionError', () => {
 
 describe('TimeoutError', () => {
   it('should create timeout error with correct properties', () => {
-    const context = { duration: 1000 };
-    const error = new TimeoutError('operation timed out', context);
+    const error = new TimeoutError('operation timed out', 1000, 1200);
 
     expect(error.message).toBe('operation timed out');
     expect(error.code).toBe(ErrorCode.TIMEOUT_ERROR);
-    expect(error.context).toBe(context);
     expect(error.name).toBe('TimeoutError');
     expect(error).toBeInstanceOf(TimeoutError);
     expect(error).toBeInstanceOf(FlowError);
@@ -99,5 +104,39 @@ describe('StateError', () => {
     expect(error.name).toBe('StateError');
     expect(error).toBeInstanceOf(StateError);
     expect(error).toBeInstanceOf(FlowError);
+  });
+});
+
+describe('toString methods', () => {
+  it('formats FlowError with context and stack', () => {
+    const err = new FlowError('oops', ErrorCode.INTERNAL_ERROR, {
+      step: { name: 'myStep' },
+      foo: 'bar',
+    });
+    const str = err.toString({ includeStack: true });
+    expect(str).toContain('FlowError: oops');
+    expect(str).toContain('[code=INTERNAL_ERROR]');
+    expect(str).toContain('[step=myStep]');
+    expect(str).toContain('[foo=bar]');
+    expect(str).toContain(err.stack!.split('\n')[0]);
+  });
+
+  it('formats MaxRetriesExceededError with all errors', () => {
+    const baseErr = new FlowError('base', ErrorCode.NETWORK_ERROR, {});
+    const retryErr = new MaxRetriesExceededError(
+      'failed',
+      {
+        code: ErrorCode.MAX_RETRIES_EXCEEDED,
+        attempts: 2,
+        lastError: 'base',
+        lastErrorCode: ErrorCode.NETWORK_ERROR,
+        policy: { maxAttempts: 2 },
+      },
+      [baseErr],
+    );
+    const str = retryErr.toString();
+    expect(str).toContain('MaxRetriesExceededError: failed');
+    expect(str).toContain('All errors in retry chain');
+    expect(str).toContain('[1] FlowError: base');
   });
 });

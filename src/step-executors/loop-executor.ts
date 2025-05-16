@@ -1,10 +1,12 @@
 import { Step, StepExecutionContext } from '../types';
 import { StepExecutor, StepExecutionResult, StepType, LoopStep } from './types';
 import { Logger } from '../util/logger';
+import { ValidationError, LoopStepExecutionError } from '../errors/base';
 
 export type ExecuteStep = (
   step: Step,
   extraContext?: Record<string, any>,
+  signal?: AbortSignal,
 ) => Promise<StepExecutionResult>;
 
 export class LoopStepExecutor implements StepExecutor {
@@ -25,6 +27,7 @@ export class LoopStepExecutor implements StepExecutor {
     step: Step,
     context: StepExecutionContext,
     extraContext: Record<string, any> = {},
+    signal?: AbortSignal,
   ): Promise<StepExecutionResult> {
     if (!this.canExecute(step)) {
       throw new Error('Invalid step type for LoopStepExecutor');
@@ -33,7 +36,9 @@ export class LoopStepExecutor implements StepExecutor {
     const loopStep = step as LoopStep;
 
     if (!loopStep.loop.step && !loopStep.loop.steps) {
-      throw new Error('Loop must have either step or steps defined');
+      throw new ValidationError('Loop must have either step or steps defined', {
+        stepName: step.name,
+      });
     }
 
     this.logger.debug('Starting loop execution', {
@@ -47,17 +52,12 @@ export class LoopStepExecutor implements StepExecutor {
       const collection = context.expressionEvaluator.evaluate(loopStep.loop.over, extraContext);
 
       if (!Array.isArray(collection)) {
-        throw new Error(
-          `Loop "over" value must resolve to an array. ${JSON.stringify(
-            {
-              over: loopStep.loop.over,
-              resolvedValue: collection,
-              contextKeys: Object.keys(extraContext),
-            },
-            null,
-            2,
-          )}`,
-        );
+        throw new ValidationError(`Loop "over" value must resolve to an array`, {
+          stepName: step.name,
+          over: loopStep.loop.over,
+          resolvedValue: collection,
+          contextKeys: Object.keys(extraContext),
+        });
       }
 
       this.logger.debug('Resolved loop collection', {
@@ -75,6 +75,10 @@ export class LoopStepExecutor implements StepExecutor {
       const iterationHistory: any[] = [];
 
       for (const item of collection) {
+        if (signal?.aborted) {
+          this.logger.warn('Loop aborted by signal', { stepName: step.name });
+          break;
+        }
         // Check if we've reached maxIterations
         if (iterationCount >= maxIterations) {
           this.logger.debug('Reached maximum iterations', {
@@ -122,6 +126,7 @@ export class LoopStepExecutor implements StepExecutor {
           const conditionMet = context.expressionEvaluator.evaluate(
             loopStep.loop.condition,
             iterationContext,
+            step,
           );
 
           if (!conditionMet) {
@@ -140,13 +145,13 @@ export class LoopStepExecutor implements StepExecutor {
         });
 
         if (loopStep.loop.step) {
-          const result = await this.executeStep(loopStep.loop.step, iterationContext);
+          const result = await this.executeStep(loopStep.loop.step, iterationContext, signal);
           results.push(result);
           executedCount++;
         } else if (loopStep.loop.steps) {
           const stepResults = [];
           for (const stepToExecute of loopStep.loop.steps) {
-            const result = await this.executeStep(stepToExecute, iterationContext);
+            const result = await this.executeStep(stepToExecute, iterationContext, signal);
             stepResults.push(result);
           }
           results.push({
@@ -197,7 +202,15 @@ export class LoopStepExecutor implements StepExecutor {
         error: errorMessage,
       });
 
-      throw new Error(errorMessage);
+      throw new LoopStepExecutionError(
+        errorMessage,
+        {
+          stepName: step.name,
+          loop: loopStep.loop,
+          originalError: error,
+        },
+        error,
+      );
     }
   }
 }

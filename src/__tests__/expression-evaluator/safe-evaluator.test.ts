@@ -155,6 +155,25 @@ describe('SafeExpressionEvaluator', () => {
       // Test spreading object values into array
       expect(evaluator.evaluate('[...${context.object}]', {})).toEqual([1, 2]);
     });
+
+    it('evaluates whitelisted global function calls', () => {
+      expect(evaluator.evaluate('Number("123")', {})).toBe(123);
+      expect(evaluator.evaluate('String(123)', {})).toBe('123');
+      expect(evaluator.evaluate('Boolean(0)', {})).toBe(false);
+      expect(evaluator.evaluate('Boolean(1)', {})).toBe(true);
+      expect(evaluator.evaluate('parseInt("42")', {})).toBe(42);
+      expect(evaluator.evaluate('parseFloat("3.14")', {})).toBeCloseTo(3.14);
+      // Arguments can be expressions
+      expect(evaluator.evaluate('Number(100 + 23)', {})).toBe(123);
+      // Nested function calls
+      expect(evaluator.evaluate('String(Number("456"))', {})).toBe('456');
+    });
+
+    it('throws on non-whitelisted function calls', () => {
+      expect(() => evaluator.evaluate('eval("2+2")', {})).toThrow(ExpressionError);
+      expect(() => evaluator.evaluate('alert("hi")', {})).toThrow(ExpressionError);
+      expect(() => evaluator.evaluate('Function("return 1")', {})).toThrow(ExpressionError);
+    });
   });
 
   describe('error handling', () => {
@@ -207,10 +226,21 @@ describe('SafeExpressionEvaluator', () => {
     it('throws on expression timeout', async () => {
       // Create a complex expression that will timeout
       const complexExpression = Array(100).fill('1 + ').join('') + '1';
-      (evaluator as any).TIMEOUT_MS = 1; // Set timeout to 1ms
-      expect(() => evaluator.evaluate(complexExpression, {})).toThrow(
-        'Expression evaluation timed out',
-      );
+
+      // Mock Date.now to simulate timeout
+      const originalDateNow = Date.now;
+      let callCount = 0;
+      Date.now = jest.fn(() => {
+        callCount++;
+        return callCount === 1 ? 1000 : 1000 + 10000; // Jump 10 seconds on second call
+      });
+
+      try {
+        expect(() => evaluator.evaluate(complexExpression, {})).toThrow(/timeout/);
+      } finally {
+        // Restore original Date.now
+        Date.now = originalDateNow;
+      }
     });
 
     it('throws on expression length limit', () => {

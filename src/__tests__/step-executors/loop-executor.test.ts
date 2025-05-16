@@ -10,7 +10,7 @@ import { StepExecutionContext } from '../../types';
 
 import { SafeExpressionEvaluator } from '../../expression-evaluator/safe-evaluator';
 import { ReferenceResolver } from '../../reference-resolver';
-import { noLogger } from '../../util/logger';
+import { noLogger, TestLogger } from '../../util/logger';
 
 interface TestResult {
   success: boolean;
@@ -27,13 +27,15 @@ describe('LoopStepExecutor', () => {
   let context: StepExecutionContext;
   let executeStep: jest.Mock;
   let stepResults: Map<string, any>;
+  let testLogger: TestLogger;
 
   beforeEach(() => {
+    testLogger = new TestLogger('LoopStepExecutor');
     executeStep = jest.fn();
-    executor = new LoopStepExecutor(executeStep, noLogger);
+    executor = new LoopStepExecutor(executeStep, testLogger);
     stepResults = new Map();
-    const referenceResolver = new ReferenceResolver(stepResults, {}, noLogger);
-    const expressionEvaluator = new SafeExpressionEvaluator(noLogger, referenceResolver);
+    const referenceResolver = new ReferenceResolver(stepResults, {}, testLogger);
+    const expressionEvaluator = new SafeExpressionEvaluator(testLogger, referenceResolver);
     context = {
       referenceResolver,
       expressionEvaluator,
@@ -43,6 +45,11 @@ describe('LoopStepExecutor', () => {
     };
     // Add spies to the real expression evaluator
     jest.spyOn(context.expressionEvaluator, 'evaluate');
+  });
+
+  afterEach(() => {
+    //testLogger.print();
+    testLogger.clear();
   });
 
   it('executes a simple loop over array', async () => {
@@ -286,6 +293,7 @@ describe('LoopStepExecutor', () => {
           current: iterationHistory[0],
         },
       }),
+      undefined,
     );
 
     expect(executeStep).toHaveBeenCalledWith(
@@ -297,6 +305,7 @@ describe('LoopStepExecutor', () => {
           current: iterationHistory[1],
         },
       }),
+      undefined,
     );
 
     // Verify expression evaluator calls
@@ -395,6 +404,7 @@ describe('LoopStepExecutor', () => {
           current: iterationHistory[0],
         },
       }),
+      undefined,
     );
     expect(executeStep).toHaveBeenCalledWith(
       expect.any(Object),
@@ -405,6 +415,7 @@ describe('LoopStepExecutor', () => {
           current: iterationHistory[1],
         },
       }),
+      undefined,
     );
   });
 
@@ -686,18 +697,22 @@ describe('LoopStepExecutor', () => {
     expect(executeStep).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'validateItem' }),
       expect.objectContaining({ item: items[0] }),
+      undefined,
     );
     expect(executeStep).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'processItem' }),
       expect.objectContaining({ item: items[0] }),
+      undefined,
     );
     expect(executeStep).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'validateItem' }),
       expect.objectContaining({ item: items[1] }),
+      undefined,
     );
     expect(executeStep).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'processItem' }),
       expect.objectContaining({ item: items[1] }),
+      undefined,
     );
   });
 });

@@ -21,6 +21,26 @@ export class FlowError extends Error {
     // Set up the prototype chain for instanceof checks
     Object.setPrototypeOf(this, FlowError.prototype);
   }
+
+  toString(options?: { includeStack?: boolean }): string {
+    let str = `${this.name}: ${this.message}`;
+    if (this.code) str += ` [code=${this.code}]`;
+    if (this.context) {
+      for (const [key, value] of Object.entries(this.context)) {
+        if (key === 'cause' || key === 'lastError' || key === 'code' || key === 'lastErrorCode')
+          continue; // handled below
+        let val = value;
+        if (key === 'step') {
+          val = value.name;
+        }
+        str += ` [${key}=${val}]`;
+      }
+    }
+    if (options?.includeStack && this.stack) {
+      str += `\n${this.stack}`;
+    }
+    return str;
+  }
 }
 
 /**
@@ -47,17 +67,6 @@ export class ExecutionError extends FlowError {
 }
 
 /**
- * Error class for timeout errors
- */
-export class TimeoutError extends FlowError {
-  constructor(message: string, context: Record<string, any>) {
-    super(message, ErrorCode.TIMEOUT_ERROR, context);
-    this.name = 'TimeoutError';
-    Object.setPrototypeOf(this, TimeoutError.prototype);
-  }
-}
-
-/**
  * Error class for state errors
  */
 export class StateError extends FlowError {
@@ -65,5 +74,57 @@ export class StateError extends FlowError {
     super(message, ErrorCode.STATE_ERROR, context);
     this.name = 'StateError';
     Object.setPrototypeOf(this, StateError.prototype);
+  }
+}
+type RetryErrorContext = {
+  code: ErrorCode.MAX_RETRIES_EXCEEDED;
+  attempts: number;
+  lastError: string;
+  lastErrorType?: string;
+  lastErrorCode: string;
+  policy: any;
+};
+export class MaxRetriesExceededError extends ExecutionError {
+  public readonly allErrors: any[];
+
+  constructor(message: string, context: RetryErrorContext, allErrors: any[], cause?: Error) {
+    super(
+      message,
+      {
+        code: context.code,
+        attempts: context.attempts,
+        policyMaxAttempts: context.policy.maxAttempts,
+      },
+      cause,
+    );
+    this.name = 'MaxRetriesExceededError';
+    this.allErrors = allErrors;
+    Object.setPrototypeOf(this, MaxRetriesExceededError.prototype);
+  }
+
+  toString(options?: { includeStack?: boolean }): string {
+    let str = super.toString(options);
+    if (this.allErrors && this.allErrors.length > 0) {
+      str += `\nAll errors in retry chain:`;
+      this.allErrors.forEach((err, idx) => {
+        if (typeof err?.toString === 'function') {
+          str += `\n  [${idx + 1}] ${err.toString({ ...options, includeStack: false })}`;
+        } else {
+          str += `\n  [${idx + 1}] ${String(err)}`;
+        }
+      });
+    }
+    return str;
+  }
+}
+
+/**
+ * Error class for loop step execution errors
+ */
+export class LoopStepExecutionError extends ExecutionError {
+  constructor(message: string, context: Record<string, any>, cause?: Error) {
+    super(message, { ...context, code: ErrorCode.EXECUTION_ERROR }, cause);
+    this.name = 'LoopStepExecutionError';
+    Object.setPrototypeOf(this, LoopStepExecutionError.prototype);
   }
 }

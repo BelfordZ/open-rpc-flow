@@ -4,8 +4,8 @@ import { Logger } from '../util/logger';
 import { ValidationError, ExecutionError } from '../errors/base';
 import { TimeoutError } from '../errors/timeout-error';
 
-class ConditionStepExecutionError extends ExecutionError {
-  constructor(message: string, context: Record<string, any>, cause?: Error) {
+class ConditionStepExecutionError extends ExecutionError<Record<string, unknown>> {
+  constructor(message: string, context: Record<string, unknown>, cause?: Error) {
     super(message, { ...context, code: 'EXECUTION_ERROR' }, cause);
     this.name = 'ConditionStepExecutionError';
     Object.setPrototypeOf(this, ConditionStepExecutionError.prototype);

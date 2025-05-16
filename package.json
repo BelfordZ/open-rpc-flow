@@ -26,6 +26,10 @@
     "workflow",
     "automation"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/open-rpc/open-rpc-flow"
+  },
   "author": "",
   "license": "MIT",
   "devDependencies": {

@@ -43,12 +43,12 @@ export class StopStepExecutor implements StepExecutor {
 
     // Perform cleanup and termination logic here
     if (endWorkflow) {
-      this.logger.log('Terminating entire workflow', { stepName: step.name });
+      this.logger.info('Terminating entire workflow', { stepName: step.name });
       if (this.globalAbortController && !this.globalAbortController.signal.aborted) {
         this.globalAbortController.abort('Stopped by stop step');
       }
     } else {
-      this.logger.log('Terminating current branch', { stepName: step.name });
+      this.logger.info('Terminating current branch', { stepName: step.name });
       // Add logic to terminate the current branch of the workflow
     }
 

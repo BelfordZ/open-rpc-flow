@@ -386,7 +386,10 @@ All timeouts must be:
 
 ## Event Emitter Interface
 
-The flow executor includes an event emitter that allows you to receive real-time updates during flow execution. This is useful for monitoring progress, logging, and integrating with external systems.
+The flow executor exposes a `FlowExecutorEvents` instance built on Node's
+`EventEmitter`. It emits strongly typed events during execution so you can
+monitor progress, log information or integrate with external systems in real
+time. All event names are available through the `FlowEventType` enum.
 
 ### Using the Event Emitter
 
@@ -418,6 +421,9 @@ executor.events.on(FlowEventType.STEP_COMPLETE, (event) => {
 const results = await executor.execute();
 ```
 
+See [**src/examples/event-emitter-example.ts**](src/examples/event-emitter-example.ts)
+for a full working example.
+
 ### Available Events
 
 | Event Type            | Description                                        |
@@ -430,6 +436,20 @@ const results = await executor.execute();
 | `step:error`          | Emitted when a step execution fails                |
 | `step:skip`           | Emitted when a step is skipped                     |
 | `dependency:resolved` | Emitted when dependencies are resolved             |
+
+### Event Payloads
+
+Each emitted event carries a typed payload. Below is a quick reference of the
+most useful fields:
+
+| Event           | Key fields                                   |
+| --------------- | -------------------------------------------- |
+| `flow:start`    | `flowName`, `orderedSteps`                   |
+| `flow:complete` | `flowName`, `results`, `duration`            |
+| `flow:error`    | `flowName`, `error`, `duration`              |
+| `step:start`    | `stepName`, `stepType`, `context?`           |
+| `step:complete` | `stepName`, `stepType`, `result`, `duration` |
+| `step:error`    | `stepName`, `stepType`, `error`, `duration`  |
 
 ### Configuration Options
 

@@ -170,6 +170,14 @@ describe('TestLogger', () => {
       data: { three: 3 },
     });
   });
+
+  test('captures info logs', () => {
+    const logger = new TestLogger('InfoTest');
+    logger.info('hello', { a: 1 });
+    expect(logger.getLogs()).toEqual([
+      { level: 'info', message: 'hello', data: { a: 1 } },
+    ]);
+  });
 });
 
 describe('NoLogger', () => {

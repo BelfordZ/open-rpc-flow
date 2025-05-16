@@ -4,6 +4,7 @@ import { createMockContext } from '../test-utils';
 import { TestLogger } from '../../util/logger';
 import { ErrorCode } from '../../errors/codes';
 import { ExecutionError } from '../../errors/base';
+import { TimeoutError } from '../../errors/timeout-error';
 import { RequestStepExecutor } from '../../step-executors';
 import { PolicyResolver } from '../../util/policy-resolver';
 
@@ -550,6 +551,49 @@ describe('RequestStepExecutor', () => {
       }),
       { signal: abortController.signal },
     );
+  });
+
+  it('uses passed signal when no context signal', async () => {
+    const step: RequestStep = {
+      name: 'signalArgTest',
+      request: { method: 'test.method', params: {} },
+    };
+    const ac = new AbortController();
+    await executor.execute(step, context, {}, ac.signal);
+    expect(jsonRpcHandler).toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'test.method' }),
+      { signal: ac.signal },
+    );
+  });
+
+  it('prefers context signal over passed signal', async () => {
+    const step: RequestStep = {
+      name: 'signalPrecedence',
+      request: { method: 'test.method', params: {} },
+    };
+    const ctxAC = new AbortController();
+    const argAC = new AbortController();
+    const ctx = { ...context, signal: ctxAC.signal };
+    await executor.execute(step, ctx, {}, argAC.signal);
+    expect(jsonRpcHandler).toHaveBeenCalledWith(
+      expect.anything(),
+      { signal: ctxAC.signal },
+    );
+  });
+
+  it('times out when handler does not respond in time', async () => {
+    jest.useFakeTimers();
+    const step: RequestStep = {
+      name: 'timeoutTest',
+      request: { method: 'test.method', params: {} },
+      policies: { timeout: { timeout: 100 } },
+    };
+    jsonRpcHandler.mockImplementation(() => new Promise(() => {}));
+    const promise = executor.execute(step, context);
+    jest.advanceTimersByTime(200);
+    await Promise.resolve();
+    await expect(promise).rejects.toThrow(/execution timed out/);
+    jest.useRealTimers();
   });
 
   it('handles custom errors properly', async () => {

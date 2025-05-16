@@ -304,6 +304,37 @@ describe('Transform Executors', () => {
         expect(context.doubled).toEqual([2, 4, 6]);
       });
     });
+
+    describe('abort handling', () => {
+      test('aborts when signal already aborted', async () => {
+        const ac = new AbortController();
+        ac.abort();
+        const ops: TransformOperation[] = [{ type: 'map', using: '${item}' }];
+        await expect(
+          executor.execute(ops, [1, 2], undefined, ac.signal),
+        ).rejects.toThrow('Transform step aborted');
+      });
+
+      const cases: Array<[string, TransformOperation, any[]]> = [
+        ['map', { type: 'map', using: '${item}' }, [1, 2]],
+        ['filter', { type: 'filter', using: '${item > 0}' }, [1, -1]],
+        ['reduce', { type: 'reduce', using: '${acc}+${item}', initial: 0 }, [1, 2]],
+        ['sort', { type: 'sort', using: '${a.key} - ${b.key}' }, [{ key: 3 }, { key: 2 }, { key: 1 }]],
+        ['group', { type: 'group', using: '${item.key}' }, [{ key: 'a' }, { key: 'b' }]],
+      ];
+
+      test.each(cases)('aborts %s operation when signal aborted mid-execution', async (name, op, data) => {
+        const ac = new AbortController();
+        let count = 0;
+        jest.spyOn(expressionEvaluator, 'evaluate').mockImplementation((expr, ctx) => {
+          if (count++ === 0) ac.abort();
+          return ctx.item ?? ctx.a ?? 0;
+        });
+        await expect(
+          executor.execute([op], data as any[], undefined, ac.signal),
+        ).rejects.toThrow(`Transform ${name} operation aborted`);
+      });
+    });
   });
 
   describe('TransformStepExecutor', () => {

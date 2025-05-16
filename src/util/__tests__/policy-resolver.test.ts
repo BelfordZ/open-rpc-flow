@@ -149,4 +149,16 @@ describe('PolicyResolver', () => {
     );
     expect(resolver.resolveRetryPolicy(baseStep, 'transform')).toBeUndefined();
   });
+
+  it('uses override policies when provided', () => {
+    const overrides = { timeout: { timeout: 999 } };
+    const resolver = new PolicyResolver(baseFlow, logger, overrides);
+    expect(resolver.resolveTimeout(baseStep, 'transform')).toBe(999);
+  });
+
+  it('resolves expression evaluation timeout', () => {
+    const step: Step = { ...baseStep, policies: { timeout: { expressionEval: 321 } } };
+    const resolver = new PolicyResolver(baseFlow, logger);
+    expect(resolver.resolveExpressionTimeout(step, 'transform')).toBe(321);
+  });
 });

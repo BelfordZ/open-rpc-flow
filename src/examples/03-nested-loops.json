@@ -1,4 +1,5 @@
 {
+  "$schema": "../meta-schema.json",
   "name": "nested-loops",
   "description": "Demonstrates nested loop operations for complex iteration patterns",
   "steps": [

@@ -16,7 +16,7 @@ describe('StopStepExecutor', () => {
       },
     };
 
-    const result = await executor.execute(step);
+    const result = await executor.execute(step, {});
 
     expect(result.type).toBe('stop');
     expect(result.result.endWorkflow).toBe(true);
@@ -31,7 +31,7 @@ describe('StopStepExecutor', () => {
       },
     };
 
-    const result = await executor.execute(step);
+    const result = await executor.execute(step, {});
 
     expect(result.type).toBe('stop');
     expect(result.result.endWorkflow).toBe(false);
@@ -44,7 +44,7 @@ describe('StopStepExecutor', () => {
       stop: {},
     };
 
-    const result = await executor.execute(step);
+    const result = await executor.execute(step, {});
 
     expect(result.type).toBe('stop');
     expect(result.result.endWorkflow).toBe(false);
@@ -60,7 +60,7 @@ describe('StopStepExecutor', () => {
       },
     };
 
-    await expect(executor.execute(invalidStep as any)).rejects.toThrow(
+    await expect(executor.execute(invalidStep as any, {})).rejects.toThrow(
       'Invalid step type for StopStepExecutor',
     );
   });

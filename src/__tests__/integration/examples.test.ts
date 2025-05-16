@@ -10,6 +10,7 @@ import {
   conditionalBranchingFlow,
   complexDataPipelineFlow,
   stopFlowExample,
+  errorHandlingFlow,
 } from '../../examples';
 
 // Mock responses for different methods
@@ -234,7 +235,7 @@ describe('Example Flow Files', () => {
   };
 
   test('examples array contains all flows', () => {
-    expect(examples).toHaveLength(6);
+    expect(examples).toHaveLength(7);
     examples.forEach((flow) => {
       validateFlow(flow);
     });
@@ -262,6 +263,10 @@ describe('Example Flow Files', () => {
 
   test('stop flow is properly typed', () => {
     validateFlow(stopFlowExample);
+  });
+
+  test('error handling flow is properly typed', () => {
+    validateFlow(errorHandlingFlow);
   });
 
   describe('Stop Flow Integration', () => {

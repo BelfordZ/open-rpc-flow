@@ -1,4 +1,5 @@
 {
+  "$schema": "../meta-schema.json",
   "name": "simple-request",
   "description": "Demonstrates a basic request flow with parameter substitution",
   "context": {

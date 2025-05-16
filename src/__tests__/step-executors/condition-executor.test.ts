@@ -1,19 +1,31 @@
 import { ConditionStepExecutor } from '../../step-executors';
 import { ConditionStep, StepType } from '../../step-executors/types';
 import { StepExecutionResult } from '../../step-executors';
-import { noLogger } from '../../util/logger';
+import { TestLogger } from '../../util/logger';
 import { createMockContext } from '../test-utils';
 import { StepExecutionContext } from '../../types';
+import { PolicyResolver } from '../../util/policy-resolver';
+import { TimeoutError } from '../../errors/timeout-error';
 
 describe('ConditionStepExecutor', () => {
   let executor: ConditionStepExecutor;
   let context: StepExecutionContext;
   let executeStep: jest.Mock;
+  let testLogger: TestLogger;
 
   beforeEach(() => {
+    testLogger = new TestLogger('ConditionStepExecutor');
     executeStep = jest.fn();
-    executor = new ConditionStepExecutor(executeStep, noLogger);
+    // Provide a minimal PolicyResolver instance
+    const dummyFlow = { name: 'dummy', description: '', steps: [] };
+    const policyResolver = new PolicyResolver(dummyFlow, testLogger);
+    executor = new ConditionStepExecutor(executeStep, testLogger, policyResolver);
     context = createMockContext();
+  });
+
+  afterEach(() => {
+    //testLogger.print();
+    testLogger.clear();
   });
 
   it('executes then branch when condition is true', async () => {
@@ -315,5 +327,50 @@ describe('ConditionStepExecutor', () => {
     expect(result.metadata.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
     expect(result.result).toBeUndefined();
     expect(executeStep).not.toHaveBeenCalled();
+  });
+
+  it('uses fallback timeout when no resolver provided', async () => {
+    jest.useFakeTimers();
+    executor = new ConditionStepExecutor(executeStep, testLogger, undefined as any);
+    const step: ConditionStep = {
+      name: 'timeoutStep',
+      condition: { if: 'true', then: { name: 'noop' } },
+    };
+    executeStep.mockImplementation(
+      () =>
+        new Promise((res) =>
+          setTimeout(() => res({ result: true, type: StepType.Request, metadata: {} }), 6000),
+        ),
+    );
+    const promise = executor.execute(step, context);
+    jest.advanceTimersByTime(5000);
+    await Promise.resolve();
+    await expect(promise).rejects.toThrow(TimeoutError);
+    jest.useRealTimers();
+  });
+
+  it('propagates pre-aborted signal', async () => {
+    const ac = new AbortController();
+    ac.abort();
+    const step: ConditionStep = {
+      name: 'abortTest',
+      condition: { if: 'true', then: { name: 'noop' } },
+    };
+    executeStep.mockImplementation((_s, _ctx, signal) => {
+      if (signal?.aborted) throw new Error('aborted');
+      return Promise.resolve({ result: true, type: StepType.Request, metadata: {} });
+    });
+    await expect(executor.execute(step, context, {}, ac.signal)).rejects.toThrow('aborted');
+  });
+
+  it('wraps errors from executeStep', async () => {
+    const step: ConditionStep = {
+      name: 'wrapTest',
+      condition: { if: 'true', then: { name: 'noop' } },
+    };
+    executeStep.mockRejectedValue(new Error('boom'));
+    await expect(executor.execute(step, context)).rejects.toThrow(
+      'Failed to execute condition step "wrapTest"',
+    );
   });
 });

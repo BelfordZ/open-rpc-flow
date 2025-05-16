@@ -5,16 +5,106 @@ import { Logger } from './util/logger';
 
 export type StepType = 'request' | 'loop' | 'condition' | 'transform' | 'stop';
 
+/**
+ * Policies for a specific step type or as a default for all steps
+ */
+export interface Policies {
+  /**
+   * Retry policy configuration
+   */
+  retryPolicy?: {
+    /**
+     * Maximum number of retry attempts
+     * @minimum 0
+     * @maximum 100
+     * @default 3
+     */
+    maxAttempts?: number;
+    /**
+     * Backoff configuration for retries
+     */
+    backoff?: {
+      /**
+       * The strategy to use for the backoff
+       * @default "exponential"
+       */
+      strategy?: 'exponential' | 'linear';
+      /**
+       * Initial delay in milliseconds
+       */
+      initial?: number;
+      /**
+       * Multiplier/exponent for the backoff
+       */
+      multiplier?: number;
+      /**
+       * Maximum delay in milliseconds
+       * @default 5000
+       */
+      maxDelay?: number;
+    };
+    /**
+     * List of error codes that are considered retryable
+     */
+    retryableErrors?: string[];
+  };
+  /**
+   * Timeout policy configuration
+   */
+  timeout?: {
+    /**
+     * Timeout in milliseconds
+     * @default 10000
+     */
+    timeout?: number;
+    /**
+     * Timeout for expression evaluation in milliseconds
+     * @default 1000
+     */
+    expressionEval?: number;
+  };
+}
+
+/**
+ * Metaschema-compliant policies for the flow
+ * - global: applies to the whole flow
+ * - step: can be a default for all steps, or per-stepType (request, transform, etc)
+ */
+export interface FlowPolicies {
+  global?: Policies;
+  step?: {
+    // Per-stepType policies (metaschema-compliant)
+    request?: Policies;
+    transform?: Policies;
+    loop?: Policies;
+    condition?: Policies;
+    stop?: Policies;
+    // Default for all steps (metaschema-compliant)
+    timeout?: Policies['timeout'];
+    retryPolicy?: Policies['retryPolicy'];
+    // Allow additional keys for future extensibility
+    [key: string]: any;
+  };
+}
+
 export interface Flow {
   name: string;
   description: string;
   steps: Step[];
   context?: Record<string, any>;
+  /**
+   * Global and step-level policies for the flow (metaschema-compliant)
+   */
+  policies?: FlowPolicies;
 }
 
 export interface Step {
   name: string;
   description?: string;
+  /**
+   * Optional policies for this specific step
+   */
+  policies?: Policies;
   request?: {
     method: string;
     params: Record<string, any> | any[];
@@ -33,12 +123,13 @@ export interface Step {
     else?: Step;
   };
   transform?: {
-    input?: string;
+    input?: string | any[];
     operations: TransformOperation[];
   };
   stop?: {
     endWorkflow?: boolean;
   };
+  timeout?: number;
 }
 
 export interface JsonRpcRequest {
@@ -49,6 +140,29 @@ export interface JsonRpcRequest {
 }
 
 /**
+ * Options for JsonRpcHandler requests
+ */
+export interface JsonRpcHandlerOptions {
+  /**
+   * AbortSignal that can be used to cancel the request
+   */
+  signal?: AbortSignal;
+
+  /**
+   * Additional options specific to the JsonRpcHandler implementation
+   */
+  [key: string]: any;
+}
+
+/**
+ * Function signature for the JsonRpcHandler
+ */
+export type JsonRpcHandler = (
+  request: JsonRpcRequest,
+  options?: JsonRpcHandlerOptions,
+) => Promise<any>;
+
+/**
  * Represents the execution context available to all step executors
  */
 export interface StepExecutionContext {
@@ -57,6 +171,14 @@ export interface StepExecutionContext {
   stepResults: Map<string, any>;
   context: Record<string, any>;
   logger: Logger;
+  /**
+   * AbortSignal that can be used to cancel operations
+   */
+  signal?: AbortSignal;
+  /**
+   * The flow being executed (for accessing flow-level configuration)
+   */
+  flow?: Flow;
 }
 
 /**
@@ -78,4 +200,16 @@ export interface DependencyGraph {
     from: string;
     to: string;
   }>;
+}
+
+/**
+ * Utility to determine the step type from a Step object
+ */
+export function getStepType(step: Step): string {
+  if (step.request) return 'request';
+  if (step.loop) return 'loop';
+  if (step.condition) return 'condition';
+  if (step.transform) return 'transform';
+  if (step.stop) return 'stop';
+  return 'unknown';
 }

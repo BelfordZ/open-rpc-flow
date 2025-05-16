@@ -327,13 +327,6 @@ describe('SafeExpressionEvaluator Coverage Improvements', () => {
       expect(() => evaluator['extractReferences'](expr4)).not.toThrow();
     });
 
-    it('tests isSpecialVariable functionality', () => {
-      // Check if isSpecialVariable is working (we may not know what variables are "special")
-      const isSpecial = evaluator['isSpecialVariable']('this');
-      // Just check the return type is boolean
-      expect(typeof isSpecial).toBe('boolean');
-    });
-
     // Additional tests to target lines 614-617
     it('handles nested references correctly', () => {
       // This will test the recursive call to extractRefs
@@ -551,11 +544,10 @@ describe('SafeExpressionEvaluator Coverage Improvements', () => {
   describe('timeout handling', () => {
     it('respects the timeout when evaluating expressions', () => {
       // This is difficult to test directly without modifying the class,
-      // but we can test that the timeout check method exists
-      expect(() => evaluator['checkTimeout'](Date.now() - 2000)).toThrow(ExpressionError);
-      expect(() => evaluator['checkTimeout'](Date.now() - 2000)).toThrow(
-        'Expression evaluation timed out',
-      );
+      // but we can test that the timeout check method works
+      const testExpression = '1 + 1';
+      expect(() => evaluator['checkTimeout'](Date.now() - 2000, testExpression)).toThrow();
+      expect(() => evaluator['checkTimeout'](Date.now() - 2000, testExpression)).toThrow(/timeout/);
     });
   });
 

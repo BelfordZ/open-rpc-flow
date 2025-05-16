@@ -1,3 +1,38 @@
+## [1.4.4](https://github.com/BelfordZ/open-rpc-flow/compare/v1.4.3...v1.4.4) (2025-05-16)
+
+
+### Bug Fixes
+
+* update readme ([#59](https://github.com/BelfordZ/open-rpc-flow/issues/59)) ([7f5d691](https://github.com/BelfordZ/open-rpc-flow/commit/7f5d6915880bb02c6bbe6e93f6f98abc95cc5c39))
+
+## [1.4.3](https://github.com/BelfordZ/open-rpc-flow/compare/v1.4.2...v1.4.3) (2025-05-16)
+
+
+### Bug Fixes
+
+* typo ([#57](https://github.com/BelfordZ/open-rpc-flow/issues/57)) ([c9afcfc](https://github.com/BelfordZ/open-rpc-flow/commit/c9afcfc486d8303533f7019fd39f048e655cc562))
+
+## [1.4.2](https://github.com/BelfordZ/open-rpc-flow/compare/v1.4.1...v1.4.2) (2025-05-16)
+
+
+### Bug Fixes
+
+* improve examples ([#56](https://github.com/BelfordZ/open-rpc-flow/issues/56)) ([58181e3](https://github.com/BelfordZ/open-rpc-flow/commit/58181e38656c0879006b62f87691cafd4a09f6ea))
+
+## [1.4.1](https://github.com/BelfordZ/open-rpc-flow/compare/v1.4.0...v1.4.1) (2025-05-16)
+
+
+### Bug Fixes
+
+* update readme ([#55](https://github.com/BelfordZ/open-rpc-flow/issues/55)) ([11a4b8c](https://github.com/BelfordZ/open-rpc-flow/commit/11a4b8c8629a2423be4ae9f02a1ba1c1a17c77a3))
+
+# [1.4.0](https://github.com/BelfordZ/open-rpc-flow/compare/v1.3.7...v1.4.0) (2025-05-16)
+
+
+### Features
+
+* events ([#48](https://github.com/BelfordZ/open-rpc-flow/issues/48)) ([3ff27f3](https://github.com/BelfordZ/open-rpc-flow/commit/3ff27f377b04d8b6e57a9ded15b1ec7c35357497))
+
 ## [1.3.7](https://github.com/BelfordZ/open-rpc-flow/compare/v1.3.6...v1.3.7) (2025-03-29)
 
 

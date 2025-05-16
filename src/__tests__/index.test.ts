@@ -1,6 +1,6 @@
 import { Flow, FlowExecutor, JsonRpcRequest } from '../index';
 import { StepType } from '../step-executors/types';
-import { TestLogger, noLogger } from '../util/logger';
+import { TestLogger } from '../util/logger';
 
 const testLogger = new TestLogger('FlowExecutorTest');
 
@@ -55,7 +55,7 @@ describe('FlowExecutor', () => {
       ],
     };
 
-    const executor = new FlowExecutor(flow, mockJsonRpcHandler, noLogger);
+    const executor = new FlowExecutor(flow, mockJsonRpcHandler, testLogger);
     const results = await executor.execute();
 
     expect(mockJsonRpcHandler).toHaveBeenCalledTimes(1);
@@ -102,7 +102,7 @@ describe('FlowExecutor', () => {
       ],
     };
 
-    const executor = new FlowExecutor(flow, mockJsonRpcHandler, noLogger);
+    const executor = new FlowExecutor(flow, mockJsonRpcHandler, testLogger);
     const results = await executor.execute();
 
     expect(mockJsonRpcHandler).toHaveBeenCalledTimes(3); // 1 getData + 2 processItem (limited by maxIterations)
@@ -159,7 +159,7 @@ describe('FlowExecutor', () => {
       ],
     };
 
-    const executor = new FlowExecutor(flow, mockJsonRpcHandler, noLogger);
+    const executor = new FlowExecutor(flow, mockJsonRpcHandler, testLogger);
     const results = await executor.execute();
 
     expect(mockJsonRpcHandler).toHaveBeenCalledTimes(2);
@@ -208,7 +208,7 @@ describe('FlowExecutor', () => {
               },
               {
                 type: 'sort',
-                using: '${a.key} - ${b.key}',
+                using: 'Number(${a.key}) - Number(${b.key})',
               },
             ],
           },
@@ -216,7 +216,7 @@ describe('FlowExecutor', () => {
       ],
     };
 
-    const executor = new FlowExecutor(flow, mockJsonRpcHandler, noLogger);
+    const executor = new FlowExecutor(flow, mockJsonRpcHandler, testLogger);
     const results = await executor.execute();
 
     expect(results.get('select_fields').result).toEqual([
@@ -228,15 +228,15 @@ describe('FlowExecutor', () => {
     const groupedResults = results.get('group_by_value').result;
     expect(groupedResults).toHaveLength(3);
     expect(groupedResults[0]).toEqual({
-      key: 100,
+      key: '100',
       items: [{ id: 1, name: 'Item 1', value: 100 }],
     });
     expect(groupedResults[1]).toEqual({
-      key: 200,
+      key: '200',
       items: [{ id: 2, name: 'Item 2', value: 200 }],
     });
     expect(groupedResults[2]).toEqual({
-      key: 300,
+      key: '300',
       items: [{ id: 3, name: 'Item 3', value: 300 }],
     });
   });
@@ -276,7 +276,7 @@ describe('FlowExecutor', () => {
       ],
     };
 
-    const executor = new FlowExecutor(flow, mockJsonRpcHandler, noLogger);
+    const executor = new FlowExecutor(flow, mockJsonRpcHandler, testLogger);
     const results = await executor.execute();
 
     const transformedData = results.get('transform_data');
@@ -316,7 +316,7 @@ describe('FlowExecutor', () => {
       ],
     };
 
-    const executor = new FlowExecutor(flow, mockJsonRpcHandler, noLogger);
+    const executor = new FlowExecutor(flow, mockJsonRpcHandler, testLogger);
     const results = await executor.execute();
 
     const filteredData = results.get('filter_by_context');
@@ -352,7 +352,7 @@ describe('FlowExecutor', () => {
       ],
     };
 
-    const executor = new FlowExecutor(flow, mockJsonRpcHandler, noLogger);
+    const executor = new FlowExecutor(flow, mockJsonRpcHandler, testLogger);
     await expect(executor.execute()).rejects.toThrow('Cannot access property');
   });
 
@@ -397,7 +397,7 @@ describe('FlowExecutor', () => {
       ],
     };
 
-    const executor = new FlowExecutor(flow, mockJsonRpcHandler, noLogger);
+    const executor = new FlowExecutor(flow, mockJsonRpcHandler, testLogger);
     const results = await executor.execute();
 
     expect(mockJsonRpcHandler).toHaveBeenCalledTimes(5); // 1 getData + (2 outer * 2 inner)
@@ -456,7 +456,7 @@ describe('FlowExecutor', () => {
       ],
     };
 
-    const executor = new FlowExecutor(flow, mockJsonRpcHandler, noLogger);
+    const executor = new FlowExecutor(flow, mockJsonRpcHandler, testLogger);
     const results = await executor.execute();
 
     expect(mockJsonRpcHandler).toHaveBeenCalledTimes(2); // getData + processItem
@@ -533,7 +533,7 @@ describe('FlowExecutor', () => {
         },
       ],
     };
-    const executor = new FlowExecutor(flow, mockJsonRpcHandler, noLogger);
+    const executor = new FlowExecutor(flow, mockJsonRpcHandler, testLogger);
     const results = await executor.execute();
 
     expect(results.get('step1').result.result).toEqual('foo');
@@ -565,7 +565,7 @@ describe('FlowExecutor', () => {
         },
       ],
     };
-    const executor = new FlowExecutor(flow, mockJsonRpcHandler, noLogger);
+    const executor = new FlowExecutor(flow, mockJsonRpcHandler, testLogger);
     const results = await executor.execute();
     expect(results.get('step1').result).toEqual({
       items: [

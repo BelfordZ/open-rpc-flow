@@ -4,12 +4,17 @@ import { ReferenceResolver } from '../reference-resolver';
 import { PathSyntaxError, PropertyAccessError } from '../path-accessor';
 import { tokenize, Token } from './tokenizer';
 import { TokenizerError } from './tokenizer';
+import { TimeoutError } from '../errors/timeout-error';
+import { PolicyResolver } from '../util/policy-resolver';
+import { Step, getStepType } from '../types';
+import { StepType } from '../step-executors/types';
+import { DEFAULT_TIMEOUTS } from '../constants/timeouts';
 
 type Operator = keyof typeof SafeExpressionEvaluator.OPERATORS;
 type StackOperator = Operator | '(' | ')';
 
 interface AstNode {
-  type: 'literal' | 'reference' | 'operation' | 'object' | 'array';
+  type: 'literal' | 'reference' | 'operation' | 'object' | 'array' | 'function_call';
   value?: any;
   path?: string;
   operator?: Operator;
@@ -17,6 +22,8 @@ interface AstNode {
   right?: AstNode;
   properties?: { key: string; value: AstNode; spread?: boolean }[];
   elements?: { value: AstNode; spread?: boolean }[];
+  name?: string;
+  args?: AstNode[];
 }
 
 export class _UnknownReferenceError extends Error {
@@ -28,8 +35,9 @@ export class _UnknownReferenceError extends Error {
 
 export class SafeExpressionEvaluator {
   private static readonly MAX_EXPRESSION_LENGTH = 1000;
-  private TIMEOUT_MS = 1000;
   private logger: Logger;
+  private policyResolver?: PolicyResolver;
+  private defaultExpressionTimeout: number = DEFAULT_TIMEOUTS.expression!;
 
   // Helper functions for operators
   private static ensureNumbers(a: any, b: any, operation: string): void {
@@ -103,14 +111,48 @@ export class SafeExpressionEvaluator {
     '??': (a: any, b: any) => a ?? b,
   } as const;
 
+  // Add whitelist of allowed global functions
+  private static readonly ALLOWED_FUNCTIONS: {
+    [key: string]: (...args: any[]) => any;
+  } = {
+    Number,
+    String,
+    Boolean,
+    parseInt,
+    parseFloat,
+  };
+
   constructor(
     logger: Logger,
     private referenceResolver: ReferenceResolver,
+    policyResolver?: PolicyResolver,
   ) {
     this.logger = logger.createNested('SafeExpressionEvaluator');
+    this.policyResolver = policyResolver;
   }
 
-  evaluate(expression: string, context: Record<string, any>): any {
+  /**
+   * Set the policy resolver to be used for expression timeouts
+   * @param policyResolver The policy resolver
+   */
+  setPolicyResolver(policyResolver: PolicyResolver): void {
+    this.policyResolver = policyResolver;
+  }
+
+  /**
+   * Get the current expression timeout in milliseconds
+   * @param step Optional step context for timeout resolution
+   * @param stepType Optional step type for timeout resolution
+   * @returns The resolved timeout value
+   */
+  getExpressionTimeout(step?: Step, stepType?: string): number {
+    if (this.policyResolver && step && stepType) {
+      return this.policyResolver.resolveExpressionTimeout(step, stepType as any);
+    }
+    return this.defaultExpressionTimeout;
+  }
+
+  evaluate(expression: string, context: Record<string, any>, step?: Step): any {
     this.logger.debug('Evaluating expression:', expression);
     this.logger.debug('Context:', JSON.stringify(context, null, 2));
     this.validateExpression(expression);
@@ -118,7 +160,8 @@ export class SafeExpressionEvaluator {
     this.logger.debug(`Expression validated at: ${startTime}`);
 
     try {
-      this.checkTimeout(startTime);
+      const stepType = step ? getStepType(step) : undefined;
+      this.checkTimeout(startTime, expression, step, stepType);
 
       // Handle simple literals directly
       if (
@@ -168,16 +211,20 @@ export class SafeExpressionEvaluator {
       // Parse and evaluate the AST
       const ast = this.parse(tokens);
       this.logger.debug('AST:', ast);
-      return this.evaluateAst(ast, context, startTime);
+      return this.evaluateAst(ast, context, startTime, expression, step, stepType);
     } catch (error) {
+      let extraHint = '';
       if (
         error instanceof TokenizerError ||
         error instanceof PathSyntaxError ||
         error instanceof PropertyAccessError ||
         error instanceof ExpressionError
       ) {
+        if (typeof expression === 'string' && /^[a-zA-Z_][a-zA-Z0-9_ ]*$/.test(expression.trim())) {
+          extraHint = ` (Did you mean to use a string literal? Wrap your value in quotes, e.g. "'${expression.trim()}'")`;
+        }
         throw new ExpressionError(
-          `Failed to evaluate expression: ${expression}. Got error: ${error.message}`,
+          `Failed to evaluate expression: ${expression}. Got error: ${error.message}${extraHint}`,
         );
       }
       throw error;
@@ -244,15 +291,31 @@ export class SafeExpressionEvaluator {
     }
   }
 
-  private checkTimeout(startTime: number): void {
+  private checkTimeout(
+    startTime: number,
+    expression: string,
+    step?: Step,
+    stepType?: string,
+  ): void {
     const currentTime = Date.now();
     const elapsedTime = currentTime - startTime;
-    this.logger.debug(
-      `Checking timeout - elapsed time: ${elapsedTime}ms, timeout: ${this.TIMEOUT_MS}ms`,
-    );
-    if (elapsedTime > this.TIMEOUT_MS) {
+    const timeout = this.getExpressionTimeout(step, stepType);
+
+    this.logger.debug(`Checking timeout - elapsed time: ${elapsedTime}ms, timeout: ${timeout}ms`);
+
+    if (elapsedTime > timeout) {
       this.logger.error(`Expression evaluation timed out after ${elapsedTime}ms`);
-      throw new ExpressionError('Expression evaluation timed out');
+      this.logger.debug('TimeoutError debug info:', {
+        step,
+        stepType: step ? getStepType(step) : undefined,
+      });
+      throw TimeoutError.forExpression(
+        expression,
+        timeout,
+        elapsedTime,
+        step,
+        step ? (getStepType(step) as StepType) : undefined,
+      );
     }
   }
 
@@ -322,6 +385,40 @@ export class SafeExpressionEvaluator {
 
     for (let i = 0; i < tokens.length; i++) {
       const token = tokens[i];
+
+      // Function call: identifier followed by '('
+      if (token.type === 'identifier' && tokens[i + 1] && tokens[i + 1].value === '(') {
+        // Find matching closing parenthesis
+        let depth = 1;
+        let j = i + 2;
+        const argTokens: Token[] = [];
+        while (j < tokens.length && depth > 0) {
+          if (tokens[j].value === '(') depth++;
+          else if (tokens[j].value === ')') depth--;
+          if (depth > 0) argTokens.push(tokens[j]);
+          j++;
+        }
+        if (depth !== 0) throw new ExpressionError('Mismatched parentheses in function call');
+        // Split args by commas at top level
+        const args: AstNode[] = [];
+        let current: Token[] = [];
+        let argDepth = 0;
+        for (const t of argTokens) {
+          if (t.value === '(') argDepth++;
+          if (t.value === ')') argDepth--;
+          if (t.value === ',' && argDepth === 0) {
+            if (current.length > 0) args.push(this.parse(current));
+            current = [];
+          } else {
+            current.push(t);
+          }
+        }
+        if (current.length > 0) args.push(this.parse(current));
+        outputQueue.push({ type: 'function_call', name: token.value, args });
+        i = j - 1;
+        expectOperator = true;
+        continue;
+      }
 
       // Handle parentheses tokens first, regardless of token type
       if (token.value === '(') {
@@ -564,8 +661,15 @@ export class SafeExpressionEvaluator {
       .join('');
   }
 
-  private evaluateAst(ast: AstNode, context: Record<string, unknown>, startTime: number): unknown {
-    this.checkTimeout(startTime);
+  private evaluateAst(
+    ast: AstNode,
+    context: Record<string, unknown>,
+    startTime: number,
+    expression: string,
+    step?: Step,
+    stepType?: string,
+  ): unknown {
+    this.checkTimeout(startTime, expression, step, stepType);
 
     switch (ast.type) {
       case 'literal':
@@ -592,8 +696,8 @@ export class SafeExpressionEvaluator {
             `Failed to evaluate expression: unknown operator '${ast.operator}'`,
           );
         }
-        const left = this.evaluateAst(ast.left, context, startTime);
-        const right = this.evaluateAst(ast.right, context, startTime);
+        const left = this.evaluateAst(ast.left, context, startTime, expression, step, stepType);
+        const right = this.evaluateAst(ast.right, context, startTime, expression, step, stepType);
         try {
           return operator(left, right);
         } catch (error: unknown) {
@@ -614,14 +718,28 @@ export class SafeExpressionEvaluator {
         const obj: Record<string, unknown> = {};
         for (const prop of ast.properties) {
           if (prop.spread) {
-            const spreadValue = this.evaluateAst(prop.value, context, startTime);
+            const spreadValue = this.evaluateAst(
+              prop.value,
+              context,
+              startTime,
+              expression,
+              step,
+              stepType,
+            );
             if (typeof spreadValue === 'object' && spreadValue !== null) {
               Object.assign(obj, spreadValue);
             } else {
               throw new ExpressionError('Invalid spread operator usage: can only spread objects');
             }
           } else {
-            obj[prop.key] = this.evaluateAst(prop.value, context, startTime);
+            obj[prop.key] = this.evaluateAst(
+              prop.value,
+              context,
+              startTime,
+              expression,
+              step,
+              stepType,
+            );
           }
         }
         return obj;
@@ -635,7 +753,14 @@ export class SafeExpressionEvaluator {
         const result: unknown[] = [];
         for (const elem of ast.elements) {
           if (elem.spread) {
-            const spreadValue = this.evaluateAst(elem.value, context, startTime);
+            const spreadValue = this.evaluateAst(
+              elem.value,
+              context,
+              startTime,
+              expression,
+              step,
+              stepType,
+            );
             if (Array.isArray(spreadValue)) {
               result.push(...spreadValue);
             } else if (spreadValue !== null && typeof spreadValue === 'object') {
@@ -646,10 +771,34 @@ export class SafeExpressionEvaluator {
               );
             }
           } else {
-            result.push(this.evaluateAst(elem.value, context, startTime));
+            result.push(
+              this.evaluateAst(elem.value, context, startTime, expression, step, stepType),
+            );
           }
         }
         return result;
+      }
+
+      case 'function_call': {
+        if (!ast.name || !Array.isArray(ast.args)) {
+          throw new ExpressionError('Malformed function call node');
+        }
+        if (
+          !Object.prototype.hasOwnProperty.call(
+            SafeExpressionEvaluator.ALLOWED_FUNCTIONS,
+            ast.name as keyof typeof SafeExpressionEvaluator.ALLOWED_FUNCTIONS,
+          )
+        ) {
+          throw new ExpressionError(`Function '${ast.name}' is not allowed`);
+        }
+        const fn =
+          SafeExpressionEvaluator.ALLOWED_FUNCTIONS[
+            ast.name as keyof typeof SafeExpressionEvaluator.ALLOWED_FUNCTIONS
+          ];
+        const argVals = ast.args.map((arg: AstNode) =>
+          this.evaluateAst(arg, context, startTime, expression, step, stepType),
+        );
+        return fn(...argVals);
       }
 
       default:
@@ -657,12 +806,16 @@ export class SafeExpressionEvaluator {
     }
   }
 
-  /**
-   * Extract all references from an expression without evaluating it.
-   * This is useful for dependency analysis.
-   * @param expression The expression to extract references from
-   * @returns An array of reference paths found in the expression
-   */
+  private handleReferenceError(error: unknown, customMessage?: string): never {
+    const originalMessage = error instanceof Error ? error.message : String(error);
+    const message = customMessage ? `${customMessage}: ${originalMessage}` : originalMessage;
+    throw new ExpressionError(message, error instanceof Error ? error : undefined);
+  }
+
+  private static isSpecialVariable(name: string): boolean {
+    return ['item', 'context', 'acc'].includes(name);
+  }
+
   public extractReferences(expression: string): string[] {
     const refs = new Set<string>();
 
@@ -687,7 +840,7 @@ export class SafeExpressionEvaluator {
         if (braceCount === 0) {
           const inner = expr.substring(startIdx + 2, i - 1);
           const baseRef = inner.split(/[[.\s]+/)[0];
-          if (baseRef && !this.isSpecialVariable(baseRef)) {
+          if (baseRef && !SafeExpressionEvaluator.isSpecialVariable(baseRef)) {
             refs.add(baseRef);
           }
           extractRefs(inner);
@@ -699,30 +852,6 @@ export class SafeExpressionEvaluator {
     };
 
     extractRefs(expression);
-
     return Array.from(refs).sort();
-  }
-
-  /**
-   * Check if a variable name is a special variable that should be ignored
-   */
-  private isSpecialVariable(name: string): boolean {
-    return ['item', 'context', 'acc'].includes(name);
-  }
-
-  /**
-   * Helper method to handle reference resolution errors consistently
-   */
-  private handleReferenceError(
-    error: unknown,
-    message: string = 'Error resolving reference',
-  ): never {
-    if (error instanceof PropertyAccessError || error instanceof PathSyntaxError) {
-      throw new ExpressionError(error.message);
-    }
-    if (error instanceof Error) {
-      throw new ExpressionError(`${message}: ${error.message}`);
-    }
-    throw new ExpressionError(`${message}: ${String(error)}`);
   }
 }

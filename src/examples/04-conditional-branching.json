@@ -1,4 +1,5 @@
 {
+  "$schema": "../meta-schema.json",
   "name": "conditional-branching",
   "description": "Demonstrates conditional execution with nested transforms and requests",
   "steps": [

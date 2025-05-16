@@ -1,7 +1,9 @@
-import { FlowExecutor } from '../flow-executor';
+import { FlowExecutor, DEFAULT_RETRY_POLICY } from '../flow-executor';
 import { Flow } from '../types';
 import { TestLogger } from '../util/logger';
 import { TransformStepExecutor } from '../step-executors/transform-executor';
+import { ErrorCode } from '../errors/codes';
+import { RetryPolicy } from '../errors/recovery';
 
 describe('FlowExecutor', () => {
   let executor: FlowExecutor;
@@ -16,7 +18,7 @@ describe('FlowExecutor', () => {
       steps: [],
     };
     testLogger = new TestLogger('FlowExecutorTest');
-    executor = new FlowExecutor(flow, jsonRpcHandler, testLogger);
+    executor = new FlowExecutor(flow, jsonRpcHandler, { logger: testLogger });
   });
 
   afterEach(() => {
@@ -39,7 +41,7 @@ describe('FlowExecutor', () => {
     };
 
     jsonRpcHandler.mockResolvedValue({ success: true });
-    executor = new FlowExecutor(flow, jsonRpcHandler);
+    executor = new FlowExecutor(flow, jsonRpcHandler, testLogger);
     await executor.execute();
 
     // expect testLogger to have captured logs
@@ -297,5 +299,85 @@ describe('FlowExecutor', () => {
     expect(conditionResult.metadata.branchTaken).toBe('else');
     expect(conditionResult.result).toBeUndefined();
     expect(jsonRpcHandler).toHaveBeenCalledTimes(0);
+  });
+
+  it('sets retry policy from options.retryPolicy', () => {
+    const retryPolicy: RetryPolicy = {
+      maxAttempts: 7,
+      backoff: { initial: 123, multiplier: 3, maxDelay: 999, strategy: 'exponential' },
+      retryableErrors: [ErrorCode.NETWORK_ERROR],
+    };
+    const flow: Flow = { name: 'RetryPolicyTest', description: '', steps: [] };
+    executor = new FlowExecutor(flow, jest.fn(), { logger: testLogger, retryPolicy });
+    expect((executor as any).retryPolicy).toEqual(retryPolicy);
+  });
+
+  it('sets retry policy from flow.policies.global.retryPolicy', () => {
+    const flow: Flow = {
+      name: 'RetryPolicyTest',
+      description: '',
+      policies: {
+        global: {
+          retryPolicy: {
+            maxAttempts: 4,
+            backoff: {
+              initial: 50,
+              multiplier: 2,
+              maxDelay: 500,
+              strategy: 'exponential' as const,
+            },
+            retryableErrors: [ErrorCode.TIMEOUT_ERROR],
+          },
+        },
+      },
+      steps: [],
+    };
+    executor = new FlowExecutor(flow, jest.fn(), { logger: testLogger });
+    expect((executor as any).retryPolicy).toEqual({
+      maxAttempts: 4,
+      backoff: { initial: 50, multiplier: 2, maxDelay: 500, strategy: 'exponential' },
+      retryableErrors: [ErrorCode.TIMEOUT_ERROR],
+    });
+  });
+
+  it('retries steps according to global retry policy', async () => {
+    let callCount = 0;
+    const flow: Flow = {
+      name: 'RetryPolicyTest',
+      description: '',
+      policies: {
+        global: {
+          retryPolicy: {
+            maxAttempts: 3,
+            backoff: { initial: 1, multiplier: 1, maxDelay: 10, strategy: 'exponential' },
+            retryableErrors: [ErrorCode.NETWORK_ERROR],
+          },
+        },
+      },
+      steps: [
+        {
+          name: 'failStep',
+          request: { method: 'fail', params: {} },
+        },
+      ],
+    };
+    const handler = jest.fn().mockImplementation(() => {
+      callCount++;
+      if (callCount < 3) throw Object.assign(new Error('fail'), { code: ErrorCode.NETWORK_ERROR });
+      return { result: 'ok' };
+    });
+    executor = new FlowExecutor(flow, handler, { logger: testLogger });
+    const results = await executor.execute();
+    expect(results.get('failStep').result).toEqual({ result: 'ok' });
+    expect(callCount).toBe(3);
+  });
+
+  it('falls back to DEFAULT_RETRY_POLICY if no policy is set', () => {
+    const flow: Flow = { name: 'RetryPolicyTest', description: '', steps: [] };
+    executor = new FlowExecutor(flow, jest.fn(), { logger: testLogger });
+    expect((executor as any).retryPolicy).toEqual({
+      ...DEFAULT_RETRY_POLICY,
+      maxAttempts: 1,
+    });
   });
 });

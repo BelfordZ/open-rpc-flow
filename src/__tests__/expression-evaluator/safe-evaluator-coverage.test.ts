@@ -404,7 +404,6 @@ describe('SafeExpressionEvaluator Coverage Improvements', () => {
 
       try {
         // First, test with a standard Error object
-        // @ts-expect-error - we're monkey patching for testing purposes
         SafeExpressionEvaluator['OPERATORS']['+'] = () => {
           const error = new Error('Custom error message');
           throw error;
@@ -417,7 +416,6 @@ describe('SafeExpressionEvaluator Coverage Improvements', () => {
         );
 
         // Now test with a non-Error object (like a string or number)
-        // @ts-expect-error - we're monkey patching for testing purposes
         SafeExpressionEvaluator['OPERATORS']['+'] = () => {
           throw 'Not an error object';
         };
@@ -429,8 +427,7 @@ describe('SafeExpressionEvaluator Coverage Improvements', () => {
         );
       } finally {
         // Restore the original operators to prevent test pollution
-        // @ts-expect-error - restoring the original
-        SafeExpressionEvaluator['OPERATORS'] = originalOperators;
+        (SafeExpressionEvaluator as any)['OPERATORS'] = originalOperators;
       }
     });
   });
@@ -581,12 +578,12 @@ describe('SafeExpressionEvaluator Coverage Improvements', () => {
 
       // Call the parse method directly
       // @ts-expect-error - we're accessing a private method for testing
-      const ast = evaluator['parse'](mockTokens);
+      const ast = evaluator['parse'](mockTokens) as any;
 
       // Verify the AST node type and structure
       expect(ast.type).toBe('object');
-      expect(ast.properties).toBeDefined();
-      expect(Array.isArray(ast.properties)).toBe(true);
+      expect((ast as any).properties).toBeDefined();
+      expect(Array.isArray((ast as any).properties)).toBe(true);
 
       // Test with empty object as well
       const emptyObjectTokens = [
@@ -595,9 +592,9 @@ describe('SafeExpressionEvaluator Coverage Improvements', () => {
       ];
 
       // @ts-expect-error - we're accessing a private method for testing
-      const emptyAst = evaluator['parse'](emptyObjectTokens);
+      const emptyAst = evaluator['parse'](emptyObjectTokens) as any;
       expect(emptyAst.type).toBe('object');
-      expect(emptyAst.properties).toEqual([]);
+      expect((emptyAst as any).properties).toEqual([]);
     });
 
     it('correctly parses nested and complex object literals', () => {
@@ -632,12 +629,12 @@ describe('SafeExpressionEvaluator Coverage Improvements', () => {
 
       // Call the parse method directly
       // @ts-expect-error - we're accessing a private method for testing
-      const ast = evaluator['parse'](mockTokens);
+      const ast = evaluator['parse'](mockTokens) as any;
 
       // Verify the AST node type and structure
       expect(ast.type).toBe('array');
-      expect(ast.elements).toBeDefined();
-      expect(Array.isArray(ast.elements)).toBe(true);
+      expect((ast as any).elements).toBeDefined();
+      expect(Array.isArray((ast as any).elements)).toBe(true);
 
       // Test with empty array as well
       const emptyArrayTokens = [
@@ -646,9 +643,9 @@ describe('SafeExpressionEvaluator Coverage Improvements', () => {
       ];
 
       // @ts-expect-error - we're accessing a private method for testing
-      const emptyAst = evaluator['parse'](emptyArrayTokens);
+      const emptyAst = evaluator['parse'](emptyArrayTokens) as any;
       expect(emptyAst.type).toBe('array');
-      expect(emptyAst.elements).toEqual([]);
+      expect((emptyAst as any).elements).toEqual([]);
     });
 
     it('correctly parses nested and complex array literals', () => {

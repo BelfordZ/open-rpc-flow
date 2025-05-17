@@ -1,23 +1,6 @@
 import { Logger } from '../util/logger';
-
-/**
- * Represents a token in an expression
- */
-export interface Token {
-  type:
-    | 'string'
-    | 'number'
-    | 'operator'
-    | 'reference'
-    | 'object_literal'
-    | 'array_literal'
-    | 'punctuation'
-    | 'identifier'
-    | 'key'
-    | 'template_literal';
-  value: string | number | Token[] | any; // Allow any for now to handle complex nested structures
-  raw: string;
-}
+import type { Token } from './types';
+export type { Token } from './types';
 
 export class TokenizerError extends Error {
   constructor(message: string) {

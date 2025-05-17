@@ -18,26 +18,29 @@ describe('Tokenizer Miscellaneous Tests', () => {
       const result1 = tokenize('${abc}', logger);
       expect(result1).toHaveLength(1);
       expect(result1[0].type).toBe('reference');
-      expect(result1[0].value).toHaveLength(1);
-      expect(result1[0].value[0].type).toBe('identifier');
-      expect(result1[0].value[0].value).toBe('abc');
+      const ref1 = result1[0].value as Token[];
+      expect(ref1).toHaveLength(1);
+      expect(ref1[0].type).toBe('identifier');
+      expect(ref1[0].value).toBe('abc');
 
       // A reference with non-alphanumeric characters that will also go through the same lines
       const result2 = tokenize('${_abc123}', logger);
       expect(result2[0].type).toBe('reference');
-      expect(result2[0].value[0].type).toBe('identifier');
-      expect(result2[0].value[0].value).toBe('_abc123');
+      const ref2 = result2[0].value as Token[];
+      expect(ref2[0].type).toBe('identifier');
+      expect(ref2[0].value).toBe('_abc123');
 
       // A more complex reference with operators that require the buffer to be flushed
       const result3 = tokenize('${a.b}', logger);
       expect(result3[0].type).toBe('reference');
-      expect(result3[0].value).toHaveLength(3); // 'a', '.', 'b'
-      expect(result3[0].value[0].type).toBe('identifier');
-      expect(result3[0].value[0].value).toBe('a');
-      expect(result3[0].value[1].type).toBe('operator');
-      expect(result3[0].value[1].value).toBe('.');
-      expect(result3[0].value[2].type).toBe('identifier');
-      expect(result3[0].value[2].value).toBe('b');
+      const ref3 = result3[0].value as Token[];
+      expect(ref3).toHaveLength(3); // 'a', '.', 'b'
+      expect(ref3[0].type).toBe('identifier');
+      expect(ref3[0].value).toBe('a');
+      expect(ref3[1].type).toBe('operator');
+      expect(ref3[1].value).toBe('.');
+      expect(ref3[2].type).toBe('identifier');
+      expect(ref3[2].value).toBe('b');
     });
   });
 
@@ -523,16 +526,18 @@ describe('Tokenizer Miscellaneous Tests', () => {
     it('handles nested reference with additional layers', () => {
       const result = tokenize('${foo[${bar[${baz}]}]}', logger);
       expect(result[0].type).toBe('reference');
-      expect(result[0].value.length).toBeGreaterThan(0);
+      const refVal = result[0].value as Token[];
+      expect(refVal.length).toBeGreaterThan(0);
       expect(result[0].raw).toBe('${foo[${bar[${baz}]}]}');
     });
 
     it('handles references with operators', () => {
       const result = tokenize('${foo.bar}', logger);
       expect(result[0].type).toBe('reference');
-      expect(result[0].value.length).toBe(3); // foo, ., and bar
-      expect(result[0].value[1].type).toBe('operator');
-      expect(result[0].value[1].value).toBe('.');
+      const refVal2 = result[0].value as Token[];
+      expect(refVal2.length).toBe(3); // foo, ., and bar
+      expect(refVal2[1].type).toBe('operator');
+      expect(refVal2[1].value).toBe('.');
     });
 
     it('throws error for unterminated reference', () => {

@@ -1,4 +1,4 @@
-import { tokenize, TokenizerError } from '../../expression-evaluator/tokenizer';
+import { tokenize, TokenizerError, Token } from '../../expression-evaluator/tokenizer';
 import { TestLogger } from '../../util/logger';
 
 describe('Tokenizer Reference Tests', () => {
@@ -203,10 +203,11 @@ describe('Tokenizer Reference Tests', () => {
       expect(result[0].type).toBe('reference');
 
       // Check that the reference token has the identifier 'foo'
-      const referenceToken = result[0] as any;
-      expect(referenceToken.value).toHaveLength(1);
-      expect(referenceToken.value[0].type).toBe('identifier');
-      expect(referenceToken.value[0].value).toBe('foo');
+      const referenceToken = result[0];
+      const refValue = referenceToken.value as Token[];
+      expect(refValue).toHaveLength(1);
+      expect(refValue[0].type).toBe('identifier');
+      expect(refValue[0].value).toBe('foo');
     });
 
     it('handles whitespace between multiple identifiers in a reference', () => {
@@ -217,12 +218,13 @@ describe('Tokenizer Reference Tests', () => {
       expect(result).toHaveLength(1);
       expect(result[0].type).toBe('reference');
 
-      const referenceToken = result[0] as any;
-      expect(referenceToken.value).toHaveLength(2);
-      expect(referenceToken.value[0].type).toBe('identifier');
-      expect(referenceToken.value[0].value).toBe('foo');
-      expect(referenceToken.value[1].type).toBe('identifier');
-      expect(referenceToken.value[1].value).toBe('bar');
+      const referenceToken = result[0];
+      const refValue = referenceToken.value as Token[];
+      expect(refValue).toHaveLength(2);
+      expect(refValue[0].type).toBe('identifier');
+      expect(refValue[0].value).toBe('foo');
+      expect(refValue[1].type).toBe('identifier');
+      expect(refValue[1].value).toBe('bar');
     });
 
     it('handles whitespace after an identifier when followed by an operator', () => {
@@ -233,14 +235,15 @@ describe('Tokenizer Reference Tests', () => {
       expect(result).toHaveLength(1);
       expect(result[0].type).toBe('reference');
 
-      const referenceToken = result[0] as any;
-      expect(referenceToken.value).toHaveLength(3);
-      expect(referenceToken.value[0].type).toBe('identifier');
-      expect(referenceToken.value[0].value).toBe('foo');
-      expect(referenceToken.value[1].type).toBe('operator');
-      expect(referenceToken.value[1].value).toBe('+');
-      expect(referenceToken.value[2].type).toBe('identifier');
-      expect(referenceToken.value[2].value).toBe('bar');
+      const referenceToken = result[0];
+      const refValue = referenceToken.value as Token[];
+      expect(refValue).toHaveLength(3);
+      expect(refValue[0].type).toBe('identifier');
+      expect(refValue[0].value).toBe('foo');
+      expect(refValue[1].type).toBe('operator');
+      expect(refValue[1].value).toBe('+');
+      expect(refValue[2].type).toBe('identifier');
+      expect(refValue[2].value).toBe('bar');
     });
 
     it('handles multiple whitespace characters (spaces, tabs, newlines) after an identifier', () => {
@@ -251,10 +254,11 @@ describe('Tokenizer Reference Tests', () => {
       expect(result).toHaveLength(1);
       expect(result[0].type).toBe('reference');
 
-      const referenceToken = result[0] as any;
-      expect(referenceToken.value).toHaveLength(1);
-      expect(referenceToken.value[0].type).toBe('identifier');
-      expect(referenceToken.value[0].value).toBe('foo');
+      const referenceToken = result[0];
+      const refValue = referenceToken.value as Token[];
+      expect(refValue).toHaveLength(1);
+      expect(refValue[0].type).toBe('identifier');
+      expect(refValue[0].value).toBe('foo');
     });
 
     it('handles whitespace in a complex expression', () => {
@@ -265,14 +269,13 @@ describe('Tokenizer Reference Tests', () => {
       expect(result).toHaveLength(1);
       expect(result[0].type).toBe('reference');
 
-      const referenceToken = result[0] as any;
+      const referenceToken = result[0];
+      const refValue = referenceToken.value as Token[];
       // Verify we have the expected tokens in the reference
-      expect(referenceToken.value.length).toBeGreaterThan(3);
+      expect(refValue.length).toBeGreaterThan(3);
 
       // The important assertion here is that whitespace between tokens is properly handled
-      const identifierCount = referenceToken.value.filter(
-        (t: any) => t.type === 'identifier',
-      ).length;
+      const identifierCount = refValue.filter((t) => t.type === 'identifier').length;
       expect(identifierCount).toBe(3); // foo, bar, baz
     });
 
@@ -309,7 +312,7 @@ describe('Tokenizer Reference Tests', () => {
       expect(result).toHaveLength(1);
       expect(result[0].type).toBe('reference');
 
-      const referenceValue = (result[0] as any).value;
+      const referenceValue = result[0].value as Token[];
       expect(referenceValue).toHaveLength(2);
       expect(referenceValue[0].type).toBe('identifier');
       expect(referenceValue[0].value).toBe('abc');

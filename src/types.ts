@@ -87,11 +87,11 @@ export interface FlowPolicies {
   };
 }
 
-export interface Flow {
+export interface Flow<TContext extends Record<string, unknown> = Record<string, unknown>> {
   name: string;
   description: string;
   steps: Step[];
-  context?: Record<string, any>;
+  context?: TContext;
   /**
    * Global and step-level policies for the flow (metaschema-compliant)
    */
@@ -107,7 +107,7 @@ export interface Step {
   policies?: Policies;
   request?: {
     method: string;
-    params: Record<string, any> | any[];
+    params: Record<string, unknown> | unknown[];
   };
   loop?: {
     over: string;
@@ -139,7 +139,7 @@ export interface Step {
 export interface JsonRpcRequest {
   jsonrpc: '2.0';
   method: string;
-  params: Record<string, any> | any[];
+  params: Record<string, unknown> | unknown[];
   id: number;
 }
 
@@ -169,11 +169,13 @@ export type JsonRpcHandler = (
 /**
  * Represents the execution context available to all step executors
  */
-export interface StepExecutionContext {
+export interface StepExecutionContext<
+  TContext extends Record<string, unknown> = Record<string, unknown>
+> {
   referenceResolver: ReferenceResolver;
   expressionEvaluator: SafeExpressionEvaluator;
   stepResults: Map<string, any>;
-  context: Record<string, any>;
+  context: TContext;
   logger: Logger;
   /**
    * AbortSignal that can be used to cancel operations
@@ -182,7 +184,7 @@ export interface StepExecutionContext {
   /**
    * The flow being executed (for accessing flow-level configuration)
    */
-  flow?: Flow;
+  flow?: Flow<TContext>;
 }
 
 /**

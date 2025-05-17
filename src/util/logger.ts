@@ -1,10 +1,10 @@
 export { NoLogger, noLogger } from './no-logger';
 
 export interface Logger {
-  log(message: string, ...args: any[]): void;
-  error(message: string, ...args: any[]): void;
-  warn(message: string, ...args: any[]): void;
-  debug(message: string, ...args: any[]): void;
+  log(message: string, ...args: unknown[]): void;
+  error(message: string, ...args: unknown[]): void;
+  warn(message: string, ...args: unknown[]): void;
+  debug(message: string, ...args: unknown[]): void;
   createNested(prefix: string): Logger;
 }
 

@@ -264,7 +264,7 @@ describe('Tokenizer Object Tests', () => {
       const xIndex = objectTokens.findIndex(
         (token) =>
           (token.type === 'string' || token.type === 'identifier') &&
-          (token.value === 'x' || token.value.includes('x')),
+          (token.value === 'x' || (token.value as string).includes('x')),
       );
 
       // Find spread operator

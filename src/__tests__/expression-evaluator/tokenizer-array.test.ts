@@ -169,7 +169,8 @@ describe('Tokenizer Array Tests', () => {
 
       expect(result.length).toBe(1);
       expect(result[0].type).toBe('array_literal');
-      expect(result[0].value.length).toBe(1);
+      const arrTokens = result[0].value as Token[];
+      expect(arrTokens.length).toBe(1);
     });
 
     // Create complex nested structures where the return is nested
@@ -196,9 +197,11 @@ describe('Tokenizer Array Tests', () => {
 
       expect(result.length).toBe(1);
       expect(result[0].type).toBe('array_literal');
-      expect(result[0].value.length).toBe(1);
-      expect(result[0].value[0].type).toBe('string');
-      expect(result[0].value[0].value).toBe('string with "escape"');
+      const arrTokens2 = result[0].value as Token[];
+      expect(arrTokens2.length).toBe(1);
+      const arrTokens = result[0].value as Token[];
+      expect(arrTokens[0].type).toBe('string');
+      expect(arrTokens[0].value).toBe('string with "escape"');
     });
 
     // Test array with unclosed brackets (error case)
@@ -217,7 +220,7 @@ describe('Tokenizer Array Tests', () => {
       expect(result[0].type).toBe('array_literal');
 
       // Plus should be treated as an operator or identifier
-      const arrayContents = result[0].value;
+      const arrayContents = result[0].value as Token[];
       expect(arrayContents.length).toBe(1);
     });
 
@@ -249,9 +252,10 @@ describe('Tokenizer Array Tests', () => {
       const result = tokenize(input, logger);
 
       expect(result[0].type).toBe('array_literal');
-      expect(result[0].value.length).toBe(1);
-      expect(result[0].value[0].type).toBe('identifier');
-      expect(result[0].value[0].value).toBe('abc');
+      const arrTokens = result[0].value as Token[];
+      expect(arrTokens.length).toBe(1);
+      expect(arrTokens[0].type).toBe('identifier');
+      expect(arrTokens[0].value).toBe('abc');
     });
 
     // Test with various array types

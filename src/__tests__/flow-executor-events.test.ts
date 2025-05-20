@@ -2,6 +2,7 @@ import { FlowExecutor, FlowEventType } from '../index';
 import { TestLogger } from '../util/logger';
 import { Flow, JsonRpcRequest } from '../types';
 import { FlowExecutorEvents } from '../util/flow-executor-events';
+import { StepType } from '../step-executors';
 
 describe('FlowExecutor Events', () => {
   const simpleFlow: Flow = {
@@ -412,7 +413,7 @@ describe('FlowExecutor Events', () => {
 
     // Verify the step type was considered "unknown"
     expect(events.length).toBeGreaterThan(0);
-    expect(events[0].data.stepType).toBe('unknown');
+    expect(events[0].data.stepType).toBe(StepType.Unknown);
   });
 
   it('should handle nested step errors correctly', async () => {
@@ -666,7 +667,7 @@ describe('FlowExecutor Events', () => {
     expect(errorEvents[0].stepName).toBe('errorStep');
     expect(errorEvents[0].error).toBe(testError);
     expect(errorEvents[0].duration).toBeGreaterThanOrEqual(100);
-    expect(errorEvents[0].stepType).toBe('request');
+    expect(errorEvents[0].stepType).toBe(StepType.Request);
   });
 
   it('should not emit step error events when disabled', async () => {
@@ -771,12 +772,12 @@ describe('FlowExecutor Events', () => {
 
     // Verify all step types were correctly identified
     expect(events.length).toBe(6);
-    expect(events[0].stepType).toBe('loop');
-    expect(events[1].stepType).toBe('request');
-    expect(events[2].stepType).toBe('condition');
-    expect(events[3].stepType).toBe('transform');
-    expect(events[4].stepType).toBe('stop');
-    expect(events[5].stepType).toBe('unknown');
+    expect(events[0].stepType).toBe(StepType.Loop);
+    expect(events[1].stepType).toBe(StepType.Request);
+    expect(events[2].stepType).toBe(StepType.Condition);
+    expect(events[3].stepType).toBe(StepType.Transform);
+    expect(events[4].stepType).toBe(StepType.Stop);
+    expect(events[5].stepType).toBe(StepType.Unknown);
   });
 
   it('should emit dependency resolved events with ordered steps', async () => {

@@ -1,5 +1,4 @@
-import type { StepType } from './step-executors/types';
-import { TransformOperation } from './step-executors/types';
+import { StepType, TransformOperation } from './step-executors/types';
 import { ReferenceResolver } from './reference-resolver';
 import { SafeExpressionEvaluator } from './expression-evaluator/safe-evaluator';
 import { Logger } from './util/logger';
@@ -206,11 +205,11 @@ export interface DependencyGraph {
 /**
  * Utility to determine the step type from a Step object
  */
-export function getStepType(step: Step): string {
-  if (step.request) return 'request';
-  if (step.loop) return 'loop';
-  if (step.condition) return 'condition';
-  if (step.transform) return 'transform';
-  if (step.stop) return 'stop';
-  return 'unknown';
+export function getStepType(step: Step): StepType {
+  if (step.request) return StepType.Request;
+  if (step.loop) return StepType.Loop;
+  if (step.condition) return StepType.Condition;
+  if (step.transform) return StepType.Transform;
+  if (step.stop) return StepType.Stop;
+  return StepType.Unknown;
 }

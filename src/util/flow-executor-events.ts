@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
+
 import { Step, StepExecutionContext, getStepType } from '../types';
-import { StepExecutionResult } from '../step-executors';
+import { StepExecutionResult, StepType } from '../step-executors';
 
 /**
  * Event types emitted by the FlowExecutor
@@ -59,7 +60,7 @@ export interface FlowErrorEvent extends FlowEvent {
 export interface StepStartEvent extends FlowEvent {
   type: FlowEventType.STEP_START;
   stepName: string;
-  stepType: string;
+  stepType: StepType;
   context?: Record<string, any>;
 }
 
@@ -69,8 +70,8 @@ export interface StepStartEvent extends FlowEvent {
 export interface StepCompleteEvent extends FlowEvent {
   type: FlowEventType.STEP_COMPLETE;
   stepName: string;
-  stepType: string;
-  result: any;
+  stepType: StepType;
+  result: StepExecutionResult;
   duration: number;
 }
 
@@ -80,7 +81,7 @@ export interface StepCompleteEvent extends FlowEvent {
 export interface StepErrorEvent extends FlowEvent {
   type: FlowEventType.STEP_ERROR;
   stepName: string;
-  stepType: string;
+  stepType: StepType;
   error: Error;
   duration: number;
 }

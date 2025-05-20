@@ -13,6 +13,7 @@ export {
 } from './reference-resolver';
 export {
   PathAccessor,
+  PathSegment,
   PathAccessorError,
   PathSyntaxError,
   PropertyAccessError,

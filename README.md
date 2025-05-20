@@ -394,7 +394,7 @@ time. All event names are available through the `FlowEventType` enum.
 ### Using the Event Emitter
 
 ```typescript
-import { FlowExecutor, FlowEventType } from '@open-rpc/flow';
+import { FlowExecutor, FlowEventType } from 'open-rpc-flow';
 
 // Create a flow executor with event options
 const executor = new FlowExecutor(flow, jsonRpcHandler, {

@@ -4,7 +4,7 @@ Thank you for considering contributing to this project!
 
 ## Getting Started
 
-1. Fork the repository and create your feature branch from `main`.
+1. Fork the repository and create your feature branch from `master`.
 2. Install dependencies using `npm install`.
 3. Make your changes along with tests when applicable.
 4. Ensure the code passes linting and tests:

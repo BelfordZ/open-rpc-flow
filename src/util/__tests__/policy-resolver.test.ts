@@ -1,5 +1,6 @@
 import { PolicyResolver } from '../policy-resolver';
 import { Step, Flow } from '../../types';
+import { StepType } from '../../step-executors/types';
 import { Logger } from '../logger';
 import { DEFAULT_TIMEOUTS } from '../../constants/timeouts';
 import { ErrorCode } from '../../errors/codes';
@@ -21,7 +22,7 @@ describe('PolicyResolver', () => {
   it('resolves step-level policy', () => {
     const step: Step = { ...baseStep, policies: { timeout: { timeout: 111 } } };
     const resolver = new PolicyResolver(baseFlow, logger);
-    expect(resolver.resolveTimeout(step, 'transform')).toBe(111);
+    expect(resolver.resolveTimeout(step, StepType.Transform)).toBe(111);
   });
 
   it('resolves per-stepType policy', () => {
@@ -30,7 +31,7 @@ describe('PolicyResolver', () => {
       policies: { step: { transform: { timeout: { timeout: 333 } } } as any },
     };
     const resolver = new PolicyResolver(flow, logger);
-    expect(resolver.resolveTimeout(baseStep, 'transform')).toBe(333);
+    expect(resolver.resolveTimeout(baseStep, StepType.Transform)).toBe(333);
   });
 
   it('resolves step-type default policy', () => {
@@ -39,7 +40,7 @@ describe('PolicyResolver', () => {
       policies: { step: { timeout: { timeout: 444 } } },
     };
     const resolver = new PolicyResolver(flow, logger);
-    expect(resolver.resolveTimeout(baseStep, 'transform')).toBe(444);
+    expect(resolver.resolveTimeout(baseStep, StepType.Transform)).toBe(444);
   });
 
   it('resolves global policy', () => {
@@ -48,12 +49,12 @@ describe('PolicyResolver', () => {
       policies: { global: { timeout: { timeout: 555 } } },
     };
     const resolver = new PolicyResolver(flow, logger);
-    expect(resolver.resolveTimeout(baseStep, 'transform')).toBe(555);
+    expect(resolver.resolveTimeout(baseStep, StepType.Transform)).toBe(555);
   });
 
   it('returns fallback/default if nothing found', () => {
     const resolver = new PolicyResolver(baseFlow, logger);
-    expect(resolver.resolveTimeout(baseStep, 'transform')).toBe(
+    expect(resolver.resolveTimeout(baseStep, StepType.Transform)).toBe(
       (DEFAULT_TIMEOUTS as any)['transform'] ?? DEFAULT_TIMEOUTS.global,
     );
   });
@@ -72,26 +73,26 @@ describe('PolicyResolver', () => {
     };
     const resolver = new PolicyResolver(flow, logger);
     // Step-level wins
-    expect(resolver.resolveTimeout(step, 'transform')).toBe(1);
+    expect(resolver.resolveTimeout(step, StepType.Transform)).toBe(1);
     // Remove step-level, per-stepType wins
-    expect(resolver.resolveTimeout(baseStep, 'transform')).toBe(3);
+    expect(resolver.resolveTimeout(baseStep, StepType.Transform)).toBe(3);
     // Remove per-stepType, step-type default wins
     const flow2: Flow = {
       ...baseFlow,
       policies: { step: { timeout: { timeout: 4 } } },
     };
     const resolver2 = new PolicyResolver(flow2, logger);
-    expect(resolver2.resolveTimeout(baseStep, 'transform')).toBe(4);
+    expect(resolver2.resolveTimeout(baseStep, StepType.Transform)).toBe(4);
     // Remove step-type default, global wins
     const flow3: Flow = {
       ...baseFlow,
       policies: { global: { timeout: { timeout: 5 } } },
     };
     const resolver3 = new PolicyResolver(flow3, logger);
-    expect(resolver3.resolveTimeout(baseStep, 'transform')).toBe(5);
+    expect(resolver3.resolveTimeout(baseStep, StepType.Transform)).toBe(5);
     // Remove all, fallback
     const resolver4 = new PolicyResolver(baseFlow, logger);
-    expect(resolver4.resolveTimeout(baseStep, 'transform')).toBe(
+    expect(resolver4.resolveTimeout(baseStep, StepType.Transform)).toBe(
       (DEFAULT_TIMEOUTS as any)['transform'] ?? DEFAULT_TIMEOUTS.global,
     );
   });
@@ -115,50 +116,52 @@ describe('PolicyResolver', () => {
     // Step-level
     const step: Step = { ...baseStep, policies: { retryPolicy: retryObj } };
     let resolver = new PolicyResolver(baseFlow, logger);
-    expect(resolver.resolveRetryPolicy(step, 'transform')).toEqual(expectedMerged);
+    expect(resolver.resolveRetryPolicy(step, StepType.Transform)).toEqual(expectedMerged);
     // Per-stepType
     let flow: Flow = {
       ...baseFlow,
       policies: { step: { transform: { retryPolicy: retryObj } } as any },
     };
     resolver = new PolicyResolver(flow, logger);
-    expect(resolver.resolveRetryPolicy(baseStep, 'transform')).toEqual(expectedMerged);
+    expect(resolver.resolveRetryPolicy(baseStep, StepType.Transform)).toEqual(expectedMerged);
     // Step-type default
     flow = {
       ...baseFlow,
       policies: { step: { retryPolicy: retryObj } },
     };
     resolver = new PolicyResolver(flow, logger);
-    expect(resolver.resolveRetryPolicy(baseStep, 'transform')).toEqual(expectedMerged);
+    expect(resolver.resolveRetryPolicy(baseStep, StepType.Transform)).toEqual(expectedMerged);
     // Global
     flow = {
       ...baseFlow,
       policies: { global: { retryPolicy: retryObj } },
     };
     resolver = new PolicyResolver(flow, logger);
-    expect(resolver.resolveRetryPolicy(baseStep, 'transform')).toEqual(expectedMerged);
+    expect(resolver.resolveRetryPolicy(baseStep, StepType.Transform)).toEqual(expectedMerged);
     // Fallback
     resolver = new PolicyResolver(baseFlow, logger);
-    expect(resolver.resolveRetryPolicy(baseStep, 'transform', retryObj)).toEqual(expectedMerged);
+    expect(resolver.resolveRetryPolicy(baseStep, StepType.Transform, retryObj)).toEqual(
+      expectedMerged,
+    );
   });
 
   it('returns undefined if nothing found and no fallback', () => {
     const resolver = new PolicyResolver(baseFlow, logger);
-    expect(resolver.resolveTimeout(baseStep, 'transform')).toBe(
+    expect(resolver.resolveTimeout(baseStep, StepType.Transform)).toBe(
       (DEFAULT_TIMEOUTS as any)['transform'] ?? DEFAULT_TIMEOUTS.global,
     );
-    expect(resolver.resolveRetryPolicy(baseStep, 'transform')).toBeUndefined();
+    expect(resolver.resolveRetryPolicy(baseStep, StepType.Transform)).toBeUndefined();
   });
 
   it('uses override policies when provided', () => {
     const overrides = { timeout: { timeout: 999 } };
     const resolver = new PolicyResolver(baseFlow, logger, overrides);
-    expect(resolver.resolveTimeout(baseStep, 'transform')).toBe(999);
+    expect(resolver.resolveTimeout(baseStep, StepType.Transform)).toBe(999);
   });
 
   it('resolves expression evaluation timeout', () => {
     const step: Step = { ...baseStep, policies: { timeout: { expressionEval: 321 } } };
     const resolver = new PolicyResolver(baseFlow, logger);
-    expect(resolver.resolveExpressionTimeout(step, 'transform')).toBe(321);
+    expect(resolver.resolveExpressionTimeout(step, StepType.Transform)).toBe(321);
   });
 });

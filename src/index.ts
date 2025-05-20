@@ -56,6 +56,7 @@ export {
 export { FlowError, ExecutionError, ValidationError, TimeoutError, StateError } from './errors';
 export { ErrorCode, ErrorCategory } from './errors/codes';
 export { RetryPolicy, RetryableOperation } from './errors/recovery';
+export { StepType } from './step-executors';
 
 import metaSchemaContent from '../meta-schema.json';
 export const metaSchema = metaSchemaContent;

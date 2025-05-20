@@ -1,9 +1,10 @@
+import type { StepType } from './step-executors/types';
 import { TransformOperation } from './step-executors/types';
 import { ReferenceResolver } from './reference-resolver';
 import { SafeExpressionEvaluator } from './expression-evaluator/safe-evaluator';
 import { Logger } from './util/logger';
 
-export type StepType = 'request' | 'loop' | 'condition' | 'transform' | 'stop';
+export type { StepType } from './step-executors/types';
 
 /**
  * Policies for a specific step type or as a default for all steps

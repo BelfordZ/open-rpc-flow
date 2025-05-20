@@ -75,6 +75,12 @@ const apiAggregationFlow: Flow = {
 };
 ```
 
+### 4. Stop Flow Execution
+
+Demonstrates halting a flow when a condition is met. See the full example here:
+
+[**src/examples/06-stop-flow.json**](src/examples/06-stop-flow.json)
+
 ## Installation
 
 ```bash
@@ -394,7 +400,7 @@ time. All event names are available through the `FlowEventType` enum.
 ### Using the Event Emitter
 
 ```typescript
-import { FlowExecutor, FlowEventType } from '@open-rpc/flow';
+import { FlowExecutor, FlowEventType } from 'open-rpc-flow';
 
 // Create a flow executor with event options
 const executor = new FlowExecutor(flow, jsonRpcHandler, {

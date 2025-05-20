@@ -3,7 +3,7 @@ import { NoLogger, noLogger } from '../no-logger';
 
 describe('ConsoleLogger', () => {
   let originalConsole: typeof console;
-  let mockConsole: Pick<Console, 'log' | 'error' | 'warn' | 'debug'>;
+  let mockConsole: Pick<Console, 'log' | 'error' | 'warn' | 'info' | 'debug'>;
 
   beforeEach(() => {
     // Save original console
@@ -13,6 +13,7 @@ describe('ConsoleLogger', () => {
       log: jest.fn(),
       error: jest.fn(),
       warn: jest.fn(),
+      info: jest.fn(),
       debug: jest.fn(),
     };
     // Replace console with mock
@@ -30,6 +31,12 @@ describe('ConsoleLogger', () => {
     expect(mockConsole.log).toHaveBeenCalledWith('test message');
   });
 
+  it('logs info messages without prefix', () => {
+    const logger = new ConsoleLogger();
+    logger.info('hello');
+    expect(mockConsole.info).toHaveBeenCalledWith('hello');
+  });
+
   it('logs messages with prefix', () => {
     const logger = new ConsoleLogger('TestPrefix');
     logger.log('test message');
@@ -41,11 +48,13 @@ describe('ConsoleLogger', () => {
     logger.log('log message');
     logger.error('error message');
     logger.warn('warn message');
+    logger.info('info message', { extra: true });
     logger.debug('debug message');
 
     expect(mockConsole.log).toHaveBeenCalledWith('[Test] log message');
     expect(mockConsole.error).toHaveBeenCalledWith('[Test] error message');
     expect(mockConsole.warn).toHaveBeenCalledWith('[Test] warn message');
+    expect(mockConsole.info).toHaveBeenCalledWith('[Test] info message', { extra: true });
     expect(mockConsole.debug).toHaveBeenCalledWith('[Test] debug message');
   });
 
@@ -201,6 +210,7 @@ describe('NoLogger', () => {
     logger.log('test');
     logger.error('test');
     logger.warn('test');
+    logger.info('test', { ok: true });
     logger.debug('test');
   });
 

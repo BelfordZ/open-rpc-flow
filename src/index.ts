@@ -1,7 +1,10 @@
 /* istanbul ignore file */
-export { Flow, Step, JsonRpcRequest } from './types';
-export { StepType } from './step-executors/types';
+export { Flow, Step, JsonRpcRequest, StepExecutionContext } from './types';
 export {
+  StepExecutor,
+  StepExecutionResult,
+  StepType,
+  JsonRpcRequestError,
   RequestStepExecutor,
   LoopStepExecutor,
   ConditionStepExecutor,
@@ -20,6 +23,7 @@ export {
 } from './reference-resolver';
 export {
   PathAccessor,
+  PathSegment,
   PathAccessorError,
   PathSyntaxError,
   PropertyAccessError,

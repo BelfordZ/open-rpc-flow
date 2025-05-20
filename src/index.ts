@@ -1,6 +1,16 @@
 /* istanbul ignore file */
 export { Flow, Step, JsonRpcRequest, StepExecutionContext } from './types';
-export { StepType } from './step-executors/types';
+export {
+  StepExecutor,
+  StepExecutionResult,
+  StepType,
+  JsonRpcRequestError,
+  RequestStepExecutor,
+  LoopStepExecutor,
+  ConditionStepExecutor,
+  TransformStepExecutor,
+  StopStepExecutor,
+} from './step-executors';
 export { FlowExecutor, FlowExecutorOptions, DEFAULT_RETRY_POLICY } from './flow-executor';
 export { SafeExpressionEvaluator } from './expression-evaluator/safe-evaluator';
 export {

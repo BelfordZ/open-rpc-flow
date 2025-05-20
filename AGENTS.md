@@ -18,6 +18,7 @@ This project uses TypeScript and Node.js. Follow these rules when contributing:
 - Build TypeScript with `npm run build`.
 - Run the full test suite with `npm test`.
 - Ensure these commands succeed before committing code.
+- Ensure any newly added code is covered by tests with **100% line coverage**.
 
 ## Commit Messages
 

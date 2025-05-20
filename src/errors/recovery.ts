@@ -199,6 +199,7 @@ export class RetryableOperation<T> {
         (retryableError) => String(retryableError) === errorCodeStr,
       );
 
+      /* istanbul ignore next -- debug logging */
       this.logger.debug('Retryable check result', {
         errorCode,
         errorCodeAsString: errorCodeStr,

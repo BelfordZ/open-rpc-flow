@@ -52,7 +52,7 @@ export {
 } from './util/flow-executor-events';
 
 // Export error handling related types
-export { FlowError, ExecutionError, ValidationError, StateError } from './errors/base';
+export { FlowError, ExecutionError, ValidationError, TimeoutError, StateError } from './errors';
 export { ErrorCode, ErrorCategory } from './errors/codes';
 export { RetryPolicy, RetryableOperation } from './errors/recovery';
 

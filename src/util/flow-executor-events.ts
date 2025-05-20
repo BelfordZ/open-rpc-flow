@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 import { Step, StepExecutionContext } from '../types';
-import { StepExecutionResult } from '../step-executors';
+import { StepExecutionResult, StepType } from '../step-executors';
 
 /**
  * Event types emitted by the FlowExecutor
@@ -59,7 +59,7 @@ export interface FlowErrorEvent extends FlowEvent {
 export interface StepStartEvent extends FlowEvent {
   type: FlowEventType.STEP_START;
   stepName: string;
-  stepType: string;
+  stepType: StepType;
   context?: Record<string, any>;
 }
 
@@ -69,8 +69,8 @@ export interface StepStartEvent extends FlowEvent {
 export interface StepCompleteEvent extends FlowEvent {
   type: FlowEventType.STEP_COMPLETE;
   stepName: string;
-  stepType: string;
-  result: any;
+  stepType: StepType;
+  result: StepExecutionResult;
   duration: number;
 }
 
@@ -80,7 +80,7 @@ export interface StepCompleteEvent extends FlowEvent {
 export interface StepErrorEvent extends FlowEvent {
   type: FlowEventType.STEP_ERROR;
   stepName: string;
-  stepType: string;
+  stepType: StepType;
   error: Error;
   duration: number;
 }
@@ -288,12 +288,12 @@ export class FlowExecutorEvents extends EventEmitter {
   /**
    * Helper to determine step type
    */
-  private getStepType(step: Step): string {
-    if (step.request) return 'request';
-    if (step.loop) return 'loop';
-    if (step.condition) return 'condition';
-    if (step.transform) return 'transform';
-    if (step.stop) return 'stop';
-    return 'unknown';
+  private getStepType(step: Step): StepType {
+    if (step.request) return StepType.Request;
+    if (step.loop) return StepType.Loop;
+    if (step.condition) return StepType.Condition;
+    if (step.transform) return StepType.Transform;
+    if (step.stop) return StepType.Stop;
+    return StepType.Unknown;
   }
 }

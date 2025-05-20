@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
-import { Step, StepExecutionContext } from '../types';
+
+import { Step, StepExecutionContext, getStepType } from '../types';
 import { StepExecutionResult, StepType } from '../step-executors';
 
 /**
@@ -210,7 +211,7 @@ export class FlowExecutorEvents extends EventEmitter {
       ? { ...executionContext.context, ...extraContext }
       : undefined;
 
-    const stepType = this.getStepType(step);
+    const stepType = getStepType(step);
 
     this.emit(FlowEventType.STEP_START, {
       timestamp: Date.now(),
@@ -227,7 +228,7 @@ export class FlowExecutorEvents extends EventEmitter {
   emitStepComplete(step: Step, result: StepExecutionResult, startTime: number): void {
     if (!this.options.emitStepEvents) return;
 
-    const stepType = this.getStepType(step);
+    const stepType = getStepType(step);
     const resultData = this.options.includeResults ? result : { type: result.type };
 
     this.emit(FlowEventType.STEP_COMPLETE, {
@@ -246,7 +247,7 @@ export class FlowExecutorEvents extends EventEmitter {
   emitStepError(step: Step, error: Error, startTime: number): void {
     if (!this.options.emitStepEvents) return;
 
-    const stepType = this.getStepType(step);
+    const stepType = getStepType(step);
 
     this.emit(FlowEventType.STEP_ERROR, {
       timestamp: Date.now(),
@@ -283,17 +284,5 @@ export class FlowExecutorEvents extends EventEmitter {
       type: FlowEventType.DEPENDENCY_RESOLVED,
       orderedSteps,
     } as DependencyResolvedEvent);
-  }
-
-  /**
-   * Helper to determine step type
-   */
-  private getStepType(step: Step): StepType {
-    if (step.request) return StepType.Request;
-    if (step.loop) return StepType.Loop;
-    if (step.condition) return StepType.Condition;
-    if (step.transform) return StepType.Transform;
-    if (step.stop) return StepType.Stop;
-    return StepType.Unknown;
   }
 }

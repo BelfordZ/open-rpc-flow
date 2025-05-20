@@ -55,6 +55,7 @@ export enum StepType {
   Condition = 'condition',
   Transform = 'transform',
   Stop = 'stop',
+  Unknown = 'unknown',
 }
 
 /**

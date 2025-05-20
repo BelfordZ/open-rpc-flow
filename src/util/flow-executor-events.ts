@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
-import { Step, StepExecutionContext } from '../types';
-import { StepExecutionResult } from '../step-executors';
+
+import { Step, StepExecutionContext, getStepType } from '../types';
+import { StepExecutionResult, StepType } from '../step-executors';
 
 /**
  * Event types emitted by the FlowExecutor
@@ -59,7 +60,7 @@ export interface FlowErrorEvent extends FlowEvent {
 export interface StepStartEvent extends FlowEvent {
   type: FlowEventType.STEP_START;
   stepName: string;
-  stepType: string;
+  stepType: StepType;
   context?: Record<string, any>;
 }
 
@@ -69,8 +70,8 @@ export interface StepStartEvent extends FlowEvent {
 export interface StepCompleteEvent extends FlowEvent {
   type: FlowEventType.STEP_COMPLETE;
   stepName: string;
-  stepType: string;
-  result: any;
+  stepType: StepType;
+  result: StepExecutionResult;
   duration: number;
 }
 
@@ -80,7 +81,7 @@ export interface StepCompleteEvent extends FlowEvent {
 export interface StepErrorEvent extends FlowEvent {
   type: FlowEventType.STEP_ERROR;
   stepName: string;
-  stepType: string;
+  stepType: StepType;
   error: Error;
   duration: number;
 }
@@ -210,7 +211,7 @@ export class FlowExecutorEvents extends EventEmitter {
       ? { ...executionContext.context, ...extraContext }
       : undefined;
 
-    const stepType = this.getStepType(step);
+    const stepType = getStepType(step);
 
     this.emit(FlowEventType.STEP_START, {
       timestamp: Date.now(),
@@ -227,7 +228,7 @@ export class FlowExecutorEvents extends EventEmitter {
   emitStepComplete(step: Step, result: StepExecutionResult, startTime: number): void {
     if (!this.options.emitStepEvents) return;
 
-    const stepType = this.getStepType(step);
+    const stepType = getStepType(step);
     const resultData = this.options.includeResults ? result : { type: result.type };
 
     this.emit(FlowEventType.STEP_COMPLETE, {
@@ -246,7 +247,7 @@ export class FlowExecutorEvents extends EventEmitter {
   emitStepError(step: Step, error: Error, startTime: number): void {
     if (!this.options.emitStepEvents) return;
 
-    const stepType = this.getStepType(step);
+    const stepType = getStepType(step);
 
     this.emit(FlowEventType.STEP_ERROR, {
       timestamp: Date.now(),
@@ -283,17 +284,5 @@ export class FlowExecutorEvents extends EventEmitter {
       type: FlowEventType.DEPENDENCY_RESOLVED,
       orderedSteps,
     } as DependencyResolvedEvent);
-  }
-
-  /**
-   * Helper to determine step type
-   */
-  private getStepType(step: Step): string {
-    if (step.request) return 'request';
-    if (step.loop) return 'loop';
-    if (step.condition) return 'condition';
-    if (step.transform) return 'transform';
-    if (step.stop) return 'stop';
-    return 'unknown';
   }
 }

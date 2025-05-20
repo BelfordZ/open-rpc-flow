@@ -145,7 +145,7 @@ export class SafeExpressionEvaluator {
    * @param stepType Optional step type for timeout resolution
    * @returns The resolved timeout value
    */
-  getExpressionTimeout(step?: Step, stepType?: string): number {
+  getExpressionTimeout(step?: Step, stepType?: StepType): number {
     if (this.policyResolver && step && stepType) {
       return this.policyResolver.resolveExpressionTimeout(step, stepType as any);
     }
@@ -295,7 +295,7 @@ export class SafeExpressionEvaluator {
     startTime: number,
     expression: string,
     step?: Step,
-    stepType?: string,
+    stepType?: StepType,
   ): void {
     const currentTime = Date.now();
     const elapsedTime = currentTime - startTime;
@@ -667,7 +667,7 @@ export class SafeExpressionEvaluator {
     startTime: number,
     expression: string,
     step?: Step,
-    stepType?: string,
+    stepType?: StepType,
   ): unknown {
     this.checkTimeout(startTime, expression, step, stepType);
 

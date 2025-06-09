@@ -33,6 +33,17 @@ This directory contains example flows demonstrating various patterns and use cas
    - Combines all primitive operations
    - Shows real-world usage patterns
    - Error handling and data validation
+6. **Stop Flow (06-stop-flow.json)**
+   - Demonstrates halting execution early
+7. **Retry with Timeout (07-retry-timeout.json)**
+   - Custom retry policy with backoff
+   - Step-level timeout control
+
+## TypeScript Examples
+
+- **event-emitter-example.ts** - Stream step updates during execution
+- **abort-signal-example.ts** - Respect `AbortSignal` for request cancellation
+- **error-handling-example.ts** - Demonstrates retry and circuit breaker logic
 
 ## Key Concepts Demonstrated
 

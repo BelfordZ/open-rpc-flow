@@ -1072,4 +1072,14 @@ describe('FlowExecutor Events', () => {
     // Verify no events were emitted
     expect(receivedEvents.length).toBe(0);
   });
+
+  it('should not emit flow finish event when emitFlowEvents is disabled', () => {
+    const events = new FlowExecutorEvents({ emitFlowEvents: false });
+    const received: any[] = [];
+    events.on(FlowEventType.FLOW_FINISH, (data) => received.push(data));
+
+    events.emitFlowFinish('complete', 'TestFlow', {}, Date.now());
+
+    expect(received.length).toBe(0);
+  });
 });

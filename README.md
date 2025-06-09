@@ -437,6 +437,7 @@ for a full working example.
 | `flow:start`          | Emitted when flow execution begins                 |
 | `flow:complete`       | Emitted when flow execution completes successfully |
 | `flow:error`          | Emitted when flow execution fails                  |
+| `flow:finish`         | Emitted when flow execution ends                   |
 | `step:start`          | Emitted when a step execution begins               |
 | `step:complete`       | Emitted when a step execution completes            |
 | `step:error`          | Emitted when a step execution fails                |
@@ -448,14 +449,15 @@ for a full working example.
 Each emitted event carries a typed payload. Below is a quick reference of the
 most useful fields:
 
-| Event           | Key fields                                   |
-| --------------- | -------------------------------------------- |
-| `flow:start`    | `flowName`, `orderedSteps`                   |
-| `flow:complete` | `flowName`, `results`, `duration`            |
-| `flow:error`    | `flowName`, `error`, `duration`              |
-| `step:start`    | `stepName`, `stepType`, `context?`           |
-| `step:complete` | `stepName`, `stepType`, `result`, `duration` |
-| `step:error`    | `stepName`, `stepType`, `error`, `duration`  |
+| Event           | Key fields                                             |
+| --------------- | ------------------------------------------------------ |
+| `flow:start`    | `flowName`, `orderedSteps`                             |
+| `flow:complete` | `flowName`, `results`, `duration`                      |
+| `flow:error`    | `flowName`, `error`, `duration`                        |
+| `flow:finish`   | `flowName`, `status`, `results?`, `error?`, `duration` |
+| `step:start`    | `stepName`, `stepType`, `context?`                     |
+| `step:complete` | `stepName`, `stepType`, `result`, `duration`           |
+| `step:error`    | `stepName`, `stepType`, `error`, `duration`            |
 
 ### Configuration Options
 

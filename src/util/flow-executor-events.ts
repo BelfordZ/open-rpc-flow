@@ -9,6 +9,7 @@ import { StepExecutionResult, StepType } from '../step-executors';
 export enum FlowEventType {
   FLOW_START = 'flow:start',
   FLOW_COMPLETE = 'flow:complete',
+  FLOW_FINISH = 'flow:finish',
   FLOW_ERROR = 'flow:error',
   STEP_START = 'step:start',
   STEP_COMPLETE = 'step:complete',
@@ -41,6 +42,18 @@ export interface FlowCompleteEvent extends FlowEvent {
   type: FlowEventType.FLOW_COMPLETE;
   flowName: string;
   results: Record<string, any>;
+  duration: number;
+}
+
+/**
+ * Flow finish event
+ */
+export interface FlowFinishEvent extends FlowEvent {
+  type: FlowEventType.FLOW_FINISH;
+  flowName: string;
+  status: 'complete' | 'error';
+  results?: Record<string, any>;
+  error?: Error;
   duration: number;
 }
 
@@ -180,6 +193,7 @@ export class FlowExecutorEvents extends EventEmitter {
       results: resultsObj,
       duration: Date.now() - startTime,
     } as FlowCompleteEvent);
+    this.emitFlowFinish('complete', flowName, resultsObj, startTime);
   }
 
   /**
@@ -195,6 +209,35 @@ export class FlowExecutorEvents extends EventEmitter {
       error,
       duration: Date.now() - startTime,
     } as FlowErrorEvent);
+    this.emitFlowFinish('error', flowName, error, startTime);
+  }
+
+  /**
+   * Emit flow finish event
+   */
+  emitFlowFinish(
+    status: 'complete' | 'error',
+    flowName: string,
+    resultsOrError: any,
+    startTime: number,
+  ): void {
+    if (!this.options.emitFlowEvents) return;
+
+    const payload: FlowFinishEvent = {
+      timestamp: Date.now(),
+      type: FlowEventType.FLOW_FINISH,
+      flowName,
+      status,
+      duration: Date.now() - startTime,
+    };
+
+    if (status === 'complete') {
+      payload.results = resultsOrError as Record<string, any>;
+    } else {
+      payload.error = resultsOrError as Error;
+    }
+
+    this.emit(FlowEventType.FLOW_FINISH, payload);
   }
 
   /**

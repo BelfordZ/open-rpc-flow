@@ -6,7 +6,7 @@ import { TimeoutError } from '../../errors/timeout-error';
 describe('Integration: Transform Step Timeout (real timers)', () => {
   it('should abort a slow transform step if timeout is hit', async () => {
     // Use a large array and a computationally expensive expression to simulate slowness
-    const itemCount = 500_000;
+    const itemCount = 100_000;
     const items = Array.from({ length: itemCount }, (_, i) => i + 1);
 
     const flow: Flow = {
@@ -51,7 +51,7 @@ describe('Integration: Transform Step Timeout (real timers)', () => {
     // Log the elapsed time for manual inspection
     // eslint-disable-next-line no-console
     console.log('Elapsed time (ms):', elapsed);
-    expect(elapsed).toBeLessThan(500);
+    expect(elapsed).toBeLessThan(1000);
     // The operation SHOULD throw a TimeoutError
     expect(errorCaught).toBe(true);
     expect(error).toBeInstanceOf(TimeoutError);

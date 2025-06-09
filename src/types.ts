@@ -126,6 +126,10 @@ export interface Step {
     input?: string | any[];
     operations: TransformOperation[];
   };
+  delay?: {
+    duration: number;
+    step: Step;
+  };
   stop?: {
     endWorkflow?: boolean;
   };
@@ -210,6 +214,7 @@ export function getStepType(step: Step): StepType {
   if (step.loop) return StepType.Loop;
   if (step.condition) return StepType.Condition;
   if (step.transform) return StepType.Transform;
+  if (step.delay) return StepType.Delay;
   if (step.stop) return StepType.Stop;
   return StepType.Unknown;
 }

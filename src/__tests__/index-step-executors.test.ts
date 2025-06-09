@@ -3,6 +3,7 @@ import {
   LoopStepExecutor,
   ConditionStepExecutor,
   TransformStepExecutor,
+  DelayStepExecutor,
   StopStepExecutor,
 } from '../index';
 
@@ -12,6 +13,7 @@ describe('index exports StepExecutors', () => {
     expect(LoopStepExecutor).toBeDefined();
     expect(ConditionStepExecutor).toBeDefined();
     expect(TransformStepExecutor).toBeDefined();
+    expect(DelayStepExecutor).toBeDefined();
     expect(StopStepExecutor).toBeDefined();
   });
 });

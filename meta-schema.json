@@ -51,6 +51,10 @@
         },
         "policies": {
           "$ref": "#/definitions/Policies"
+        },
+        "openrpc": {
+          "$ref": "#/definitions/OpenRPCMethod",
+          "description": "Optional OpenRPC method definition describing the step's interface"
         }
       },
       "oneOf": [
@@ -324,6 +328,29 @@
             }
           }
         }
+      }
+    },
+    "OpenRPCContentDescriptor": {
+      "type": "object",
+      "required": ["name", "schema"],
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "required": { "type": "boolean" },
+        "schema": { "type": "object" }
+      }
+    },
+    "OpenRPCMethod": {
+      "type": "object",
+      "required": ["name", "params", "result"],
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "params": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/OpenRPCContentDescriptor" }
+        },
+        "result": { "$ref": "#/definitions/OpenRPCContentDescriptor" }
       }
     }
   }

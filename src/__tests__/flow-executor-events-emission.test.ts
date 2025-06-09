@@ -45,6 +45,9 @@ describe('FlowExecutor event emission', () => {
     fevents.on(FlowEventType.FLOW_ERROR, (payload) =>
       events.push({ type: FlowEventType.FLOW_ERROR, payload }),
     );
+    fevents.on(FlowEventType.FLOW_FINISH, (payload) =>
+      events.push({ type: FlowEventType.FLOW_FINISH, payload }),
+    );
     fevents.on(FlowEventType.STEP_START, (payload) =>
       events.push({ type: FlowEventType.STEP_START, payload }),
     );
@@ -68,6 +71,7 @@ describe('FlowExecutor event emission', () => {
     // Check for flow start and complete
     expect(events.some((e) => e.type === FlowEventType.FLOW_START)).toBe(true);
     expect(events.some((e) => e.type === FlowEventType.FLOW_COMPLETE)).toBe(true);
+    expect(events.some((e) => e.type === FlowEventType.FLOW_FINISH)).toBe(true);
     // Check for step start and complete for each step
     const stepStartEvents = events.filter((e) => e.type === FlowEventType.STEP_START);
     const stepCompleteEvents = events.filter((e) => e.type === FlowEventType.STEP_COMPLETE);
@@ -100,9 +104,13 @@ describe('FlowExecutor event emission', () => {
     fevents.on(FlowEventType.FLOW_ERROR, (payload) =>
       events.push({ type: FlowEventType.FLOW_ERROR, payload }),
     );
+    fevents.on(FlowEventType.FLOW_FINISH, (payload) =>
+      events.push({ type: FlowEventType.FLOW_FINISH, payload }),
+    );
     await expect(executor.execute()).rejects.toThrow('fail!');
     expect(events.some((e) => e.type === FlowEventType.STEP_ERROR)).toBe(true);
     expect(events.some((e) => e.type === FlowEventType.FLOW_ERROR)).toBe(true);
+    expect(events.some((e) => e.type === FlowEventType.FLOW_FINISH)).toBe(true);
   });
 
   it('emits step skip and flow complete if a stop step is encountered', async () => {
@@ -129,9 +137,13 @@ describe('FlowExecutor event emission', () => {
     fevents.on(FlowEventType.FLOW_COMPLETE, (payload) =>
       events.push({ type: FlowEventType.FLOW_COMPLETE, payload }),
     );
+    fevents.on(FlowEventType.FLOW_FINISH, (payload) =>
+      events.push({ type: FlowEventType.FLOW_FINISH, payload }),
+    );
     await executor.execute();
     // Should emit a skip for the second step
     expect(events.some((e) => e.type === FlowEventType.STEP_SKIP)).toBe(true);
     expect(events.some((e) => e.type === FlowEventType.FLOW_COMPLETE)).toBe(true);
+    expect(events.some((e) => e.type === FlowEventType.FLOW_FINISH)).toBe(true);
   });
 });

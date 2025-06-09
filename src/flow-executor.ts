@@ -1,7 +1,8 @@
 import { ReferenceResolver } from './reference-resolver';
 import { SafeExpressionEvaluator } from './expression-evaluator/safe-evaluator';
+import { SesExpressionEvaluator } from './expression-evaluator/ses-evaluator';
 import { DependencyResolver } from './dependency-resolver';
-import { Flow, Step, StepExecutionContext, JsonRpcHandler } from './types';
+import { Flow, Step, StepExecutionContext, JsonRpcHandler, ExpressionEvaluator } from './types';
 import {
   StepExecutor,
   StepExecutionResult,
@@ -44,6 +45,8 @@ export interface FlowExecutorOptions {
   eventOptions?: Partial<FlowEventOptions>;
   /** Retry policy for request steps */
   retryPolicy?: RetryPolicy;
+  /** Expression evaluator type to use */
+  evaluatorType?: 'safe' | 'ses';
 }
 
 /**
@@ -52,7 +55,7 @@ export interface FlowExecutorOptions {
 export class FlowExecutor {
   public dependencyResolver: DependencyResolver;
   public referenceResolver: ReferenceResolver;
-  public expressionEvaluator: SafeExpressionEvaluator;
+  public expressionEvaluator: ExpressionEvaluator;
   public events: FlowExecutorEvents;
 
   private context: Record<string, any>;
@@ -118,7 +121,10 @@ export class FlowExecutor {
 
     // Initialize shared execution context
     this.referenceResolver = new ReferenceResolver(this.stepResults, this.context, this.logger);
-    this.expressionEvaluator = new SafeExpressionEvaluator(this.logger, this.referenceResolver);
+    this.expressionEvaluator =
+      options?.evaluatorType === 'ses'
+        ? new SesExpressionEvaluator(this.logger)
+        : new SafeExpressionEvaluator(this.logger, this.referenceResolver);
     this.dependencyResolver = new DependencyResolver(
       this.flow,
       this.expressionEvaluator,

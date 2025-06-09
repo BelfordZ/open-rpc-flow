@@ -170,6 +170,10 @@ export interface StepExecutionContext {
   expressionEvaluator: SafeExpressionEvaluator;
   stepResults: Map<string, any>;
   context: Record<string, any>;
+  /**
+   * Default timeout in milliseconds for steps when not otherwise specified
+   */
+  timeout?: number;
   logger: Logger;
   /**
    * AbortSignal that can be used to cancel operations

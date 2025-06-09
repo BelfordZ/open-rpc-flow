@@ -192,6 +192,7 @@ export class FlowExecutor {
 
       this.logger.log('Executing steps in order:', orderedStepNames);
 
+      let flowAbortEmitted = false;
       for (const step of orderedSteps) {
         const stepStartTime = Date.now();
 
@@ -203,7 +204,12 @@ export class FlowExecutor {
               stepName: step.name,
               reason: String(reason),
             });
+            this.events.emitStepAborted(step, String(reason));
             this.events.emitStepSkip(step, String(reason));
+            if (!flowAbortEmitted) {
+              this.events.emitFlowAborted(this.flow.name, String(reason));
+              flowAbortEmitted = true;
+            }
             throw new Error(String(reason));
           }
 
@@ -219,6 +225,7 @@ export class FlowExecutor {
 
           if (shouldStop) {
             this.logger.log('Workflow stopped by step:', step.name);
+            this.events.emitFlowAborted(this.flow.name, 'Stopped by stop step');
             this.events.emitStepSkip(step, 'Workflow stopped by previous step');
             break;
           }
@@ -307,6 +314,13 @@ export class FlowExecutor {
       // Only emit step error for nested steps
       if (Object.keys(extraContext).length > 0) {
         this.events.emitStepError(step, error, stepStartTime);
+      }
+
+      if (
+        error?.name === 'AbortError' ||
+        (typeof error.message === 'string' && error.message.includes('aborted'))
+      ) {
+        this.events.emitStepAborted(step, error.message || 'aborted');
       }
 
       // Do not wrap custom errors

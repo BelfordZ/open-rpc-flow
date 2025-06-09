@@ -1,11 +1,12 @@
-import { Step, StepExecutionContext } from '../types';
+import { Step, StepExecutionContext, ExecutionContextData } from '../types';
 import { StepExecutor, StepExecutionResult, StepType, ConditionStep } from './types';
 import { Logger } from '../util/logger';
 import { ValidationError, ExecutionError } from '../errors/base';
 import { TimeoutError } from '../errors/timeout-error';
+import { PolicyResolver } from '../util/policy-resolver';
 
-class ConditionStepExecutionError extends ExecutionError<Record<string, unknown>> {
-  constructor(message: string, context: Record<string, unknown>, cause?: Error) {
+class ConditionStepExecutionError extends ExecutionError<ExecutionContextData> {
+  constructor(message: string, context: ExecutionContextData, cause?: Error) {
     super(message, { ...context, code: 'EXECUTION_ERROR' }, cause);
     this.name = 'ConditionStepExecutionError';
     Object.setPrototypeOf(this, ConditionStepExecutionError.prototype);
@@ -14,16 +15,16 @@ class ConditionStepExecutionError extends ExecutionError<Record<string, unknown>
 
 export class ConditionStepExecutor implements StepExecutor {
   private logger: Logger;
-  private policyResolver: any;
+  private policyResolver: PolicyResolver;
 
   constructor(
     private executeStep: (
       step: Step,
-      extraContext?: Record<string, any>,
+      extraContext?: ExecutionContextData,
       signal?: AbortSignal,
     ) => Promise<StepExecutionResult>,
     logger: Logger,
-    policyResolver: any,
+    policyResolver: PolicyResolver,
   ) {
     this.logger = logger.createNested('ConditionStepExecutor');
     this.policyResolver = policyResolver;
@@ -36,7 +37,7 @@ export class ConditionStepExecutor implements StepExecutor {
   async execute(
     step: Step,
     context: StepExecutionContext,
-    extraContext: Record<string, any> = {},
+    extraContext: ExecutionContextData = {},
     signal?: AbortSignal,
   ): Promise<StepExecutionResult> {
     if (!this.canExecute(step)) {

@@ -1,4 +1,4 @@
-import { Step, StepExecutionContext } from '../types';
+import { Step, StepExecutionContext, ExecutionContextData } from '../types';
 import {
   StepExecutor,
   StepExecutionResult,
@@ -22,7 +22,7 @@ export class TransformExecutor {
   constructor(
     private expressionEvaluator: SafeExpressionEvaluator,
     private referenceResolver: ReferenceResolver,
-    private context: Record<string, any>,
+    private context: ExecutionContextData,
     logger: Logger,
   ) {
     this.logger = logger.createNested('TransformExecutor');
@@ -392,7 +392,7 @@ export class TransformStepExecutor implements StepExecutor {
   constructor(
     expressionEvaluator: SafeExpressionEvaluator,
     referenceResolver: ReferenceResolver,
-    context: Record<string, any>,
+    context: ExecutionContextData,
     logger: Logger,
     policyResolver: PolicyResolver,
   ) {
@@ -413,7 +413,7 @@ export class TransformStepExecutor implements StepExecutor {
   async execute(
     step: Step,
     context: StepExecutionContext,
-    extraContext: Record<string, any> = {},
+    extraContext: ExecutionContextData = {},
     signal?: AbortSignal,
   ): Promise<StepExecutionResult> {
     if (!this.canExecute(step)) {

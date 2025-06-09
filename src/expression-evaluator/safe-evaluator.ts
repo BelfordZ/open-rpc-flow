@@ -147,7 +147,7 @@ export class SafeExpressionEvaluator {
    */
   getExpressionTimeout(step?: Step, stepType?: StepType): number {
     if (this.policyResolver && step && stepType) {
-      return this.policyResolver.resolveExpressionTimeout(step, stepType as any);
+      return this.policyResolver.resolveExpressionTimeout(step, stepType);
     }
     return this.defaultExpressionTimeout;
   }

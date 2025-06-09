@@ -1,4 +1,4 @@
-import { Step, StepExecutionContext } from '../types';
+import { Step, StepExecutionContext, ExpressionEvaluator } from '../types';
 import {
   StepExecutor,
   StepExecutionResult,
@@ -7,7 +7,6 @@ import {
   TransformOperation,
 } from './types';
 import { Logger } from '../util/logger';
-import { SafeExpressionEvaluator } from '../expression-evaluator/safe-evaluator';
 import { ReferenceResolver } from '../reference-resolver';
 import { TimeoutError } from '../errors/timeout-error';
 import { PolicyResolver } from '../util/policy-resolver';
@@ -20,7 +19,7 @@ export class TransformExecutor {
   private logger: Logger;
 
   constructor(
-    private expressionEvaluator: SafeExpressionEvaluator,
+    private expressionEvaluator: ExpressionEvaluator,
     private referenceResolver: ReferenceResolver,
     private context: Record<string, any>,
     logger: Logger,
@@ -390,7 +389,7 @@ export class TransformStepExecutor implements StepExecutor {
   private policyResolver: PolicyResolver;
 
   constructor(
-    expressionEvaluator: SafeExpressionEvaluator,
+    expressionEvaluator: ExpressionEvaluator,
     referenceResolver: ReferenceResolver,
     context: Record<string, any>,
     logger: Logger,

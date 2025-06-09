@@ -1,4 +1,4 @@
-import { Flow, Step, DependencyGraph, DependencyNode } from '../types';
+import { Flow, Step, DependencyGraph, DependencyNode, ExpressionEvaluator } from '../types';
 import { StepType } from '../step-executors/types';
 import { Logger } from '../util/logger';
 import {
@@ -7,7 +7,6 @@ import {
   isConditionStep,
   isTransformStep,
 } from '../step-executors/types';
-import { SafeExpressionEvaluator } from '../expression-evaluator/safe-evaluator';
 import { StepNotFoundError, UnknownDependencyError, CircularDependencyError } from './errors';
 
 export class DependencyResolver {
@@ -17,7 +16,7 @@ export class DependencyResolver {
 
   constructor(
     private flow: Flow,
-    private expressionEvaluator: SafeExpressionEvaluator,
+    private expressionEvaluator: ExpressionEvaluator,
     logger: Logger,
   ) {
     this.logger = logger.createNested('DependencyResolver');
@@ -231,7 +230,7 @@ export class DependencyResolver {
    * Extract step references from an expression
    */
   private extractReferences(expr: string): string[] {
-    const refs = this.expressionEvaluator.extractReferences(expr);
+    const refs = this.expressionEvaluator.extractReferences?.(expr) || [];
     // Filter out internal variables and loop variables
     return refs.filter((ref) => !this.internalVars.has(ref) && !this.loopVars.has(ref));
   }

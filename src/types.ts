@@ -1,6 +1,5 @@
 import { StepType, TransformOperation } from './step-executors/types';
 import { ReferenceResolver } from './reference-resolver';
-import { SafeExpressionEvaluator } from './expression-evaluator/safe-evaluator';
 import { Logger } from './util/logger';
 
 export type { StepType } from './step-executors/types';
@@ -163,11 +162,19 @@ export type JsonRpcHandler = (
 ) => Promise<any>;
 
 /**
+ * Minimal interface for expression evaluators
+ */
+export interface ExpressionEvaluator {
+  evaluate(expression: string, context: Record<string, any>, step?: Step): any;
+  extractReferences?(expression: string): string[];
+}
+
+/**
  * Represents the execution context available to all step executors
  */
 export interface StepExecutionContext {
   referenceResolver: ReferenceResolver;
-  expressionEvaluator: SafeExpressionEvaluator;
+  expressionEvaluator: ExpressionEvaluator;
   stepResults: Map<string, any>;
   context: Record<string, any>;
   logger: Logger;

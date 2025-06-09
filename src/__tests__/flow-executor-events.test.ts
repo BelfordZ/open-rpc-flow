@@ -741,6 +741,11 @@ describe('FlowExecutor Events', () => {
       },
     };
 
+    const delayStep = {
+      name: 'delayStep',
+      delay: { duration: 1, step: { name: 'd', request: { method: 'm', params: {} } } },
+    };
+
     const stopStep = {
       name: 'stopStep',
       stop: { endWorkflow: true },
@@ -768,17 +773,19 @@ describe('FlowExecutor Events', () => {
     executor.events.emitStepStart(requestStep as any, ctx, {}, 'corr2');
     executor.events.emitStepStart(conditionStep as any, ctx, {}, 'corr3');
     executor.events.emitStepStart(transformStep as any, ctx, {}, 'corr4');
-    executor.events.emitStepStart(stopStep as any, ctx, {}, 'corr5');
-    executor.events.emitStepStart(unknownStep as any, ctx, {}, 'corr6');
+    executor.events.emitStepStart(delayStep as any, ctx, {}, 'corr5');
+    executor.events.emitStepStart(stopStep as any, ctx, {}, 'corr6');
+    executor.events.emitStepStart(unknownStep as any, ctx, {}, 'corr7');
 
     // Verify all step types were correctly identified
-    expect(events.length).toBe(6);
+    expect(events.length).toBe(7);
     expect(events[0].stepType).toBe(StepType.Loop);
     expect(events[1].stepType).toBe(StepType.Request);
     expect(events[2].stepType).toBe(StepType.Condition);
     expect(events[3].stepType).toBe(StepType.Transform);
-    expect(events[4].stepType).toBe(StepType.Stop);
-    expect(events[5].stepType).toBe(StepType.Unknown);
+    expect(events[4].stepType).toBe(StepType.Delay);
+    expect(events[5].stepType).toBe(StepType.Stop);
+    expect(events[6].stepType).toBe(StepType.Unknown);
   });
 
   it('should emit dependency resolved events with ordered steps', async () => {

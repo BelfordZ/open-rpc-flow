@@ -9,6 +9,7 @@ export {
   LoopStepExecutor,
   ConditionStepExecutor,
   TransformStepExecutor,
+  DelayStepExecutor,
   StopStepExecutor,
 } from './step-executors';
 export { FlowExecutor, FlowExecutorOptions, DEFAULT_RETRY_POLICY } from './flow-executor';

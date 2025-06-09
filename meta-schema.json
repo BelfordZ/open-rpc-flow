@@ -63,6 +63,7 @@
         { "$ref": "#/definitions/TransformStep" },
         { "$ref": "#/definitions/LoopStep" },
         { "$ref": "#/definitions/ConditionStep" },
+        { "$ref": "#/definitions/DelayStep" },
         { "$ref": "#/definitions/StopStep" }
       ]
     },
@@ -327,6 +328,30 @@
               "description": "Indicates whether to end the entire workflow (true) or just the current branch (false).",
               "default": true
             }
+          }
+        }
+      }
+    },
+    "DelayStep": {
+      "type": "object",
+      "description": "A step that waits for a duration before executing another step.",
+      "required": ["name", "delay"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "A unique identifier for the step within the flow. Used for referencing step results in expressions.",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+        },
+        "delay": {
+          "type": "object",
+          "required": ["duration", "step"],
+          "properties": {
+            "duration": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Delay duration in milliseconds before executing the nested step."
+            },
+            "step": { "$ref": "#/definitions/Step" }
           }
         }
       }

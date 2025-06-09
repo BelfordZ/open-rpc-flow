@@ -48,6 +48,9 @@ describe('RetryableOperation', () => {
 
       expect(result).toBe('success');
       expect(operation).toHaveBeenCalledTimes(2);
+
+      const warnings = testLogger.getLogs().filter((l) => l.level === 'warn');
+      expect(warnings.length).toBeGreaterThan(0);
     });
 
     it('should throw immediately on non-retryable error', async () => {

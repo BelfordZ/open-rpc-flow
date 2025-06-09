@@ -300,6 +300,9 @@ describe('RequestStepExecutor', () => {
     expect(result.metadata).toBeDefined();
     expect(result?.metadata?.hasError).toBe(true);
     expect(result.result.error).toEqual({ message: 'Custom error' });
+
+    const warnLogs = testLogger.getLogs().filter((l) => l.level === 'warn');
+    expect(warnLogs.length).toBeGreaterThan(0);
   });
 
   it('throws error when given invalid step type', async () => {

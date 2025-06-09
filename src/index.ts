@@ -43,10 +43,13 @@ export {
   FlowStartEvent,
   FlowCompleteEvent,
   FlowErrorEvent,
+  FlowTimeoutEvent,
   StepStartEvent,
   StepCompleteEvent,
   StepErrorEvent,
   StepSkipEvent,
+  StepRetryEvent,
+  StepTimeoutEvent,
   DependencyResolvedEvent,
   FlowEventOptions,
 } from './util/flow-executor-events';

@@ -14,7 +14,10 @@ export enum FlowEventType {
   STEP_COMPLETE = 'step:complete',
   STEP_ERROR = 'step:error',
   STEP_SKIP = 'step:skip',
+  STEP_RETRY = 'step:retry',
+  STEP_TIMEOUT = 'step:timeout',
   DEPENDENCY_RESOLVED = 'dependency:resolved',
+  FLOW_TIMEOUT = 'flow:timeout',
 }
 
 /**
@@ -51,6 +54,16 @@ export interface FlowErrorEvent extends FlowEvent {
   type: FlowEventType.FLOW_ERROR;
   flowName: string;
   error: Error;
+  duration: number;
+}
+
+/**
+ * Flow timeout event
+ */
+export interface FlowTimeoutEvent extends FlowEvent {
+  type: FlowEventType.FLOW_TIMEOUT;
+  flowName: string;
+  timeout: number;
   duration: number;
 }
 
@@ -93,6 +106,29 @@ export interface StepSkipEvent extends FlowEvent {
   type: FlowEventType.STEP_SKIP;
   stepName: string;
   reason: string;
+}
+
+/**
+ * Step retry event
+ */
+export interface StepRetryEvent extends FlowEvent {
+  type: FlowEventType.STEP_RETRY;
+  stepName: string;
+  stepType: StepType;
+  attempt: number;
+  error: Error;
+  delay: number;
+}
+
+/**
+ * Step timeout event
+ */
+export interface StepTimeoutEvent extends FlowEvent {
+  type: FlowEventType.STEP_TIMEOUT;
+  stepName: string;
+  stepType: StepType;
+  timeout: number;
+  duration: number;
 }
 
 /**
@@ -198,6 +234,21 @@ export class FlowExecutorEvents extends EventEmitter {
   }
 
   /**
+   * Emit flow timeout event
+   */
+  emitFlowTimeout(flowName: string, timeout: number, duration: number): void {
+    if (!this.options.emitFlowEvents) return;
+
+    this.emit(FlowEventType.FLOW_TIMEOUT, {
+      timestamp: Date.now(),
+      type: FlowEventType.FLOW_TIMEOUT,
+      flowName,
+      timeout,
+      duration,
+    } as FlowTimeoutEvent);
+  }
+
+  /**
    * Emit step start event
    */
   emitStepStart(
@@ -271,6 +322,43 @@ export class FlowExecutorEvents extends EventEmitter {
       stepName: step.name,
       reason,
     } as StepSkipEvent);
+  }
+
+  /**
+   * Emit step retry event
+   */
+  emitStepRetry(step: Step, attempt: number, error: Error, delay: number): void {
+    if (!this.options.emitStepEvents) return;
+
+    const stepType = getStepType(step);
+
+    this.emit(FlowEventType.STEP_RETRY, {
+      timestamp: Date.now(),
+      type: FlowEventType.STEP_RETRY,
+      stepName: step.name,
+      stepType,
+      attempt,
+      error,
+      delay,
+    } as StepRetryEvent);
+  }
+
+  /**
+   * Emit step timeout event
+   */
+  emitStepTimeout(step: Step, timeout: number, duration: number): void {
+    if (!this.options.emitStepEvents) return;
+
+    const stepType = getStepType(step);
+
+    this.emit(FlowEventType.STEP_TIMEOUT, {
+      timestamp: Date.now(),
+      type: FlowEventType.STEP_TIMEOUT,
+      stepName: step.name,
+      stepType,
+      timeout,
+      duration,
+    } as StepTimeoutEvent);
   }
 
   /**

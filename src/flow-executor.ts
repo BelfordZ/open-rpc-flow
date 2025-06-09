@@ -165,7 +165,12 @@ export class FlowExecutor {
    * Create a RequestStepExecutor with the current error handling configuration
    */
   private createRequestStepExecutor(): RequestStepExecutor {
-    return new RequestStepExecutor(this.jsonRpcHandler, this.logger, this.policyResolver);
+    return new RequestStepExecutor(
+      this.jsonRpcHandler,
+      this.logger,
+      this.policyResolver,
+      this.events,
+    );
   }
 
   /**
@@ -223,6 +228,9 @@ export class FlowExecutor {
             break;
           }
         } catch (error: any) {
+          if (error instanceof TimeoutError) {
+            this.events.emitStepTimeout(step, error.timeout, error.executionTime);
+          }
           this.events.emitStepError(step, error, stepStartTime);
           throw error; // Re-throw to be caught by the outer try/catch
         }
@@ -246,6 +254,7 @@ export class FlowExecutor {
           duration,
         );
 
+        this.events.emitFlowTimeout(this.flow.name, flowTimeout, duration);
         this.events.emitFlowError(this.flow.name, timeoutError, startTime);
         throw timeoutError;
       }
@@ -306,6 +315,9 @@ export class FlowExecutor {
 
       // Only emit step error for nested steps
       if (Object.keys(extraContext).length > 0) {
+        if (error instanceof TimeoutError) {
+          this.events.emitStepTimeout(step, error.timeout, error.executionTime);
+        }
         this.events.emitStepError(step, error, stepStartTime);
       }
 

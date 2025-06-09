@@ -92,6 +92,8 @@ describe('FlowExecutor event emission', () => {
     };
     jsonRpcHandler.mockRejectedValueOnce(new Error('fail!'));
     const executor = new FlowExecutor(flow, jsonRpcHandler, { logger: testLogger });
+    // rpc.discover consumes the first mockRejectedValueOnce, reapply for the step
+    jsonRpcHandler.mockRejectedValueOnce(new Error('fail!'));
     const events: { type: string; payload: any }[] = [];
     const fevents = executor.events;
     fevents.on(FlowEventType.STEP_ERROR, (payload) =>

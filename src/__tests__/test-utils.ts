@@ -32,6 +32,9 @@ export function createMockJsonRpcHandler(_mockResponses: Record<string, any> = {
   return jest.fn().mockImplementation((request) => {
     const response = _mockResponses[request.method];
     if (response === undefined) {
+      if (request.method === 'rpc.discover') {
+        return Promise.resolve({});
+      }
       throw new Error(`No mock response for method: ${request.method}`);
     }
     return Promise.resolve(response);

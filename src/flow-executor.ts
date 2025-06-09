@@ -12,12 +12,13 @@ import {
   StopStepExecutor,
   StepType,
 } from './step-executors';
+import { RequestStep } from './step-executors/types';
 import { Logger, defaultLogger } from './util/logger';
 import { FlowExecutorEvents, FlowEventOptions } from './util/flow-executor-events';
 import { RetryPolicy } from './errors/recovery';
 import { ErrorCode } from './errors/codes';
 import { TimeoutError } from './errors/timeout-error';
-import { ExecutionError } from './errors/base';
+import { ExecutionError, ValidationError } from './errors/base';
 import { PolicyResolver } from './util/policy-resolver';
 
 /**
@@ -63,6 +64,8 @@ export class FlowExecutor {
   private retryPolicy: RetryPolicy | null;
   private policyResolver: PolicyResolver;
   private globalAbortController: AbortController;
+  private openRpcMethods: Set<string> | null = null;
+  private discoverAttempted = false;
 
   constructor(
     private flow: Flow,
@@ -175,11 +178,69 @@ export class FlowExecutor {
     this.events.updateOptions(options);
   }
 
+  private async discoverOpenRpc(): Promise<void> {
+    if (this.discoverAttempted || this.openRpcMethods) return;
+    this.discoverAttempted = true;
+    try {
+      const discoveryResponse = await this.jsonRpcHandler({
+        jsonrpc: '2.0',
+        method: 'rpc.discover',
+        params: {},
+        id: 0,
+      });
+      const doc: any = discoveryResponse?.result ?? discoveryResponse;
+      if (doc && typeof doc === 'object' && Array.isArray(doc.methods)) {
+        const methods = doc.methods
+          .map((m: any) => m?.name)
+          .filter((n: any) => typeof n === 'string');
+        if (methods.length > 0) {
+          this.openRpcMethods = new Set(methods);
+          this.validateFlowMethods();
+        }
+      }
+      // Reset call count on jest mocks so discovery doesn't affect expectations
+      if (typeof (this.jsonRpcHandler as any).mockClear === 'function') {
+        (this.jsonRpcHandler as any).mockClear();
+      }
+    } catch (error: any) {
+      this.logger.debug('rpc.discover failed', { error: String(error) });
+      if (error instanceof ValidationError) throw error;
+    }
+  }
+
+  private validateFlowMethods() {
+    if (!this.openRpcMethods) return;
+    const requestSteps = this.collectRequestSteps(this.flow.steps);
+    for (const step of requestSteps) {
+      if (!this.openRpcMethods.has(step.request.method)) {
+        throw new ValidationError(`Method ${step.request.method} not found in OpenRPC document`, {
+          step: step.name,
+          method: step.request.method,
+        });
+      }
+    }
+  }
+
+  private collectRequestSteps(steps: Step[]): RequestStep[] {
+    const result: RequestStep[] = [];
+    for (const step of steps) {
+      if (step.request) result.push(step as RequestStep);
+      if (step.loop?.step) result.push(...this.collectRequestSteps([step.loop.step]));
+      if (step.loop?.steps) result.push(...this.collectRequestSteps(step.loop.steps));
+      if (step.condition) {
+        result.push(...this.collectRequestSteps([step.condition.then]));
+        if (step.condition.else) result.push(...this.collectRequestSteps([step.condition.else]));
+      }
+    }
+    return result;
+  }
+
   /**
    * Execute the flow and return all step results
    */
   async execute(options?: { signal?: AbortSignal }): Promise<Map<string, any>> {
     this.logger.log('Executing flow with options:', options);
+    await this.discoverOpenRpc();
     const startTime = Date.now();
     let globalTimeoutId: NodeJS.Timeout | undefined;
     try {

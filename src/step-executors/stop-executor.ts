@@ -1,4 +1,4 @@
-import { Step } from '../types';
+import { Step, StepExecutionContext, ExecutionContextData } from '../types';
 import { StepExecutor, StepExecutionResult, StepType } from './types';
 import { Logger } from '../util/logger';
 import { ValidationError } from '../errors/base';
@@ -25,8 +25,8 @@ export class StopStepExecutor implements StepExecutor {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async execute(
     step: Step,
-    context: any, // eslint-disable-line @typescript-eslint/no-unused-vars
-    extraContext?: Record<string, any>, // eslint-disable-line @typescript-eslint/no-unused-vars
+    context: StepExecutionContext, // eslint-disable-line @typescript-eslint/no-unused-vars
+    extraContext?: ExecutionContextData, // eslint-disable-line @typescript-eslint/no-unused-vars
     signal?: AbortSignal, // eslint-disable-line @typescript-eslint/no-unused-vars
   ): Promise<StepExecutionResult> {
     if (!this.canExecute(step)) {

@@ -1,4 +1,10 @@
-import { Step, StepExecutionContext, JsonRpcHandler } from '../types';
+import {
+  Step,
+  StepExecutionContext,
+  JsonRpcHandler,
+  JsonRpcHandlerOptions,
+  ExecutionContextData,
+} from '../types';
 import { StepExecutor, StepExecutionResult, JsonRpcRequestError, StepType } from './types';
 import { Logger } from '../util/logger';
 import { RequestStep } from './types';
@@ -61,7 +67,7 @@ export class RequestStepExecutor implements StepExecutor {
   async execute(
     step: Step,
     _context: StepExecutionContext,
-    extraContext: Record<string, any> = {},
+    extraContext: ExecutionContextData = {},
     signal?: AbortSignal,
   ): Promise<StepExecutionResult> {
     if (!this.canExecute(step)) {
@@ -136,7 +142,7 @@ export class RequestStepExecutor implements StepExecutor {
         });
 
         // Create options object with AbortSignal if available
-        const options: Record<string, any> = {};
+        const options: JsonRpcHandlerOptions = {};
 
         // Use either our timeout's abort signal or the one from context or the passed signal
         if (abortController?.signal) {

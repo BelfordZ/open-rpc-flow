@@ -14,6 +14,7 @@ export enum FlowEventType {
   STEP_COMPLETE = 'step:complete',
   STEP_ERROR = 'step:error',
   STEP_SKIP = 'step:skip',
+  STEP_PROGRESS = 'step:progress',
   DEPENDENCY_RESOLVED = 'dependency:resolved',
 }
 
@@ -93,6 +94,18 @@ export interface StepSkipEvent extends FlowEvent {
   type: FlowEventType.STEP_SKIP;
   stepName: string;
   reason: string;
+}
+
+/**
+ * Step progress event
+ */
+export interface StepProgressEvent extends FlowEvent {
+  type: FlowEventType.STEP_PROGRESS;
+  stepName: string;
+  stepType: StepType;
+  iteration: number;
+  totalIterations: number;
+  percent: number;
 }
 
 /**
@@ -271,6 +284,26 @@ export class FlowExecutorEvents extends EventEmitter {
       stepName: step.name,
       reason,
     } as StepSkipEvent);
+  }
+
+  /**
+   * Emit step progress event
+   */
+  emitStepProgress(step: Step, iteration: number, totalIterations: number): void {
+    if (!this.options.emitStepEvents) return;
+
+    const stepType = getStepType(step);
+    const percent = Math.min(Math.round((iteration / totalIterations) * 100), 100);
+
+    this.emit(FlowEventType.STEP_PROGRESS, {
+      timestamp: Date.now(),
+      type: FlowEventType.STEP_PROGRESS,
+      stepName: step.name,
+      stepType,
+      iteration,
+      totalIterations,
+      percent,
+    } as StepProgressEvent);
   }
 
   /**

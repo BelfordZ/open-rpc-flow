@@ -1103,4 +1103,25 @@ describe('FlowExecutor Events', () => {
     // Verify no events were emitted
     expect(receivedEvents.length).toBe(0);
   });
+
+  it('should emit step aborted events', () => {
+    const events = new FlowExecutorEvents({ emitStepEvents: true });
+    const received: any[] = [];
+    const step = { name: 's1', request: { method: 'm', params: {} } } as any;
+    events.on(FlowEventType.STEP_ABORTED, (data) => received.push(data));
+    events.emitStepAborted(step, 'canceled');
+    expect(received.length).toBe(1);
+    expect(received[0].stepName).toBe('s1');
+    expect(received[0].reason).toBe('canceled');
+  });
+
+  it('should emit flow aborted events', () => {
+    const events = new FlowExecutorEvents({ emitFlowEvents: true });
+    const received: any[] = [];
+    events.on(FlowEventType.FLOW_ABORTED, (d) => received.push(d));
+    events.emitFlowAborted('FlowA', 'canceled');
+    expect(received.length).toBe(1);
+    expect(received[0].flowName).toBe('FlowA');
+    expect(received[0].reason).toBe('canceled');
+  });
 });

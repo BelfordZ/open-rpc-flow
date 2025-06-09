@@ -129,10 +129,54 @@ describe('FlowExecutor event emission', () => {
     fevents.on(FlowEventType.FLOW_COMPLETE, (payload) =>
       events.push({ type: FlowEventType.FLOW_COMPLETE, payload }),
     );
+    fevents.on(FlowEventType.FLOW_ABORTED, (payload) =>
+      events.push({ type: FlowEventType.FLOW_ABORTED, payload }),
+    );
     await executor.execute();
     // Should emit a skip for the second step
     expect(events.some((e) => e.type === FlowEventType.STEP_SKIP)).toBe(true);
     expect(events.some((e) => e.type === FlowEventType.FLOW_COMPLETE)).toBe(true);
+    expect(events.some((e) => e.type === FlowEventType.FLOW_ABORTED)).toBe(true);
+  });
+
+  it('emits step aborted when a step receives an aborted signal', async () => {
+    const flow: Flow = {
+      name: 'AbortFlow',
+      description: 'flow',
+      steps: [
+        {
+          name: 'transform',
+          transform: {
+            input: [1, 2],
+            operations: [{ type: 'map', using: '${item}' }],
+          },
+        },
+      ],
+    };
+    const executor = new FlowExecutor(flow, jsonRpcHandler, { logger: testLogger });
+    const events: any[] = [];
+    executor.events.on(FlowEventType.STEP_ABORTED, (p) => events.push(p));
+    const ac = new AbortController();
+    ac.abort();
+    await expect(executor['executeStep'](flow.steps[0], {}, ac.signal)).rejects.toThrow();
+    expect(events.length).toBe(1);
+    expect(events[0].stepName).toBe('transform');
+  });
+
+  it('emits abort events when flow is aborted before execution', async () => {
+    const flow: Flow = {
+      name: 'PreAbort',
+      description: 'flow',
+      steps: [{ name: 's', request: { method: 'foo', params: {} } }],
+    };
+    const executor = new FlowExecutor(flow, jsonRpcHandler, { logger: testLogger });
+    executor['globalAbortController'].abort('pre');
+    const events: any[] = [];
+    executor.events.on(FlowEventType.STEP_ABORTED, (p) => events.push({ t: 's', p }));
+    executor.events.on(FlowEventType.FLOW_ABORTED, (p) => events.push({ t: 'f', p }));
+    await expect(executor.execute()).rejects.toThrow();
+    expect(events.some((e) => e.t === 's')).toBe(true);
+    expect(events.some((e) => e.t === 'f')).toBe(true);
   });
 
   it('emits step progress events for loop steps', async () => {

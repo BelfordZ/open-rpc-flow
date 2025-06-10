@@ -13,7 +13,7 @@ const flow: Flow = {
     {
       name: 'step1',
       request: {
-        method: 'echo',
+        method: 'echoMany',
         params: { message: 'Hello!' },
       },
     },
@@ -31,7 +31,7 @@ const flow: Flow = {
         operations: [
           {
             type: 'map',
-            using: 'item => ({ ...item, data: item.data + " " + ${step2.result.data} })',
+            using: '{...${item}, data: ${item.data} + " " + ${step2.result.data}}',
           },
         ],
       },
@@ -44,8 +44,11 @@ const jsonRpcHandler = async (request: JsonRpcRequest) => {
   // Simulate network delay
   await new Promise((resolve) => setTimeout(resolve, 500));
 
+  if (request.method === 'echoMany') {
+    const params = request.params as Record<string, any>;
+    return [{ data: params.message }];
+  }
   if (request.method === 'echo') {
-    // Safely access the message property with type checking
     const params = request.params as Record<string, any>;
     return { data: params.message };
   }

@@ -7,6 +7,7 @@ import {
   TransformOperation,
 } from './types';
 import { Logger } from '../util/logger';
+import { getDataType } from '../util/type-utils';
 import { SafeExpressionEvaluator } from '../expression-evaluator/safe-evaluator';
 import { ReferenceResolver } from '../reference-resolver';
 import { TimeoutError } from '../errors/timeout-error';
@@ -448,8 +449,8 @@ export class TransformStepExecutor implements StepExecutor {
 
       this.logger.debug('Resolved transform input', {
         stepName: step.name,
-        inputType: typeof resolvedInput,
-        isArray: Array.isArray(resolvedInput),
+        expected: 'string | array',
+        actual: getDataType(resolvedInput),
       });
 
       const result = await this.transformExecutor.execute(

@@ -150,7 +150,11 @@ export class FlowExecutor {
     // Initialize step executors in order of specificity
     this.stepExecutors = [
       this.createRequestStepExecutor(),
-      new LoopStepExecutor(this.executeStep.bind(this), this.logger),
+      new LoopStepExecutor(
+        this.executeStep.bind(this),
+        this.logger,
+        this.events.emitStepProgress.bind(this.events),
+      ),
       new ConditionStepExecutor(this.executeStep.bind(this), this.logger, this.policyResolver),
       new TransformStepExecutor(
         this.expressionEvaluator,

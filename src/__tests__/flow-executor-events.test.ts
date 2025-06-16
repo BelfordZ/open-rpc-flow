@@ -1028,6 +1028,36 @@ describe('FlowExecutor Events', () => {
     expect(disabledEvents.length).toBe(0);
   });
 
+  it('should emit step progress events', () => {
+    const events = new FlowExecutorEvents({ emitStepEvents: true });
+    const received: any[] = [];
+    const testStep = {
+      name: 'loop',
+      loop: { over: '${items}', as: 'item', step: { name: 'inner' } },
+    } as any;
+
+    events.on(FlowEventType.STEP_PROGRESS, (data) => received.push(data));
+
+    events.emitStepProgress(testStep, 2, 5);
+
+    expect(received.length).toBe(1);
+    expect(received[0].iteration).toBe(2);
+    expect(received[0].totalIterations).toBe(5);
+    expect(received[0].percent).toBe(40);
+  });
+
+  it('should not emit step progress when step events are disabled', () => {
+    const events = new FlowExecutorEvents({ emitStepEvents: false });
+    const received: any[] = [];
+    const testStep = { name: 'loop', loop: { over: '${items}', as: 'item' } } as any;
+
+    events.on(FlowEventType.STEP_PROGRESS, (data) => received.push(data));
+
+    events.emitStepProgress(testStep, 1, 3);
+
+    expect(received.length).toBe(0);
+  });
+
   it('should not emit flow complete event when emitFlowEvents is false', async () => {
     // Testing specifically the early return in emitFlowComplete when emitFlowEvents is false
 

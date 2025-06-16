@@ -47,6 +47,7 @@ export {
   StepCompleteEvent,
   StepErrorEvent,
   StepSkipEvent,
+  StepProgressEvent,
   DependencyResolvedEvent,
   FlowEventOptions,
 } from './util/flow-executor-events';

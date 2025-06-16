@@ -81,6 +81,20 @@ Demonstrates halting a flow when a condition is met. See the full example here:
 
 [**src/examples/06-stop-flow.json**](src/examples/06-stop-flow.json)
 
+---
+
+### 5. Timeouts and Retries
+
+Handle flaky endpoints with retry policies and step-level timeouts. See the full example here:
+
+[**src/examples/07-retry-timeout.json**](src/examples/07-retry-timeout.json)
+
+### 6. Abortable Requests
+
+Integrate `AbortSignal` to cancel long running requests.
+
+[**src/examples/abort-signal-example.ts**](src/examples/abort-signal-example.ts)
+
 ## Installation
 
 ```bash
@@ -462,6 +476,7 @@ for a full working example.
 | `step:complete`       | Emitted when a step execution completes            |
 | `step:error`          | Emitted when a step execution fails                |
 | `step:skip`           | Emitted when a step is skipped                     |
+| `step:progress`       | Emitted to report progress of long-running steps   |
 | `dependency:resolved` | Emitted when dependencies are resolved             |
 
 ### Event Payloads
@@ -469,14 +484,15 @@ for a full working example.
 Each emitted event carries a typed payload. Below is a quick reference of the
 most useful fields:
 
-| Event           | Key fields                                   |
-| --------------- | -------------------------------------------- |
-| `flow:start`    | `flowName`, `orderedSteps`                   |
-| `flow:complete` | `flowName`, `results`, `duration`            |
-| `flow:error`    | `flowName`, `error`, `duration`              |
-| `step:start`    | `stepName`, `stepType`, `context?`           |
-| `step:complete` | `stepName`, `stepType`, `result`, `duration` |
-| `step:error`    | `stepName`, `stepType`, `error`, `duration`  |
+| Event           | Key fields                                                        |
+| --------------- | ----------------------------------------------------------------- |
+| `flow:start`    | `flowName`, `orderedSteps`                                        |
+| `flow:complete` | `flowName`, `results`, `duration`                                 |
+| `flow:error`    | `flowName`, `error`, `duration`                                   |
+| `step:start`    | `stepName`, `stepType`, `context?`                                |
+| `step:complete` | `stepName`, `stepType`, `result`, `duration`                      |
+| `step:error`    | `stepName`, `stepType`, `error`, `duration`                       |
+| `step:progress` | `stepName`, `stepType`, `iteration`, `totalIterations`, `percent` |
 
 ### Configuration Options
 

@@ -15,6 +15,7 @@ export class LoopStepExecutor implements StepExecutor {
   constructor(
     private executeStep: ExecuteStep,
     logger: Logger,
+    private progressCallback?: (step: Step, iteration: number, totalIterations: number) => void,
   ) {
     this.logger = logger.createNested('LoopStepExecutor');
   }
@@ -90,6 +91,8 @@ export class LoopStepExecutor implements StepExecutor {
 
         // Increment iteration count before any processing
         iterationCount++;
+
+        this.progressCallback?.(step, iterationCount, Math.min(maxIterations, collection.length));
 
         // Create iteration context with array of iterations
         const currentIteration = {

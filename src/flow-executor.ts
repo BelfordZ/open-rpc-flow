@@ -14,6 +14,7 @@ import {
 } from './step-executors';
 import { Logger, defaultLogger } from './util/logger';
 import { FlowExecutorEvents, FlowEventOptions } from './util/flow-executor-events';
+import { randomUUID } from 'crypto';
 import { RetryPolicy } from './errors/recovery';
 import { ErrorCode } from './errors/codes';
 import { TimeoutError } from './errors/timeout-error';
@@ -63,6 +64,8 @@ export class FlowExecutor {
   private retryPolicy: RetryPolicy | null;
   private policyResolver: PolicyResolver;
   private globalAbortController: AbortController;
+  private stepCorrelationIds: Map<string, string>;
+  private correlationPrefix: string;
 
   constructor(
     private flow: Flow,
@@ -163,6 +166,8 @@ export class FlowExecutor {
       new StopStepExecutor(this.logger, globalAbortController),
     ];
     this.globalAbortController = globalAbortController;
+    this.stepCorrelationIds = new Map();
+    this.correlationPrefix = randomUUID();
   }
 
   /**
@@ -199,6 +204,8 @@ export class FlowExecutor {
       for (const step of orderedSteps) {
         const stepStartTime = Date.now();
 
+        const correlationId = this.generateCorrelationId(step.name);
+        this.stepCorrelationIds.set(step.name, correlationId);
         try {
           // Check if we've been aborted before executing step
           if (this.globalAbortController.signal.aborted) {
@@ -207,27 +214,35 @@ export class FlowExecutor {
               stepName: step.name,
               reason: String(reason),
             });
-            this.events.emitStepSkip(step, String(reason));
+            this.events.emitStepSkip(step, String(reason), correlationId);
             throw new Error(String(reason));
           }
 
-          this.events.emitStepStart(step, this.executionContext);
+          const stepContext = { metadata: { ...(step.metadata || {}) } };
 
-          const result = await this.executeStep(step);
+          this.events.emitStepStart(
+            step,
+            this.executionContext,
+            stepContext,
+            correlationId,
+            step.metadata || {},
+          );
+
+          const result = await this.executeStep(step, stepContext);
           this.stepResults.set(step.name, result);
 
-          this.events.emitStepComplete(step, result, stepStartTime);
+          this.events.emitStepComplete(step, result, stepStartTime, correlationId);
 
           // Check if the step or any nested step resulted in a stop
           const shouldStop = this.checkForStopResult(result);
 
           if (shouldStop) {
             this.logger.log('Workflow stopped by step:', step.name);
-            this.events.emitStepSkip(step, 'Workflow stopped by previous step');
+            this.events.emitStepSkip(step, 'Workflow stopped by previous step', correlationId);
             break;
           }
         } catch (error: any) {
-          this.events.emitStepError(step, error, stepStartTime);
+          this.events.emitStepError(step, error, stepStartTime, correlationId);
           throw error; // Re-throw to be caught by the outer try/catch
         }
       }
@@ -274,6 +289,19 @@ export class FlowExecutor {
   ): Promise<StepExecutionResult> {
     const stepStartTime = Date.now();
 
+    const correlationId =
+      this.stepCorrelationIds.get(step.name) || this.generateCorrelationId(step.name);
+    this.stepCorrelationIds.set(step.name, correlationId);
+
+    const contextWithMeta = {
+      ...extraContext,
+      metadata: {
+        ...(extraContext.metadata || {}),
+        ...(step.metadata || {}),
+      },
+    };
+    const isNested = Boolean(extraContext._nestedStep);
+
     try {
       this.logger.debug('Executing step:', {
         stepName: step.name,
@@ -282,8 +310,14 @@ export class FlowExecutor {
       });
 
       // Only emit step events for nested steps
-      if (Object.keys(extraContext).length > 0) {
-        this.events.emitStepStart(step, this.executionContext, extraContext);
+      if (isNested) {
+        this.events.emitStepStart(
+          step,
+          this.executionContext,
+          contextWithMeta,
+          correlationId,
+          step.metadata || {},
+        );
       }
 
       const executor = this.findExecutor(step);
@@ -296,11 +330,11 @@ export class FlowExecutor {
         executor: executor.constructor.name,
       });
 
-      const result = await executor.execute(step, this.executionContext, extraContext, signal);
+      const result = await executor.execute(step, this.executionContext, contextWithMeta, signal);
 
       // Only emit step complete for nested steps
-      if (Object.keys(extraContext).length > 0) {
-        this.events.emitStepComplete(step, result, stepStartTime);
+      if (isNested) {
+        this.events.emitStepComplete(step, result, stepStartTime, correlationId);
       }
 
       return result;
@@ -309,8 +343,8 @@ export class FlowExecutor {
       this.logger.error(`Step execution failed: ${step.name}`, { error: errorMessage });
 
       // Only emit step error for nested steps
-      if (Object.keys(extraContext).length > 0) {
-        this.events.emitStepError(step, error, stepStartTime);
+      if (isNested) {
+        this.events.emitStepError(step, error, stepStartTime, correlationId);
       }
 
       // Do not wrap custom errors
@@ -355,5 +389,9 @@ export class FlowExecutor {
     }
 
     return false;
+  }
+
+  private generateCorrelationId(stepName: string): string {
+    return `${this.correlationPrefix}-${stepName}-${Math.random().toString(36).slice(2, 8)}`;
   }
 }

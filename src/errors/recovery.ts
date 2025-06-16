@@ -118,6 +118,12 @@ export class RetryableOperation<T> {
           );
         }
 
+        this.logger.warn('Retrying operation after failure', {
+          attempt,
+          maxAttempts: this.policy.maxAttempts,
+          error: error instanceof Error ? error.message : String(error),
+        });
+
         attempt++;
 
         const delay = this.calculateDelay(attempt);

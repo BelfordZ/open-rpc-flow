@@ -179,6 +179,14 @@ export class RequestStepExecutor implements StepExecutor {
           result: raceResult,
         });
 
+        if (raceResult && typeof raceResult === 'object' && 'error' in raceResult) {
+          this.logger.warn('Request returned error response', {
+            stepName: step.name,
+            requestId,
+            error: (raceResult as any).error,
+          });
+        }
+
         return {
           result: raceResult,
           type: StepType.Request,

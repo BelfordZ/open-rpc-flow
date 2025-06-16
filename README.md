@@ -81,6 +81,20 @@ Demonstrates halting a flow when a condition is met. See the full example here:
 
 [**src/examples/06-stop-flow.json**](src/examples/06-stop-flow.json)
 
+---
+
+### 5. Timeouts and Retries
+
+Handle flaky endpoints with retry policies and step-level timeouts. See the full example here:
+
+[**src/examples/07-retry-timeout.json**](src/examples/07-retry-timeout.json)
+
+### 6. Abortable Requests
+
+Integrate `AbortSignal` to cancel long running requests.
+
+[**src/examples/abort-signal-example.ts**](src/examples/abort-signal-example.ts)
+
 ## Installation
 
 ```bash

@@ -42,6 +42,7 @@ export {
   FlowEvent,
   FlowStartEvent,
   FlowCompleteEvent,
+  FlowFinishEvent,
   FlowErrorEvent,
   StepStartEvent,
   StepCompleteEvent,

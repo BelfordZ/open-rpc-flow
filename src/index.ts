@@ -1,5 +1,5 @@
 /* istanbul ignore file */
-export { Flow, Step, JsonRpcRequest, StepExecutionContext } from './types';
+export { Flow, Step, JsonRpcRequest, StepExecutionContext, ExpressionEvaluator } from './types';
 export {
   StepExecutor,
   StepExecutionResult,
@@ -13,6 +13,7 @@ export {
 } from './step-executors';
 export { FlowExecutor, FlowExecutorOptions, DEFAULT_RETRY_POLICY } from './flow-executor';
 export { SafeExpressionEvaluator } from './expression-evaluator/safe-evaluator';
+export { SesExpressionEvaluator } from './expression-evaluator/ses-evaluator';
 export {
   ReferenceResolver,
   ReferenceResolverError,

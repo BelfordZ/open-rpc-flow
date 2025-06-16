@@ -129,6 +129,10 @@ export interface Step {
   stop?: {
     endWorkflow?: boolean;
   };
+  /**
+   * Optional custom metadata for this step
+   */
+  metadata?: Record<string, any>;
   timeout?: number;
 }
 

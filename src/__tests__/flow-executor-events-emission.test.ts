@@ -146,4 +146,32 @@ describe('FlowExecutor event emission', () => {
     expect(events.some((e) => e.type === FlowEventType.FLOW_COMPLETE)).toBe(true);
     expect(events.some((e) => e.type === FlowEventType.FLOW_FINISH)).toBe(true);
   });
+
+  it('emits step progress events for loop steps', async () => {
+    const flow: Flow = {
+      name: 'ProgressFlow',
+      description: 'progress test',
+      steps: [
+        {
+          name: 'loopStep',
+          loop: {
+            over: '${context.items}',
+            as: 'item',
+            step: { name: 'inner', request: { method: 'foo', params: {} } },
+          },
+        },
+      ],
+      context: { items: [1, 2, 3] },
+    };
+
+    const executor = new FlowExecutor(flow, jsonRpcHandler, { logger: testLogger });
+    const progress: any[] = [];
+    executor.events.on(FlowEventType.STEP_PROGRESS, (p) => progress.push(p));
+
+    await executor.execute();
+
+    expect(progress.length).toBe(3);
+    expect(progress[0].iteration).toBe(1);
+    expect(progress[2].percent).toBe(100);
+  });
 });

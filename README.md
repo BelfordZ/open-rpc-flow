@@ -456,6 +456,7 @@ for a full working example.
 | `step:complete`       | Emitted when a step execution completes            |
 | `step:error`          | Emitted when a step execution fails                |
 | `step:skip`           | Emitted when a step is skipped                     |
+| `step:progress`       | Emitted to report progress of long-running steps   |
 | `dependency:resolved` | Emitted when dependencies are resolved             |
 
 ### Event Payloads
@@ -472,6 +473,8 @@ most useful fields:
 | `step:start`    | `stepName`, `stepType`, `context?`                     |
 | `step:complete` | `stepName`, `stepType`, `result`, `duration`           |
 | `step:error`    | `stepName`, `stepType`, `error`, `duration`            |
+| `step:progress` | `stepName`, `stepType`, `iteration`, `totalIterations`, `percent` |
+
 
 ### Configuration Options
 

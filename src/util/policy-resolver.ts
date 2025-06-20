@@ -1,4 +1,4 @@
-import type { Flow, Step } from '../types';
+import type { Flow, Step, PolicyOverrides } from '../types';
 import type { StepType } from '../step-executors/types';
 import { Logger, defaultLogger } from '../util/logger';
 import { DEFAULT_TIMEOUTS } from '../constants/timeouts';
@@ -18,9 +18,9 @@ import { DEFAULT_RETRY_POLICY } from '../flow-executor';
 export class PolicyResolver {
   private flow: Flow;
   private logger: Logger;
-  private overrides: Record<string, any>;
+  private overrides: PolicyOverrides;
 
-  constructor(flow: Flow, logger: Logger = defaultLogger, overrides: Record<string, any> = {}) {
+  constructor(flow: Flow, logger: Logger = defaultLogger, overrides: PolicyOverrides = {}) {
     this.flow = flow;
     this.logger = logger.createNested('PolicyResolver');
     this.overrides = overrides;

@@ -1,4 +1,4 @@
-import { Step } from '../types';
+import { Step, ErrorData } from '../types';
 import { StepExecutionContext } from '../types';
 import { RetryPolicy } from '../errors/recovery';
 
@@ -37,11 +37,7 @@ export class JsonRpcRequestError extends Error {
  */
 export interface StepExecutionResult<T = any> {
   result?: T;
-  error?: {
-    code: number;
-    message: string;
-    data?: any;
-  };
+  error?: ErrorData;
   type: StepType;
   metadata?: Record<string, any>;
 }

@@ -71,6 +71,8 @@ export class FlowExecutor {
     private flow: Flow,
     private jsonRpcHandler: JsonRpcHandler,
     loggerOrOptions?: Logger | FlowExecutorOptions,
+    initialStepResults?: Map<string, any>,
+    initialContext?: Record<string, any>,
   ) {
     // Handle both new options object and legacy logger parameter
     let options: FlowExecutorOptions | undefined;
@@ -85,8 +87,8 @@ export class FlowExecutor {
       options = { logger: this.logger };
     }
 
-    this.context = flow.context || {};
-    this.stepResults = new Map();
+    this.context = { ...(flow.context || {}), ...(initialContext || {}) };
+    this.stepResults = initialStepResults || new Map();
 
     // Initialize the event emitter
     this.events = new FlowExecutorEvents(options?.eventOptions);
@@ -207,6 +209,13 @@ export class FlowExecutor {
         const correlationId = this.generateCorrelationId(step.name);
         this.stepCorrelationIds.set(step.name, correlationId);
         try {
+          if (this.stepResults.has(step.name)) {
+            this.logger.debug('Skipping already executed step', {
+              stepName: step.name,
+            });
+            this.events.emitStepSkip(step, 'step already executed', correlationId);
+            continue;
+          }
           // Check if we've been aborted before executing step
           if (this.globalAbortController.signal.aborted) {
             const reason = this.globalAbortController.signal.reason || 'Flow execution aborted';

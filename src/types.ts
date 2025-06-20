@@ -87,6 +87,26 @@ export interface FlowPolicies {
   };
 }
 
+/**
+ * Minimal OpenRPC content descriptor
+ */
+export interface OpenRPCContentDescriptor {
+  name: string;
+  description?: string;
+  required?: boolean;
+  schema: Record<string, any>;
+}
+
+/**
+ * Minimal OpenRPC method definition
+ */
+export interface OpenRPCMethod {
+  name: string;
+  description?: string;
+  params: OpenRPCContentDescriptor[];
+  result: OpenRPCContentDescriptor;
+}
+
 export interface Flow {
   name: string;
   description: string;
@@ -105,6 +125,10 @@ export interface Step {
    * Optional policies for this specific step
    */
   policies?: Policies;
+  /**
+   * Optional OpenRPC method definition describing the step's interface
+   */
+  openrpc?: OpenRPCMethod;
   request?: {
     method: string;
     params: Record<string, any> | any[];

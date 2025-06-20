@@ -1,6 +1,7 @@
 import { Step, StepExecutionContext, JsonRpcHandler } from '../types';
 import { StepExecutor, StepExecutionResult, JsonRpcRequestError, StepType } from './types';
 import { Logger } from '../util/logger';
+import { getDataType } from '../util/type-utils';
 import { RequestStep } from './types';
 import { RetryPolicy, RetryableOperation } from '../errors/recovery';
 import { ExecutionError, ValidationError } from '../errors/base';
@@ -72,6 +73,15 @@ export class RequestStepExecutor implements StepExecutor {
     const requestId = this.getNextRequestId();
     const stepRetryPolicy = this.getStepRetryPolicy(requestStep, _context);
     const timeout = this.getStepTimeout(requestStep, _context);
+
+    this.logger.debug('Checking request input types', {
+      stepName: step.name,
+      expected: { method: 'string', params: 'object | array | null' },
+      actual: {
+        method: typeof requestStep.request.method,
+        params: getDataType(requestStep.request.params),
+      },
+    });
 
     this.logger.debug('Executing request step', {
       stepName: step.name,

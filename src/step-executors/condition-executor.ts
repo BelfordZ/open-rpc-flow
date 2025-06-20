@@ -1,6 +1,7 @@
 import { Step, StepExecutionContext } from '../types';
 import { StepExecutor, StepExecutionResult, StepType, ConditionStep } from './types';
 import { Logger } from '../util/logger';
+import { getDataType } from '../util/type-utils';
 import { ValidationError, ExecutionError } from '../errors/base';
 import { TimeoutError } from '../errors/timeout-error';
 
@@ -71,6 +72,12 @@ export class ConditionStepExecutor implements StepExecutor {
           extraContext,
           step,
         );
+
+        this.logger.debug('Condition input type', {
+          stepName: step.name,
+          expected: 'boolean',
+          actual: getDataType(conditionValue),
+        });
 
         this.logger.debug('Condition evaluated', {
           stepName: step.name,

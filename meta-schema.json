@@ -49,6 +49,11 @@
           "description": "A unique identifier for the step within the flow. Used for referencing step results in expressions.",
           "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
         },
+        "description": {
+          "type": "string",
+          "description": "Optional human-readable summary of what the step does. This helps documentation generation and assists AI models in understanding the flow.",
+          "minLength": 1
+        },
         "policies": {
           "$ref": "#/definitions/Policies"
         }

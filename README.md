@@ -75,10 +75,30 @@ const apiAggregationFlow: Flow = {
 };
 ```
 
+### 4. Stop Flow Execution
+
+Demonstrates halting a flow when a condition is met. See the full example here:
+
+[**src/examples/06-stop-flow.json**](src/examples/06-stop-flow.json)
+
+---
+
+### 5. Timeouts and Retries
+
+Handle flaky endpoints with retry policies and step-level timeouts. See the full example here:
+
+[**src/examples/07-retry-timeout.json**](src/examples/07-retry-timeout.json)
+
+### 6. Abortable Requests
+
+Integrate `AbortSignal` to cancel long running requests.
+
+[**src/examples/abort-signal-example.ts**](src/examples/abort-signal-example.ts)
+
 ## Installation
 
 ```bash
-npm install @open-rpc/flow
+npm install open-rpc-flow
 ```
 
 ## Quick Start
@@ -86,7 +106,7 @@ npm install @open-rpc/flow
 Here's a simple example of defining and executing a flow:
 
 ```typescript
-import { FlowExecutor, Flow } from '@open-rpc/flow';
+import { FlowExecutor, Flow } from 'open-rpc-flow';
 
 // Define your JSON-RPC handler
 const jsonRpcHandler = async (request) => {
@@ -394,7 +414,7 @@ time. All event names are available through the `FlowEventType` enum.
 ### Using the Event Emitter
 
 ```typescript
-import { FlowExecutor, FlowEventType } from '@open-rpc/flow';
+import { FlowExecutor, FlowEventType } from 'open-rpc-flow';
 
 // Create a flow executor with event options
 const executor = new FlowExecutor(flow, jsonRpcHandler, {
@@ -435,6 +455,7 @@ for a full working example.
 | `step:complete`       | Emitted when a step execution completes            |
 | `step:error`          | Emitted when a step execution fails                |
 | `step:skip`           | Emitted when a step is skipped                     |
+| `step:progress`       | Emitted to report progress of long-running steps   |
 | `dependency:resolved` | Emitted when dependencies are resolved             |
 
 ### Event Payloads
@@ -442,14 +463,15 @@ for a full working example.
 Each emitted event carries a typed payload. Below is a quick reference of the
 most useful fields:
 
-| Event           | Key fields                                   |
-| --------------- | -------------------------------------------- |
-| `flow:start`    | `flowName`, `orderedSteps`                   |
-| `flow:complete` | `flowName`, `results`, `duration`            |
-| `flow:error`    | `flowName`, `error`, `duration`              |
-| `step:start`    | `stepName`, `stepType`, `context?`           |
-| `step:complete` | `stepName`, `stepType`, `result`, `duration` |
-| `step:error`    | `stepName`, `stepType`, `error`, `duration`  |
+| Event           | Key fields                                                        |
+| --------------- | ----------------------------------------------------------------- |
+| `flow:start`    | `flowName`, `orderedSteps`                                        |
+| `flow:complete` | `flowName`, `results`, `duration`                                 |
+| `flow:error`    | `flowName`, `error`, `duration`                                   |
+| `step:start`    | `stepName`, `stepType`, `context?`                                |
+| `step:complete` | `stepName`, `stepType`, `result`, `duration`                      |
+| `step:error`    | `stepName`, `stepType`, `error`, `duration`                       |
+| `step:progress` | `stepName`, `stepType`, `iteration`, `totalIterations`, `percent` |
 
 ### Configuration Options
 

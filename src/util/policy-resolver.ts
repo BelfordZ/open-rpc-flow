@@ -1,4 +1,5 @@
-import { Flow, Step, StepType } from '../types';
+import type { Flow, Step } from '../types';
+import type { StepType } from '../step-executors/types';
 import { Logger, defaultLogger } from '../util/logger';
 import { DEFAULT_TIMEOUTS } from '../constants/timeouts';
 import { DEFAULT_RETRY_POLICY } from '../flow-executor';

@@ -1,6 +1,17 @@
 import { tokenize, TokenizerError, Token } from '../../expression-evaluator/tokenizer';
 import { TestLogger } from '../../util/logger';
 
+function expectTokenArrayValue(
+  token: Token,
+  expectedType: 'array_literal' | 'reference' | 'object_literal' | 'template_literal',
+): Token[] {
+  expect(token.type).toBe(expectedType);
+  if (token.type !== expectedType) {
+    throw new Error(`Expected ${expectedType} token`);
+  }
+  return token.value;
+}
+
 describe('Tokenizer Array Tests', () => {
   let logger: TestLogger;
 
@@ -168,8 +179,8 @@ describe('Tokenizer Array Tests', () => {
       const result = tokenize(input, logger);
 
       expect(result.length).toBe(1);
-      expect(result[0].type).toBe('array_literal');
-      expect(result[0].value.length).toBe(1);
+      const arrTokens = expectTokenArrayValue(result[0], 'array_literal');
+      expect(arrTokens.length).toBe(1);
     });
 
     // Create complex nested structures where the return is nested
@@ -178,10 +189,8 @@ describe('Tokenizer Array Tests', () => {
       const result = tokenize(input, logger);
 
       expect(result.length).toBe(1);
-      expect(result[0].type).toBe('array_literal');
-
+      const outerArray = expectTokenArrayValue(result[0], 'array_literal');
       // Just verify the structure exists without specific length assertions
-      const outerArray = result[0].value as Token[];
       expect(Array.isArray(outerArray)).toBe(true);
 
       // Check that we have array literals and numeric values
@@ -195,10 +204,10 @@ describe('Tokenizer Array Tests', () => {
       const result = tokenize(input, logger);
 
       expect(result.length).toBe(1);
-      expect(result[0].type).toBe('array_literal');
-      expect(result[0].value.length).toBe(1);
-      expect(result[0].value[0].type).toBe('string');
-      expect(result[0].value[0].value).toBe('string with "escape"');
+      const arrTokens2 = expectTokenArrayValue(result[0], 'array_literal');
+      expect(arrTokens2.length).toBe(1);
+      expect(arrTokens2[0].type).toBe('string');
+      expect(arrTokens2[0].value).toBe('string with "escape"');
     });
 
     // Test array with unclosed brackets (error case)
@@ -214,10 +223,8 @@ describe('Tokenizer Array Tests', () => {
       const result = tokenize(input, logger);
 
       expect(result.length).toBe(1);
-      expect(result[0].type).toBe('array_literal');
-
       // Plus should be treated as an operator or identifier
-      const arrayContents = result[0].value;
+      const arrayContents = expectTokenArrayValue(result[0], 'array_literal');
       expect(arrayContents.length).toBe(1);
     });
 
@@ -248,10 +255,10 @@ describe('Tokenizer Array Tests', () => {
       const input = '[abc]';
       const result = tokenize(input, logger);
 
-      expect(result[0].type).toBe('array_literal');
-      expect(result[0].value.length).toBe(1);
-      expect(result[0].value[0].type).toBe('identifier');
-      expect(result[0].value[0].value).toBe('abc');
+      const arrTokens = expectTokenArrayValue(result[0], 'array_literal');
+      expect(arrTokens.length).toBe(1);
+      expect(arrTokens[0].type).toBe('identifier');
+      expect(arrTokens[0].value).toBe('abc');
     });
 
     // Test with various array types
@@ -316,8 +323,7 @@ describe('Tokenizer Array Tests', () => {
 
       expect(result.length).toBe(1);
       expect(result[0].type).toBe('array_literal');
-
-      const arrayTokens = result[0].value as Token[];
+      const arrayTokens = expectTokenArrayValue(result[0], 'array_literal');
 
       // First substantive token should be spread operator
       const spreadIndex = arrayTokens.findIndex(
@@ -333,8 +339,7 @@ describe('Tokenizer Array Tests', () => {
 
       expect(result.length).toBe(1);
       expect(result[0].type).toBe('array_literal');
-
-      const arrayTokens = result[0].value as Token[];
+      const arrayTokens = expectTokenArrayValue(result[0], 'array_literal');
 
       // First token should be spread operator
       expect(arrayTokens[0].type).toBe('operator');
@@ -347,8 +352,7 @@ describe('Tokenizer Array Tests', () => {
 
       expect(result.length).toBe(1);
       expect(result[0].type).toBe('array_literal');
-
-      const arrayTokens = result[0].value as Token[];
+      const arrayTokens = expectTokenArrayValue(result[0], 'array_literal');
 
       // Find the spread operator
       const spreadIndex = arrayTokens.findIndex(
@@ -366,8 +370,7 @@ describe('Tokenizer Array Tests', () => {
 
       expect(result.length).toBe(1);
       expect(result[0].type).toBe('array_literal');
-
-      const arrayTokens = result[0].value as Token[];
+      const arrayTokens = expectTokenArrayValue(result[0], 'array_literal');
 
       // Find all spread operators
       const spreadIndices: number[] = [];
@@ -386,15 +389,17 @@ describe('Tokenizer Array Tests', () => {
 
       expect(result.length).toBe(1);
       expect(result[0].type).toBe('array_literal');
-
-      const arrayTokens = result[0].value as Token[];
+      const arrayTokens = expectTokenArrayValue(result[0], 'array_literal');
 
       // Find the nested array
       const nestedArrayIndex = arrayTokens.findIndex((token) => token.type === 'array_literal');
       expect(nestedArrayIndex).toBeGreaterThanOrEqual(0);
 
       // Check the nested array for spread operator
-      const nestedArrayTokens = arrayTokens[nestedArrayIndex].value as Token[];
+      const nestedArrayTokens = expectTokenArrayValue(
+        arrayTokens[nestedArrayIndex],
+        'array_literal',
+      );
       const spreadIndex = nestedArrayTokens.findIndex(
         (token) => token.type === 'operator' && token.value === '...',
       );

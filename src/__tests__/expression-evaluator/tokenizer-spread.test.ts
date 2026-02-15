@@ -5,6 +5,17 @@ import {
 } from '../../expression-evaluator/tokenizer';
 import { TestLogger } from '../../util/logger';
 
+function expectTokenArrayValue(
+  token: Token,
+  expectedType: 'array_literal' | 'reference' | 'object_literal' | 'template_literal',
+): Token[] {
+  expect(token.type).toBe(expectedType);
+  if (token.type !== expectedType) {
+    throw new Error(`Expected ${expectedType} token`);
+  }
+  return token.value;
+}
+
 describe('Tokenizer Spread Tests', () => {
   let logger: TestLogger;
 
@@ -26,7 +37,7 @@ describe('Tokenizer Spread Tests', () => {
       expect(result.length).toBe(1);
       expect(result[0].type).toBe('array_literal');
 
-      const arrayTokens = result[0].value as Token[];
+      const arrayTokens = expectTokenArrayValue(result[0], 'array_literal');
 
       // Check what tokens were created - we should have either a combined token or separate tokens
       const tokenValues = arrayTokens.map((token) => `${token.type}:${token.value}`).join(', ');
@@ -40,11 +51,16 @@ describe('Tokenizer Spread Tests', () => {
       expect(result.length).toBe(1);
       expect(result[0].type).toBe('array_literal');
 
-      const arrayTokens = result[0].value as Token[];
+      const arrayTokens = expectTokenArrayValue(result[0], 'array_literal');
       const stringTokenIndex = arrayTokens.findIndex((token) => token.type === 'string');
 
       expect(stringTokenIndex).toBeGreaterThanOrEqual(0);
-      expect((arrayTokens[stringTokenIndex].value as string).includes('...')).toBe(true);
+      const stringToken = arrayTokens[stringTokenIndex];
+      expect(stringToken.type).toBe('string');
+      if (stringToken.type !== 'string') {
+        throw new Error('Expected string token');
+      }
+      expect(stringToken.value.includes('...')).toBe(true);
     });
 
     // Try forcing a more direct test by using array bracket syntax
@@ -116,7 +132,7 @@ describe('Tokenizer Spread Tests', () => {
       // Verify we have a valid object literal
       expect(result).toHaveLength(1);
       expect(result[0].type).toBe('object_literal');
-      const tokens = result[0].value as any[];
+      const tokens = expectTokenArrayValue(result[0], 'object_literal');
 
       // Check if we have a spread operator token
       const hasSpread = tokens.some((token) => token.type === 'operator' && token.value === '...');
@@ -300,7 +316,7 @@ describe('Tokenizer Spread Tests', () => {
       const result = tokenize('{ ...obj }', logger);
 
       expect(result[0].type).toBe('object_literal');
-      const objectValues = result[0].value as any[];
+      const objectValues = expectTokenArrayValue(result[0], 'object_literal');
 
       expect(objectValues.length).toBeGreaterThanOrEqual(2);
       expect(objectValues[0].type).toBe('operator');
@@ -313,7 +329,7 @@ describe('Tokenizer Spread Tests', () => {
       const result = tokenize('{ ...${reference} }', logger);
 
       expect(result[0].type).toBe('object_literal');
-      const objectValues = result[0].value as any[];
+      const objectValues = expectTokenArrayValue(result[0], 'object_literal');
 
       expect(objectValues.length).toBeGreaterThanOrEqual(2);
       expect(objectValues[0].type).toBe('operator');
@@ -325,7 +341,7 @@ describe('Tokenizer Spread Tests', () => {
       const result = tokenize('{ ...obj1, ...obj2 }', logger);
 
       expect(result[0].type).toBe('object_literal');
-      const objectValues = result[0].value as any[];
+      const objectValues = expectTokenArrayValue(result[0], 'object_literal');
 
       // Find the spread operators
       const spreadOperators = objectValues.filter(
@@ -345,7 +361,7 @@ describe('Tokenizer Spread Tests', () => {
       const result = tokenize('{ ...obj, key: value }', logger);
 
       expect(result[0].type).toBe('object_literal');
-      const objectValues = result[0].value as any[];
+      const objectValues = expectTokenArrayValue(result[0], 'object_literal');
 
       // Check spread operator at beginning
       expect(objectValues[0].type).toBe('operator');
@@ -361,7 +377,7 @@ describe('Tokenizer Spread Tests', () => {
       const result = tokenize('{ ...{a:1, b:2} }', logger);
 
       expect(result[0].type).toBe('object_literal');
-      const objectValues = result[0].value as any[];
+      const objectValues = expectTokenArrayValue(result[0], 'object_literal');
 
       // Check spread operator at beginning
       expect(objectValues[0].type).toBe('operator');
@@ -376,7 +392,7 @@ describe('Tokenizer Spread Tests', () => {
       const result = tokenize('{ key1: val1, ...middle, key2: val2 }', logger);
 
       expect(result[0].type).toBe('object_literal');
-      const objectValues = result[0].value as any[];
+      const objectValues = expectTokenArrayValue(result[0], 'object_literal');
 
       // Find the spread operator
       const spreadIndex = objectValues.findIndex(
@@ -423,7 +439,7 @@ describe('Tokenizer Spread Tests', () => {
       expect(result[0].type).toBe('array_literal');
 
       // Check that the array contains the expected tokens in the right order
-      const tokens = result[0].value as Token[];
+      const tokens = expectTokenArrayValue(result[0], 'array_literal');
 
       // The first token should be the flushed text buffer ('abc')
       expect(tokens[0].type).toBe('identifier');
@@ -458,7 +474,7 @@ describe('Tokenizer Spread Tests', () => {
         expect(result[0].type).toBe('array_literal');
 
         // Get the array tokens
-        const tokens = result[0].value as Token[];
+        const tokens = expectTokenArrayValue(result[0], 'array_literal');
 
         // Check that we have at least a token before the spread operator
         expect(tokens.length).toBeGreaterThan(1);
@@ -483,7 +499,7 @@ describe('Tokenizer Spread Tests', () => {
       expect(result[0].type).toBe('array_literal');
 
       // Get array tokens
-      const tokens = result[0].value as Token[];
+      const tokens = expectTokenArrayValue(result[0], 'array_literal');
 
       // Find all spread operators
       const spreadIndices = tokens
@@ -524,7 +540,7 @@ describe('Tokenizer Spread Tests', () => {
       const result = tokenize(input, logger);
 
       expect(result.length).toBe(1);
-      const tokens = result[0].value as Token[];
+      const tokens = expectTokenArrayValue(result[0], 'array_literal');
 
       // Verify content from buffer was flushed to tokens
       expect(tokens.some((t) => t.type === 'identifier' && t.value === 'text')).toBe(true);
@@ -557,7 +573,7 @@ describe('Tokenizer Spread Tests', () => {
         expect(result[0].type).toBe('array_literal');
 
         // Get tokens and check that we have both an identifier and a spread
-        const tokens = result[0].value as Token[];
+        const tokens = expectTokenArrayValue(result[0], 'array_literal');
         const hasIdentifier = tokens.some((t) => t.type === 'identifier');
         const hasSpread = tokens.some((t) => t.type === 'operator' && t.value === '...');
 
@@ -591,7 +607,7 @@ describe('Tokenizer Spread Tests', () => {
       expect(result[0].type).toBe('array_literal');
 
       // Get array tokens
-      const tokens = result[0].value as Token[];
+      const tokens = expectTokenArrayValue(result[0], 'array_literal');
 
       // Verify the spread operator token was created
       const spreadToken = tokens.find((t) => t.type === 'operator' && t.value === '...');
@@ -610,7 +626,7 @@ describe('Tokenizer Spread Tests', () => {
       expect(result[0].type).toBe('array_literal');
 
       // Get array tokens
-      const tokens = result[0].value as Token[];
+      const tokens = expectTokenArrayValue(result[0], 'array_literal');
 
       // Find spread operator
       const spreadIndex = tokens.findIndex((t) => t.type === 'operator' && t.value === '...');
@@ -635,7 +651,7 @@ describe('Tokenizer Spread Tests', () => {
       expect(result[0].type).toBe('array_literal');
 
       // Get array tokens
-      const tokens = result[0].value as Token[];
+      const tokens = expectTokenArrayValue(result[0], 'array_literal');
 
       // Find all spread operators
       const spreadTokens = tokens.filter((t) => t.type === 'operator' && t.value === '...');
@@ -679,7 +695,7 @@ describe('Tokenizer Spread Tests', () => {
           expect(result[0].type).toBe('array_literal');
 
           // Check that we have at least one spread operator token
-          const tokens = result[0].value as Token[];
+          const tokens = expectTokenArrayValue(result[0], 'array_literal');
           const hasSpread = tokens.some((t) => t.type === 'operator' && t.value === '...');
           expect(hasSpread).toBe(true);
         } catch (e) {
@@ -700,7 +716,7 @@ describe('Tokenizer Spread Tests', () => {
         expect(result.length).toBe(1);
         expect(result[0].type).toBe('object_literal');
 
-        const objectTokens = result[0].value as Token[];
+        const objectTokens = expectTokenArrayValue(result[0], 'object_literal');
 
         // Find the spread operator
         const spreadOperatorIndex = objectTokens.findIndex(
@@ -719,7 +735,7 @@ describe('Tokenizer Spread Tests', () => {
         expect(result.length).toBe(1);
         expect(result[0].type).toBe('object_literal');
 
-        const objectTokens = result[0].value as Token[];
+        const objectTokens = expectTokenArrayValue(result[0], 'object_literal');
 
         expect(objectTokens[0].type).toBe('operator');
         expect(objectTokens[0].value).toBe('...');
@@ -732,7 +748,7 @@ describe('Tokenizer Spread Tests', () => {
         expect(result.length).toBe(1);
         expect(result[0].type).toBe('object_literal');
 
-        const objectTokens = result[0].value as Token[];
+        const objectTokens = expectTokenArrayValue(result[0], 'object_literal');
 
         expect(objectTokens[0].type).toBe('operator');
         expect(objectTokens[0].value).toBe('...');
@@ -745,7 +761,7 @@ describe('Tokenizer Spread Tests', () => {
         expect(result.length).toBe(1);
         expect(result[0].type).toBe('object_literal');
 
-        const objectTokens = result[0].value as Token[];
+        const objectTokens = expectTokenArrayValue(result[0], 'object_literal');
 
         const spreadIndices: number[] = [];
         objectTokens.forEach((token, index) => {
@@ -764,7 +780,7 @@ describe('Tokenizer Spread Tests', () => {
       it('detects spread operator at the beginning of an object literal', () => {
         const result = tokenize('{...obj}', logger);
         expect(result[0].type).toBe('object_literal');
-        const tokens = result[0].value as any[];
+        const tokens = expectTokenArrayValue(result[0], 'object_literal');
         expect(tokens[0].type).toBe('operator');
         expect(tokens[0].value).toBe('...');
       });
@@ -773,14 +789,14 @@ describe('Tokenizer Spread Tests', () => {
         // Beginning
         let result = tokenize('{...obj}', logger);
         expect(result[0].type).toBe('object_literal');
-        let tokens = result[0].value as any[];
+        let tokens = expectTokenArrayValue(result[0], 'object_literal');
         expect(tokens[0].type).toBe('operator');
         expect(tokens[0].value).toBe('...');
 
         // Middle
         result = tokenize('{key1: val1, ...obj, key2: val2}', logger);
         expect(result[0].type).toBe('object_literal');
-        tokens = result[0].value as any[];
+        tokens = expectTokenArrayValue(result[0], 'object_literal');
 
         // Find the spread operator
         const spreadIndex = tokens.findIndex((t) => t.type === 'operator' && t.value === '...');
@@ -789,7 +805,7 @@ describe('Tokenizer Spread Tests', () => {
         // End
         result = tokenize('{key1: val1, ...obj}', logger);
         expect(result[0].type).toBe('object_literal');
-        tokens = result[0].value as any[];
+        tokens = expectTokenArrayValue(result[0], 'object_literal');
 
         // Find the spread operator
         const lastTokens = tokens.slice(-2);
@@ -800,7 +816,7 @@ describe('Tokenizer Spread Tests', () => {
       it('handles spread operator without any following values', () => {
         const result = tokenize('{...}', logger);
         expect(result[0].type).toBe('object_literal');
-        const tokens = result[0].value as any[];
+        const tokens = expectTokenArrayValue(result[0], 'object_literal');
         expect(tokens[0].type).toBe('operator');
         expect(tokens[0].value).toBe('...');
       });
@@ -808,7 +824,7 @@ describe('Tokenizer Spread Tests', () => {
       it('handles multiple consecutive spread operators', () => {
         const result = tokenize('{......}', logger);
         expect(result[0].type).toBe('object_literal');
-        const tokens = result[0].value as any[];
+        const tokens = expectTokenArrayValue(result[0], 'object_literal');
 
         // Should have two spread operators
         const spreadOperators = tokens.filter((t) => t.type === 'operator' && t.value === '...');
@@ -818,7 +834,7 @@ describe('Tokenizer Spread Tests', () => {
       it('correctly processes spread operators with whitespace', () => {
         const result = tokenize('{ ... obj }', logger);
         expect(result[0].type).toBe('object_literal');
-        const tokens = result[0].value as any[];
+        const tokens = expectTokenArrayValue(result[0], 'object_literal');
         expect(tokens.some((t) => t.type === 'operator' && t.value === '...')).toBe(true);
       });
 
@@ -853,7 +869,7 @@ describe('Tokenizer Spread Tests', () => {
           try {
             const result = tokenize(example, logger);
             expect(result[0].type).toBe('object_literal');
-            const tokens = result[0].value as any[];
+            const tokens = expectTokenArrayValue(result[0], 'object_literal');
             expect(tokens[0].type).toBe('operator');
             expect(tokens[0].value).toBe('...');
           } catch (e) {
@@ -869,7 +885,7 @@ describe('Tokenizer Spread Tests', () => {
           const result = tokenize('{.obj}', logger);
           // The object should still be tokenized, but not as a spread
           expect(result[0].type).toBe('object_literal');
-          const tokens = result[0].value as any[];
+          const tokens = expectTokenArrayValue(result[0], 'object_literal');
           expect(tokens.every((t) => t.value !== '...')).toBe(true);
         } catch (e) {
           // May throw an error, which is fine
@@ -879,7 +895,7 @@ describe('Tokenizer Spread Tests', () => {
           const result = tokenize('{..obj}', logger);
           // The object should still be tokenized, but not as a spread
           expect(result[0].type).toBe('object_literal');
-          const tokens = result[0].value as any[];
+          const tokens = expectTokenArrayValue(result[0], 'object_literal');
           expect(tokens.every((t) => t.value !== '...')).toBe(true);
         } catch (e) {
           // May throw an error, which is fine

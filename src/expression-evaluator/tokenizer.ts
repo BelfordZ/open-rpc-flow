@@ -1,23 +1,7 @@
 import { Logger } from '../util/logger';
-
-/**
- * Represents a token in an expression
- */
-export interface Token {
-  type:
-    | 'string'
-    | 'number'
-    | 'operator'
-    | 'reference'
-    | 'object_literal'
-    | 'array_literal'
-    | 'punctuation'
-    | 'identifier'
-    | 'key'
-    | 'template_literal';
-  value: string | number | Token[] | any; // Allow any for now to handle complex nested structures
-  raw: string;
-}
+import type { Token } from './types';
+export type { Token, TokenType, TokenWithKeyValue, TokenWithTokenArrayValue } from './types';
+export { hasKeyValue, hasTokenArrayValue } from './types';
 
 export class TokenizerError extends Error {
   constructor(message: string) {
@@ -267,6 +251,14 @@ function handleReference(state: TokenizerState): Token {
       });
       state.currentIndex++;
       inOperator = true;
+      continue;
+    }
+
+    if (isQuote(char)) {
+      flushBufferToArray(textBuffer, referenceTokens);
+      textBuffer = '';
+      const stringToken = handleStringLiteral(state, char);
+      referenceTokens.push(stringToken);
       continue;
     }
 

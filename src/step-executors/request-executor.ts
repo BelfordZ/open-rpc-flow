@@ -75,7 +75,7 @@ export class RequestStepExecutor implements StepExecutor {
       throw new ValidationError('Invalid step type for RequestStepExecutor', { step });
     }
 
-    const requestStep = step as RequestStep;
+    const requestStep: RequestStep = step;
     const requestId = this.getNextRequestId();
     const stepRetryPolicy = this.getStepRetryPolicy(requestStep, _context);
     const timeout = this.getStepTimeout(requestStep, _context);
@@ -251,16 +251,23 @@ export class RequestStepExecutor implements StepExecutor {
           }
         }
 
-        const err = error as any;
+        const errMessage =
+          error instanceof Error
+            ? error.message
+            : error !== null && error !== undefined
+              ? String(error)
+              : 'Unknown error';
+        const err = error instanceof Error ? error : new Error(errMessage);
         // Wrap other errors as ExecutionError with NETWORK_ERROR code for retries
-        const errorMessage = `Failed to execute request step "${step.name}": ${err?.message || 'Unknown error'}`;
+        const errorMessage = `Failed to execute request step "${step.name}": ${errMessage}`;
+        const code =
+          error && typeof error === 'object' && 'code' in error
+            ? (error as { code: ErrorCode }).code
+            : ErrorCode.NETWORK_ERROR;
         throw new ExecutionError(
           errorMessage,
           {
-            code:
-              err && typeof err === 'object' && 'code' in err && err.code
-                ? err.code
-                : ErrorCode.NETWORK_ERROR,
+            code,
             stepName: step.name,
             requestId,
             originalError: err,

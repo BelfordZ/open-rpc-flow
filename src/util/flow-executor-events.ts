@@ -14,9 +14,6 @@ export enum FlowEventType {
   STEP_COMPLETE = 'step:complete',
   STEP_ERROR = 'step:error',
   STEP_SKIP = 'step:skip',
-  STEP_PROGRESS = 'step:progress',
-  STEP_ABORTED = 'step:aborted',
-  FLOW_ABORTED = 'flow:aborted',
   DEPENDENCY_RESOLVED = 'dependency:resolved',
 }
 
@@ -65,8 +62,6 @@ export interface StepStartEvent extends FlowEvent {
   stepName: string;
   stepType: StepType;
   context?: Record<string, any>;
-  correlationId: string;
-  metadata?: Record<string, any>;
 }
 
 /**
@@ -78,7 +73,6 @@ export interface StepCompleteEvent extends FlowEvent {
   stepType: StepType;
   result: StepExecutionResult;
   duration: number;
-  correlationId: string;
 }
 
 /**
@@ -90,7 +84,6 @@ export interface StepErrorEvent extends FlowEvent {
   stepType: StepType;
   error: Error;
   duration: number;
-  correlationId: string;
 }
 
 /**
@@ -99,38 +92,6 @@ export interface StepErrorEvent extends FlowEvent {
 export interface StepSkipEvent extends FlowEvent {
   type: FlowEventType.STEP_SKIP;
   stepName: string;
-  reason: string;
-  correlationId: string;
-}
-
-/**
- * Step progress event
- */
-export interface StepProgressEvent extends FlowEvent {
-  type: FlowEventType.STEP_PROGRESS;
-  stepName: string;
-  stepType: StepType;
-  iteration: number;
-  totalIterations: number;
-  percent: number;
-}
-
-/**
- * Step aborted event
- */
-export interface StepAbortedEvent extends FlowEvent {
-  type: FlowEventType.STEP_ABORTED;
-  stepName: string;
-  stepType: StepType;
-  reason: string;
-}
-
-/**
- * Flow aborted event
- */
-export interface FlowAbortedEvent extends FlowEvent {
-  type: FlowEventType.FLOW_ABORTED;
-  flowName: string;
   reason: string;
 }
 
@@ -194,12 +155,13 @@ export class FlowExecutorEvents extends EventEmitter {
   emitFlowStart(flowName: string, orderedSteps: string[]): void {
     if (!this.options.emitFlowEvents) return;
 
-    this.emit(FlowEventType.FLOW_START, {
+    const event: FlowStartEvent = {
       timestamp: Date.now(),
       type: FlowEventType.FLOW_START,
       flowName,
       orderedSteps,
-    } as FlowStartEvent);
+    };
+    this.emit(FlowEventType.FLOW_START, event);
   }
 
   /**
@@ -212,13 +174,14 @@ export class FlowExecutorEvents extends EventEmitter {
       ? Object.fromEntries(results.entries())
       : { stepCount: results.size };
 
-    this.emit(FlowEventType.FLOW_COMPLETE, {
+    const event: FlowCompleteEvent = {
       timestamp: Date.now(),
       type: FlowEventType.FLOW_COMPLETE,
       flowName,
       results: resultsObj,
       duration: Date.now() - startTime,
-    } as FlowCompleteEvent);
+    };
+    this.emit(FlowEventType.FLOW_COMPLETE, event);
   }
 
   /**
@@ -227,13 +190,14 @@ export class FlowExecutorEvents extends EventEmitter {
   emitFlowError(flowName: string, error: Error, startTime: number): void {
     if (!this.options.emitFlowEvents) return;
 
-    this.emit(FlowEventType.FLOW_ERROR, {
+    const event: FlowErrorEvent = {
       timestamp: Date.now(),
       type: FlowEventType.FLOW_ERROR,
       flowName,
       error,
       duration: Date.now() - startTime,
-    } as FlowErrorEvent);
+    };
+    this.emit(FlowEventType.FLOW_ERROR, event);
   }
 
   /**
@@ -243,8 +207,6 @@ export class FlowExecutorEvents extends EventEmitter {
     step: Step,
     executionContext: StepExecutionContext,
     extraContext: Record<string, any> = {},
-    correlationId: string,
-    metadata: Record<string, any> = {},
   ): void {
     if (!this.options.emitStepEvents) return;
 
@@ -254,111 +216,68 @@ export class FlowExecutorEvents extends EventEmitter {
 
     const stepType = getStepType(step);
 
-    this.emit(FlowEventType.STEP_START, {
+    const event: StepStartEvent = {
       timestamp: Date.now(),
       type: FlowEventType.STEP_START,
       stepName: step.name,
       stepType,
       context,
-      correlationId,
-      metadata,
-    } as StepStartEvent);
+    };
+    this.emit(FlowEventType.STEP_START, event);
   }
 
   /**
    * Emit step complete event
    */
-  emitStepComplete(
-    step: Step,
-    result: StepExecutionResult,
-    startTime: number,
-    correlationId: string,
-  ): void {
+  emitStepComplete(step: Step, result: StepExecutionResult, startTime: number): void {
     if (!this.options.emitStepEvents) return;
 
     const stepType = getStepType(step);
     const resultData = this.options.includeResults ? result : { type: result.type };
 
-    this.emit(FlowEventType.STEP_COMPLETE, {
+    const event: StepCompleteEvent = {
       timestamp: Date.now(),
       type: FlowEventType.STEP_COMPLETE,
       stepName: step.name,
       stepType,
       result: resultData,
       duration: Date.now() - startTime,
-      correlationId,
-    } as StepCompleteEvent);
+    };
+    this.emit(FlowEventType.STEP_COMPLETE, event);
   }
 
   /**
    * Emit step error event
    */
-  emitStepError(step: Step, error: Error, startTime: number, correlationId: string): void {
+  emitStepError(step: Step, error: Error, startTime: number): void {
     if (!this.options.emitStepEvents) return;
 
     const stepType = getStepType(step);
 
-    this.emit(FlowEventType.STEP_ERROR, {
+    const event: StepErrorEvent = {
       timestamp: Date.now(),
       type: FlowEventType.STEP_ERROR,
       stepName: step.name,
       stepType,
       error,
       duration: Date.now() - startTime,
-      correlationId,
-    } as StepErrorEvent);
+    };
+    this.emit(FlowEventType.STEP_ERROR, event);
   }
 
   /**
    * Emit step skip event
    */
-  emitStepSkip(step: Step, reason: string, correlationId: string): void {
+  emitStepSkip(step: Step, reason: string): void {
     if (!this.options.emitStepEvents) return;
 
-    this.emit(FlowEventType.STEP_SKIP, {
+    const event: StepSkipEvent = {
       timestamp: Date.now(),
       type: FlowEventType.STEP_SKIP,
       stepName: step.name,
       reason,
-      correlationId,
-    } as StepSkipEvent);
-  }
-
-  /**
-   * Emit step progress event
-   */
-  emitStepProgress(step: Step, iteration: number, totalIterations: number): void {
-    if (!this.options.emitStepEvents) return;
-
-    const stepType = getStepType(step);
-    const percent = Math.min(Math.round((iteration / totalIterations) * 100), 100);
-
-    this.emit(FlowEventType.STEP_PROGRESS, {
-      timestamp: Date.now(),
-      type: FlowEventType.STEP_PROGRESS,
-      stepName: step.name,
-      stepType,
-      iteration,
-      totalIterations,
-      percent,
-    } as StepProgressEvent);
-  }
-
-  /**
-   * Emit step aborted event
-   */
-  emitStepAborted(step: Step, reason: string): void {
-    if (!this.options.emitStepEvents) return;
-
-    const stepType = getStepType(step);
-
-    this.emit(FlowEventType.STEP_ABORTED, {
-      timestamp: Date.now(),
-      type: FlowEventType.STEP_ABORTED,
-      stepName: step.name,
-      stepType,
-      reason,
-    } as StepAbortedEvent);
+    };
+    this.emit(FlowEventType.STEP_SKIP, event);
   }
 
   /**
@@ -367,24 +286,11 @@ export class FlowExecutorEvents extends EventEmitter {
   emitDependencyResolved(orderedSteps: string[]): void {
     if (!this.options.emitDependencyEvents) return;
 
-    this.emit(FlowEventType.DEPENDENCY_RESOLVED, {
+    const event: DependencyResolvedEvent = {
       timestamp: Date.now(),
       type: FlowEventType.DEPENDENCY_RESOLVED,
       orderedSteps,
-    } as DependencyResolvedEvent);
-  }
-
-  /**
-   * Emit flow aborted event
-   */
-  emitFlowAborted(flowName: string, reason: string): void {
-    if (!this.options.emitFlowEvents) return;
-
-    this.emit(FlowEventType.FLOW_ABORTED, {
-      timestamp: Date.now(),
-      type: FlowEventType.FLOW_ABORTED,
-      flowName,
-      reason,
-    } as FlowAbortedEvent);
+    };
+    this.emit(FlowEventType.DEPENDENCY_RESOLVED, event);
   }
 }

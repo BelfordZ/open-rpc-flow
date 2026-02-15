@@ -34,7 +34,7 @@ export class StopStepExecutor implements StepExecutor {
       throw new ValidationError('Invalid step type for StopStepExecutor', { step });
     }
 
-    const stopStep = step as StopStep;
+    const stopStep: StopStep = step;
     const endWorkflow = stopStep.stop.endWorkflow ?? false;
 
     this.logger.debug('Input type check', {

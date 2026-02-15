@@ -251,12 +251,16 @@ export class RequestStepExecutor implements StepExecutor {
           }
         }
 
+        const hasMessage =
+          error !== null && error !== undefined && typeof error === 'object' && 'message' in error;
         const errMessage =
           error instanceof Error
             ? error.message
-            : error !== null && error !== undefined
-              ? String(error)
-              : 'Unknown error';
+            : hasMessage
+              ? String((error as { message?: unknown }).message)
+              : error !== null && error !== undefined
+                ? String(error)
+                : 'Unknown error';
         const err = error instanceof Error ? error : new Error(errMessage);
         // Wrap other errors as ExecutionError with NETWORK_ERROR code for retries
         const errorMessage = `Failed to execute request step "${step.name}": ${errMessage}`;

@@ -287,6 +287,39 @@ describe('RequestStepExecutor', () => {
     );
   });
 
+  it('uses message and code from non-Error objects', async () => {
+    const step: RequestStep = {
+      name: 'objectError',
+      request: {
+        method: 'test.method',
+        params: {},
+      },
+    };
+
+    jsonRpcHandler.mockRejectedValue({ message: 'Object boom', code: ErrorCode.TIMEOUT_ERROR });
+    await expect(executor.execute(step, context)).rejects.toThrow(
+      'Failed to execute request step "objectError": Object boom',
+    );
+    await expect(executor.execute(step, context)).rejects.toMatchObject({
+      code: ErrorCode.TIMEOUT_ERROR,
+    });
+  });
+
+  it('uses string message for non-object errors', async () => {
+    const step: RequestStep = {
+      name: 'stringError',
+      request: {
+        method: 'test.method',
+        params: {},
+      },
+    };
+
+    jsonRpcHandler.mockRejectedValue('string boom');
+    await expect(executor.execute(step, context)).rejects.toThrow(
+      'Failed to execute request step "stringError": string boom',
+    );
+  });
+
   it('throws error when given invalid step type', async () => {
     const invalidStep = {
       name: 'invalidStep',

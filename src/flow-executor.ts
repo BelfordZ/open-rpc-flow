@@ -262,16 +262,12 @@ export class FlowExecutor {
         (this.globalAbortController.signal.aborted && error.message?.includes('timeout')) ||
         error.name === 'AbortError'
       ) {
-        const duration = Date.now() - startTime;
-        const flowTimeout = this.flow.policies?.global?.timeout?.timeout || 0;
-
-        // Create a detailed timeout error for the flow
+        const timeout = this.flow.policies?.global?.timeout?.timeout || 0;
         const timeoutError = new TimeoutError(
-          `Flow execution timed out after ${duration}ms. Configured timeout: ${flowTimeout}ms.`,
-          flowTimeout,
-          duration,
+          `Flow execution timed out after ${Date.now() - startTime}ms. Configured timeout: ${timeout}ms.`,
+          timeout,
+          Date.now() - startTime,
         );
-
         this.events.emitFlowError(this.flow.name, timeoutError, startTime);
         throw timeoutError;
       }

@@ -52,9 +52,7 @@ export class ConditionStepExecutor implements StepExecutor {
     });
 
     // Get the timeout for the condition step
-    const timeout = this.policyResolver?.resolveTimeout
-      ? this.policyResolver.resolveTimeout(step, StepType.Condition)
-      : 5000; // fallback default
+    const timeout = this.policyResolver?.resolveTimeout?.(step, StepType.Condition) ?? 5000;
 
     // Create an AbortController for this condition step
     const abortController = new AbortController();
@@ -79,32 +77,24 @@ export class ConditionStepExecutor implements StepExecutor {
         });
 
         let value: StepExecutionResult | undefined;
-        let branchTaken: 'then' | 'else' | undefined;
         const nestedContext = {
           ...extraContext,
           _nestedStep: true,
           _parentStep: step.name,
         };
 
-        if (conditionValue) {
-          this.logger.debug('Executing then branch', { stepName: step.name });
-          value = await this.executeStep(
-            conditionStep.condition.then,
-            nestedContext,
-            abortController.signal,
-          );
-          branchTaken = 'then';
-        } else if (conditionStep.condition.else) {
-          this.logger.debug('Executing else branch', { stepName: step.name });
-          value = await this.executeStep(
-            conditionStep.condition.else,
-            nestedContext,
-            abortController.signal,
-          );
-          branchTaken = 'else';
-        } else {
-          branchTaken = 'else';
+        const branch = conditionValue
+          ? { name: 'then' as const, step: conditionStep.condition.then }
+          : conditionStep.condition.else
+            ? { name: 'else' as const, step: conditionStep.condition.else }
+            : undefined;
+
+        if (branch) {
+          this.logger.debug(`Executing ${branch.name} branch`, { stepName: step.name });
+          value = await this.executeStep(branch.step, nestedContext, abortController.signal);
         }
+
+        const branchTaken = branch?.name ?? 'else';
 
         this.logger.debug('Condition execution completed', {
           stepName: step.name,

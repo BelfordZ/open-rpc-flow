@@ -280,7 +280,7 @@ describe('Timeout and Retry Policies', () => {
       });
     });
 
-  describe('Global timeout policies', () => {
+    describe('Global timeout policies', () => {
       it('should respect global timeout configuration', async () => {
         // Set a global timeout
         const globalTimeout = 100;
@@ -322,7 +322,7 @@ describe('Timeout and Retry Policies', () => {
         });
       });
 
-    it('should allow a flow with multiple steps to complete within global timeout', async () => {
+      it('should allow a flow with multiple steps to complete within global timeout', async () => {
         // Set a global timeout longer than needed
         const globalTimeout = 1000;
         const flow: Flow = {
@@ -1007,8 +1007,8 @@ describe('Timeout and Retry Policies', () => {
     });
   });
 
-    describe('Global timeout cancellation', () => {
-      it('should timeout on a global timeout and cancel remaining steps', async () => {
+  describe('Global timeout cancellation', () => {
+    it('should timeout on a global timeout and cancel remaining steps', async () => {
       const flow: Flow = {
         name: 'global-timeout-test',
         description: 'Test global timeout cancellation',
@@ -1035,11 +1035,11 @@ describe('Timeout and Retry Policies', () => {
       const executor = new FlowExecutor(flow, mockHandler, { logger: testLogger });
       const controller = new AbortController();
 
-        // Pass the signal to executor.execute
-        await expectError(executor.execute({ signal: controller.signal }), {
-          errorClass: TimeoutError,
-          messageIncludes: 'Flow execution timed out',
-        });
+      // Pass the signal to executor.execute
+      await expectError(executor.execute({ signal: controller.signal }), {
+        errorClass: TimeoutError,
+        messageIncludes: 'Flow execution timed out',
       });
     });
+  });
 });

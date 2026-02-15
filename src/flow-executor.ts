@@ -56,7 +56,7 @@ export class FlowExecutor {
   public expressionEvaluator: SafeExpressionEvaluator;
   public events: FlowExecutorEvents;
 
-  private context: Record<string, unknown>;
+  private context: Record<string, any>;
   private stepResults: Map<string, any>;
   private executionContext: StepExecutionContext;
   private stepExecutors: StepExecutor[];
@@ -86,7 +86,7 @@ export class FlowExecutor {
     }
 
     this.context = flow.context || {};
-    this.stepResults = new Map<string, any>();
+    this.stepResults = new Map();
 
     // Initialize the event emitter
     this.events = new FlowExecutorEvents(options?.eventOptions);

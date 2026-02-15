@@ -93,7 +93,7 @@ export interface StepExecutor<
 export interface RequestStep extends Step {
   request: {
     method: string;
-    params: Record<string, unknown> | unknown[];
+    params: Record<string, any> | any[];
   };
   /**
    * @deprecated Use step.policies.retryPolicy instead

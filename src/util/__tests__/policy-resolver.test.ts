@@ -13,7 +13,7 @@ describe('PolicyResolver', () => {
   beforeEach(() => {
     logger = {
       debug: jest.fn(),
-      log: jest.fn(),
+      info: jest.fn(),
       error: jest.fn(),
       createNested: () => logger,
     } as any;

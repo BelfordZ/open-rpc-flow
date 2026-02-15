@@ -106,7 +106,7 @@ describe('SafeExpressionEvaluator - Debug Tests (Consolidated)', () => {
       try {
         // 1. Test with valid reference usage
         try {
-          logger.log('Testing with valid reference: ${context.value}');
+          logger.info('Testing with valid reference: ${context.value}');
           evaluator.evaluate('${context.value}', {});
         } catch (error: any) {
           logger.error(`Unexpected error with valid reference: ${error}`);
@@ -114,7 +114,7 @@ describe('SafeExpressionEvaluator - Debug Tests (Consolidated)', () => {
 
         // 2. Test with reference + operator (valid)
         try {
-          logger.log('Testing with valid reference + operator: ${context.value} + 3');
+          logger.info('Testing with valid reference + operator: ${context.value} + 3');
           evaluator.evaluate('${context.value} + 3', {});
         } catch (error: any) {
           logger.error(`Unexpected error with valid reference + operator: ${error}`);
@@ -122,7 +122,7 @@ describe('SafeExpressionEvaluator - Debug Tests (Consolidated)', () => {
 
         // 3. Test with operator + reference (valid)
         try {
-          logger.log('Testing with valid operator + reference: 3 + ${context.value}');
+          logger.info('Testing with valid operator + reference: 3 + ${context.value}');
           evaluator.evaluate('3 + ${context.value}', {});
         } catch (error: any) {
           logger.error(`Unexpected error with valid operator + reference: ${error}`);
@@ -130,27 +130,27 @@ describe('SafeExpressionEvaluator - Debug Tests (Consolidated)', () => {
 
         // 4. Test with reference + reference (should trigger error)
         try {
-          logger.log(
+          logger.info(
             'Testing with invalid reference + reference: ${context.value} ${context.value}',
           );
           evaluator.evaluate('${context.value} ${context.value}', {});
           logger.error('Error: Should have thrown but did not');
         } catch (error: any) {
-          logger.log(`Got expected error with reference + reference: ${error.message}`);
+          logger.info(`Got expected error with reference + reference: ${error.message}`);
         }
 
         // 5. Test with number + reference (should trigger error)
         try {
-          logger.log('Testing with invalid number + reference: 5 ${context.value}');
+          logger.info('Testing with invalid number + reference: 5 ${context.value}');
           evaluator.evaluate('5 ${context.value}', {});
           logger.error('Error: Should have thrown but did not');
         } catch (error: any) {
-          logger.log(`Got expected error with number + reference: ${error.message}`);
+          logger.info(`Got expected error with number + reference: ${error.message}`);
         }
 
         // 6. Test with parenthesized expression to see if operatorStack gets populated
         try {
-          logger.log('Testing with parenthesized expression: (${context.value} + 3) * 2');
+          logger.info('Testing with parenthesized expression: (${context.value} + 3) * 2');
           evaluator.evaluate('(${context.value} + 3) * 2', {});
         } catch (error: any) {
           logger.error(`Unexpected error with parenthesized expression: ${error}`);
@@ -186,21 +186,21 @@ describe('SafeExpressionEvaluator - Debug Tests (Consolidated)', () => {
 
       // Create a patched version that tracks operator stack state
       evaluatorAny.parseExpression = function (tokens: any[]) {
-        logger.log('Tokens to parse:', JSON.stringify(tokens));
+        logger.info('Tokens to parse:', JSON.stringify(tokens));
 
         const operatorStack: any[] = [];
         let expectOperator = false;
 
         for (let i = 0; i < tokens.length; i++) {
           const token = tokens[i];
-          logger.log(`[${i}] Processing token: ${JSON.stringify(token)}`);
-          logger.log(`[${i}] Current operatorStack: ${JSON.stringify(operatorStack)}`);
-          logger.log(`[${i}] expectOperator: ${expectOperator}`);
+          logger.info(`[${i}] Processing token: ${JSON.stringify(token)}`);
+          logger.info(`[${i}] Current operatorStack: ${JSON.stringify(operatorStack)}`);
+          logger.info(`[${i}] expectOperator: ${expectOperator}`);
 
           // Handle parentheses first
           if (token.value === '(') {
             operatorStack.push('(');
-            logger.log(`[${i}] Pushed opening paren, stack: ${JSON.stringify(operatorStack)}`);
+            logger.info(`[${i}] Pushed opening paren, stack: ${JSON.stringify(operatorStack)}`);
             continue;
           }
 
@@ -213,13 +213,13 @@ describe('SafeExpressionEvaluator - Debug Tests (Consolidated)', () => {
                 break;
               }
             }
-            logger.log(`[${i}] After closing paren, stack: ${JSON.stringify(operatorStack)}`);
+            logger.info(`[${i}] After closing paren, stack: ${JSON.stringify(operatorStack)}`);
             continue;
           }
 
           // For reference tokens
           if (token.type === 'reference') {
-            logger.log(
+            logger.info(
               `[${i}] Reference token with expectOperator=${expectOperator}, stack: ${JSON.stringify(operatorStack)}`,
             );
 
@@ -227,14 +227,14 @@ describe('SafeExpressionEvaluator - Debug Tests (Consolidated)', () => {
             // Is it possible for operatorStack to be non-empty when encountering a reference
             // with expectOperator = true?
             if (expectOperator) {
-              logger.log(
+              logger.info(
                 `[${i}] Found reference with expectOperator=true, stack size: ${operatorStack.length}`,
               );
               operatorStackSizesWhenExpectOperatorIsTrue.push(operatorStack.length);
 
               if (operatorStack.length > 0) {
                 foundNonEmptyStackWithExpectOperator = true;
-                logger.log(
+                logger.info(
                   `[${i}] FOUND NON-EMPTY OPERATOR STACK (${operatorStack.length}) WHEN HANDLING REFERENCE WITH expectOperator=true`,
                 );
               }
@@ -248,19 +248,19 @@ describe('SafeExpressionEvaluator - Debug Tests (Consolidated)', () => {
             ['+', '-', '*', '/', '&&', '||'].includes(token.value)
           ) {
             operatorStack.push(token.value);
-            logger.log(
+            logger.info(
               `[${i}] Pushed operator ${token.value}, stack: ${JSON.stringify(operatorStack)}`,
             );
             expectOperator = false;
           }
           // For any other tokens
           else {
-            logger.log(`[${i}] Regular token, setting expectOperator=true`);
+            logger.info(`[${i}] Regular token, setting expectOperator=true`);
             expectOperator = true;
           }
         }
 
-        logger.log(`Final operatorStack: ${JSON.stringify(operatorStack)}`);
+        logger.info(`Final operatorStack: ${JSON.stringify(operatorStack)}`);
 
         // Restore and call original
         evaluatorAny.parseExpression = originalParseExpression;
@@ -270,74 +270,74 @@ describe('SafeExpressionEvaluator - Debug Tests (Consolidated)', () => {
       try {
         // Test 1: Valid parenthesized expression
         try {
-          logger.log('\nTest 1: Valid expression: (${context.a} + ${context.b}) * 2');
+          logger.info('\nTest 1: Valid expression: (${context.a} + ${context.b}) * 2');
           const result = evaluator.evaluate('(${context.a} + ${context.b}) * 2', {});
-          logger.log(`Result: ${result}`);
+          logger.info(`Result: ${result}`);
         } catch (error: any) {
           logger.error(`Unexpected error: ${error.message}`);
         }
 
         // Test 2: Invalid expression with reference where operator is expected in parentheses
         try {
-          logger.log('\nTest 2: Invalid expression: (${context.a} ${context.b}) * 2');
+          logger.info('\nTest 2: Invalid expression: (${context.a} ${context.b}) * 2');
           evaluator.evaluate('(${context.a} ${context.b}) * 2', {});
           logger.error('Error: Should have thrown but did not');
         } catch (error: any) {
-          logger.log(`Got expected error: ${error.message}`);
+          logger.info(`Got expected error: ${error.message}`);
         }
 
         // Test 3: Invalid expression with reference right after opening parenthesis and another reference
         try {
-          logger.log('\nTest 3: Invalid expression: (${context.a}) ${context.b} * 2');
+          logger.info('\nTest 3: Invalid expression: (${context.a}) ${context.b} * 2');
           evaluator.evaluate('(${context.a}) ${context.b} * 2', {});
           logger.error('Error: Should have thrown but did not');
         } catch (error: any) {
-          logger.log(`Got expected error: ${error.message}`);
+          logger.info(`Got expected error: ${error.message}`);
         }
 
         // Test 4: Very complex expression to maximize chances of a non-empty stack
         try {
-          logger.log(
+          logger.info(
             '\nTest 4: Complex valid expression: (${context.a} + (${context.b} * ${context.nested.value})) / 2',
           );
           const result = evaluator.evaluate(
             '(${context.a} + (${context.b} * ${context.nested.value})) / 2',
             {},
           );
-          logger.log(`Result: ${result}`);
+          logger.info(`Result: ${result}`);
         } catch (error: any) {
           logger.error(`Unexpected error: ${error.message}`);
         }
 
         // Test 5: Complex invalid expression
         try {
-          logger.log(
+          logger.info(
             '\nTest 5: Complex invalid expression: (${context.a} + (${context.b} ${context.nested.value})) / 2',
           );
           evaluator.evaluate('(${context.a} + (${context.b} ${context.nested.value})) / 2', {});
           logger.error('Error: Should have thrown but did not');
         } catch (error: any) {
-          logger.log(`Got expected error: ${error.message}`);
+          logger.info(`Got expected error: ${error.message}`);
         }
 
         // Report findings
-        logger.log('\n=== Test Results ===');
-        logger.log(
+        logger.info('\n=== Test Results ===');
+        logger.info(
           `Found non-empty operator stack when expectOperator is true: ${foundNonEmptyStackWithExpectOperator}`,
         );
-        logger.log(
+        logger.info(
           `Operator stack sizes when expectOperator is true: ${operatorStackSizesWhenExpectOperatorIsTrue}`,
         );
 
         if (foundNonEmptyStackWithExpectOperator) {
-          logger.log(
+          logger.info(
             'CONCLUSION: The hypothesis is FALSE. It is possible for the operator stack to be non-empty when handling a reference with expectOperator=true.',
           );
         } else {
-          logger.log(
+          logger.info(
             'CONCLUSION: The hypothesis is TRUE. The operator stack is always empty when handling a reference with expectOperator=true.',
           );
-          logger.log(
+          logger.info(
             'This suggests that lines 383-391 in safe-evaluator.ts may indeed be dead code.',
           );
         }
@@ -373,14 +373,14 @@ describe('SafeExpressionEvaluator - Debug Tests (Consolidated)', () => {
         const outputQueue: any[] = [];
         const operatorStack: any[] = [];
 
-        logger.log('Beginning complex parseExpression debug test');
-        logger.log('Initial tokens:', JSON.stringify(tokens));
+        logger.info('Beginning complex parseExpression debug test');
+        logger.info('Initial tokens:', JSON.stringify(tokens));
 
         for (let i = 0; i < tokens.length; i++) {
           const token = tokens[i];
-          logger.log(`Processing token: ${token.type}:${token.value}`);
-          logger.log(`Current operatorStack: ${JSON.stringify(operatorStack)}`);
-          logger.log(`Current outputQueue: ${JSON.stringify(outputQueue)}`);
+          logger.info(`Processing token: ${token.type}:${token.value}`);
+          logger.info(`Current operatorStack: ${JSON.stringify(operatorStack)}`);
+          logger.info(`Current outputQueue: ${JSON.stringify(outputQueue)}`);
 
           // Just do minimal processing to track the stack states
           if (token.type === 'number' || token.type === 'string' || token.type === 'boolean') {
@@ -418,8 +418,8 @@ describe('SafeExpressionEvaluator - Debug Tests (Consolidated)', () => {
           }
         }
 
-        logger.log('Final operatorStack (should be empty):', JSON.stringify(operatorStack));
-        logger.log('Final outputQueue:', JSON.stringify(outputQueue));
+        logger.info('Final operatorStack (should be empty):', JSON.stringify(operatorStack));
+        logger.info('Final outputQueue:', JSON.stringify(outputQueue));
 
         // Restore the original method and call it with the original tokens
         evaluatorAny.parseExpression = originalParseExpression;
@@ -439,10 +439,10 @@ describe('SafeExpressionEvaluator - Debug Tests (Consolidated)', () => {
         ];
 
         for (const expr of expressions) {
-          logger.log(`\nTesting expression: ${expr}`);
+          logger.info(`\nTesting expression: ${expr}`);
           try {
             const result = evaluator.evaluate(expr, {});
-            logger.log(`Result: ${result}`);
+            logger.info(`Result: ${result}`);
           } catch (error: any) {
             logger.error(`Error evaluating ${expr}: ${error.message}`);
           }
@@ -467,12 +467,12 @@ describe('SafeExpressionEvaluator - Debug Tests (Consolidated)', () => {
 
       // Replace with a tracing version
       evaluatorAny.parse = function (tokens: any[]) {
-        logger.log('Tracing parse call with tokens:', JSON.stringify(tokens));
+        logger.info('Tracing parse call with tokens:', JSON.stringify(tokens));
 
         // Track token processing
         for (let i = 0; i < tokens.length; i++) {
           const token = tokens[i];
-          logger.log(`Token ${i}: ${token.type}:${token.value}`);
+          logger.info(`Token ${i}: ${token.type}:${token.value}`);
         }
 
         return originalParse.call(this, tokens);
@@ -492,10 +492,10 @@ describe('SafeExpressionEvaluator - Debug Tests (Consolidated)', () => {
         ];
 
         for (const expr of expressions) {
-          logger.log(`\nTracing expression: ${expr}`);
+          logger.info(`\nTracing expression: ${expr}`);
           try {
             const result = evaluator.evaluate(expr, {});
-            logger.log(`=> ${result}`);
+            logger.info(`=> ${result}`);
           } catch (error: any) {
             logger.error(`Error: ${error.message}`);
           }

@@ -3,17 +3,16 @@ import { NoLogger, noLogger } from '../no-logger';
 
 describe('ConsoleLogger', () => {
   let originalConsole: typeof console;
-  let mockConsole: Pick<Console, 'log' | 'error' | 'warn' | 'info' | 'debug'>;
+  let mockConsole: Pick<Console, 'info' | 'error' | 'warn' | 'debug'>;
 
   beforeEach(() => {
     // Save original console
     originalConsole = global.console;
     // Create mock console with just the methods we need
     mockConsole = {
-      log: jest.fn(),
+      info: jest.fn(),
       error: jest.fn(),
       warn: jest.fn(),
-      info: jest.fn(),
       debug: jest.fn(),
     };
     // Replace console with mock
@@ -27,8 +26,8 @@ describe('ConsoleLogger', () => {
 
   it('logs messages without prefix', () => {
     const logger = new ConsoleLogger();
-    logger.log('test message');
-    expect(mockConsole.log).toHaveBeenCalledWith('test message');
+    logger.info('test message');
+    expect(mockConsole.info).toHaveBeenCalledWith('test message');
   });
 
   it('logs info messages without prefix', () => {
@@ -39,19 +38,19 @@ describe('ConsoleLogger', () => {
 
   it('logs messages with prefix', () => {
     const logger = new ConsoleLogger('TestPrefix');
-    logger.log('test message');
-    expect(mockConsole.log).toHaveBeenCalledWith('[TestPrefix] test message');
+    logger.info('test message');
+    expect(mockConsole.info).toHaveBeenCalledWith('[TestPrefix] test message');
   });
 
   it('handles all log levels', () => {
     const logger = new ConsoleLogger('Test');
-    logger.log('log message');
+    logger.info('info message');
     logger.error('error message');
     logger.warn('warn message');
     logger.info('info message', { extra: true });
     logger.debug('debug message');
 
-    expect(mockConsole.log).toHaveBeenCalledWith('[Test] log message');
+    expect(mockConsole.info).toHaveBeenCalledWith('[Test] info message');
     expect(mockConsole.error).toHaveBeenCalledWith('[Test] error message');
     expect(mockConsole.warn).toHaveBeenCalledWith('[Test] warn message');
     expect(mockConsole.info).toHaveBeenCalledWith('[Test] info message', { extra: true });
@@ -61,32 +60,32 @@ describe('ConsoleLogger', () => {
   it('creates nested loggers with combined prefix', () => {
     const logger = new ConsoleLogger('Parent');
     const nested = logger.createNested('Child');
-    nested.log('test message');
-    expect(mockConsole.log).toHaveBeenCalledWith('[Parent:Child] test message');
+    nested.info('test message');
+    expect(mockConsole.info).toHaveBeenCalledWith('[Parent:Child] test message');
   });
 
   it('creates nested loggers from unprefixed logger', () => {
     const logger = new ConsoleLogger();
     const nested = logger.createNested('Child');
-    nested.log('test message');
-    expect(mockConsole.log).toHaveBeenCalledWith('[Child] test message');
+    nested.info('test message');
+    expect(mockConsole.info).toHaveBeenCalledWith('[Child] test message');
   });
 });
 
 describe('TestLogger', () => {
   test('captures logs without prefix', () => {
     const logger = new TestLogger();
-    logger.log('test message', { data: 123 });
+    logger.info('test message', { data: 123 });
     expect(logger.getLogs()).toEqual([
-      { level: 'log', message: 'test message', data: { data: 123 } },
+      { level: 'info', message: 'test message', data: { data: 123 } },
     ]);
   });
 
   test('captures logs with prefix', () => {
     const logger = new TestLogger('TestPrefix');
-    logger.log('test message', { data: 123 });
+    logger.info('test message', { data: 123 });
     expect(logger.getLogs()).toEqual([
-      { level: 'log', message: 'test message', data: { data: 123 } },
+      { level: 'info', message: 'test message', data: { data: 123 } },
     ]);
   });
 
@@ -119,7 +118,7 @@ describe('TestLogger', () => {
 
   test('clears logs', () => {
     const logger = new TestLogger();
-    logger.log('test message');
+    logger.info('test message');
     logger.clear();
     expect(logger.getLogs()).toEqual([]);
   });
@@ -130,12 +129,12 @@ describe('TestLogger', () => {
     console.log = mockLog;
 
     const logger = new TestLogger('Test');
-    logger.log('test message');
+    logger.info('test message');
     logger.print();
 
     expect(mockLog).toHaveBeenCalledTimes(1);
     const output = mockLog.mock.calls[0][0];
-    expect(output).toContain('[LOG] [Test] test message');
+    expect(output).toContain('[INFO] [Test] test message');
 
     Object.assign(console, originalConsole);
   });
@@ -160,21 +159,21 @@ describe('TestLogger', () => {
     const parent = new TestLogger('Parent');
     const child = parent.createNested('Child');
 
-    parent.log('parent message');
-    child.log('child message');
+    parent.info('parent message');
+    child.info('child message');
 
     expect(parent.getLogs()).toBe(child.getLogs());
     expect(parent.getLogs()).toEqual([
-      { level: 'log', message: 'parent message', data: undefined },
-      { level: 'log', message: 'child message', data: undefined },
+      { level: 'info', message: 'parent message', data: undefined },
+      { level: 'info', message: 'child message', data: undefined },
     ]);
   });
 
   test('handles single message and data', () => {
     const logger = new TestLogger('Test');
-    logger.log('message', { three: 3 });
+    logger.info('message', { three: 3 });
     expect(logger.getLogs()[0]).toEqual({
-      level: 'log',
+      level: 'info',
       message: 'message',
       data: { three: 3 },
     });
@@ -207,7 +206,7 @@ describe('NoLogger', () => {
   it('silently handles all log methods', () => {
     const logger = NoLogger.getInstance();
     // These should not throw
-    logger.log('test');
+    logger.info('test');
     logger.error('test');
     logger.warn('test');
     logger.info('test', { ok: true });

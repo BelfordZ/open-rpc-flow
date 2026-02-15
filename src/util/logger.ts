@@ -1,10 +1,12 @@
 export { NoLogger, noLogger } from './no-logger';
 
 export interface Logger {
-  log(message: string, ...args: any[]): void;
+  /**
+   * General informational messages.
+   */
+  info(message: string, ...args: any[]): void;
   error(message: string, ...args: any[]): void;
   warn(message: string, ...args: any[]): void;
-  info(message: string, ...args: any[]): void;
   debug(message: string, ...args: any[]): void;
   createNested(prefix: string): Logger;
 }
@@ -15,16 +17,17 @@ export class ConsoleLogger implements Logger {
     private _console: Console = console,
   ) {}
 
-  log(message: string, data?: any) {
+  info(message: string, data?: any) {
     if (this.prefix) {
       message = `[${this.prefix}] ${message}`;
     }
     if (data !== undefined) {
-      this._console.log(message, data);
+      this._console.info(message, data);
     } else {
-      this._console.log(message);
+      this._console.info(message);
     }
   }
+
   error(message: string, data?: any) {
     if (this.prefix) {
       message = `[${this.prefix}] ${message}`;
@@ -43,16 +46,6 @@ export class ConsoleLogger implements Logger {
       this._console.warn(message, data);
     } else {
       this._console.warn(message);
-    }
-  }
-  info(message: string, data?: any) {
-    if (this.prefix) {
-      message = `[${this.prefix}] ${message}`;
-    }
-    if (data !== undefined) {
-      this._console.info(message, data);
-    } else {
-      this._console.info(message);
     }
   }
   debug(message: string, data?: any) {
@@ -75,17 +68,15 @@ export class TestLogger implements Logger {
   private logs: { level: string; message: string; data?: any }[] = [];
   constructor(private name: string = 'TestLogger') {}
 
-  log(message: string, data?: any) {
-    this.logs.push({ level: 'log', message, data });
+  info(message: string, data?: any) {
+    this.logs.push({ level: 'info', message, data });
   }
+
   warn(message: string, data?: any) {
     this.logs.push({ level: 'warn', message, data });
   }
   debug(message: string, data?: any) {
     this.logs.push({ level: 'debug', message, data });
-  }
-  info(message: string, data?: any) {
-    this.logs.push({ level: 'info', message, data });
   }
   error(message: string, data?: any) {
     this.logs.push({ level: 'error', message, data });

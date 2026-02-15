@@ -275,6 +275,20 @@ describe('Transform Executors', () => {
         );
       });
 
+      test('throws when array operation receives non-array literal input', async () => {
+        const data = { value: 1 };
+        const operations: TransformOperation[] = [
+          {
+            type: 'map',
+            using: '${item}',
+          },
+        ];
+
+        await expect(executor.execute(operations, data as unknown as any[])).rejects.toThrow(
+          'Input to map operation must be an array',
+        );
+      });
+
       test('throws on unknown operation type', async () => {
         const data = [1, 2, 3];
         const operations: TransformOperation[] = [
@@ -336,9 +350,9 @@ describe('Transform Executors', () => {
             if (count++ === 0) ac.abort();
             return ctx.item ?? ctx.a ?? 0;
           });
-          await expect(executor.execute([op], data as any[], undefined, ac.signal)).rejects.toThrow(
-            `Transform ${name} operation aborted`,
-          );
+          await expect(
+            executor.execute([op], data as unknown as any[], undefined, ac.signal),
+          ).rejects.toThrow(`Transform ${name} operation aborted`);
         },
       );
     });

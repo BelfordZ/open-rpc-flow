@@ -1,4 +1,4 @@
-import { Step, StepExecutionContext } from '../types';
+import { Step, StepExecutionContext, ExecutionContextData } from '../types';
 import {
   StepExecutor,
   StepExecutionResult,
@@ -22,10 +22,24 @@ export class TransformExecutor {
   constructor(
     private expressionEvaluator: SafeExpressionEvaluator,
     private referenceResolver: ReferenceResolver,
-    private context: Record<string, any>,
+    private context: ExecutionContextData,
     logger: Logger,
   ) {
     this.logger = logger.createNested('TransformExecutor');
+  }
+
+  private throwIfAborted(
+    signal: AbortSignal | undefined,
+    operation: string,
+    step?: Step,
+    errorMessage?: string,
+  ): void {
+    if (!signal?.aborted) {
+      return;
+    }
+
+    this.logger.warn(`Transform ${operation} aborted by signal`, { stepName: step?.name });
+    throw new Error(errorMessage ?? `Transform ${operation} operation aborted`);
   }
 
   async execute(
@@ -60,10 +74,7 @@ export class TransformExecutor {
         isArray: Array.isArray(data),
       });
 
-      if (signal?.aborted) {
-        this.logger.warn('Transform aborted by signal', { stepName: step?.name });
-        throw new Error('Transform step aborted');
-      }
+      this.throwIfAborted(signal, 'step', step, 'Transform step aborted');
 
       data = await this.executeOperation(op, data, step, signal);
 
@@ -145,10 +156,7 @@ export class TransformExecutor {
     const timeout = step?.timeout ?? 10000; // fallback to default if not set
     const result: any[] = [];
     for (let index = 0; index < data.length; index++) {
-      if (signal?.aborted) {
-        this.logger.warn('Transform map aborted by signal', { stepName: step?.name });
-        throw new Error('Transform map operation aborted');
-      }
+      this.throwIfAborted(signal, 'map', step);
       if (Date.now() - start > timeout) {
         throw new TimeoutError(
           `Transform step "${step?.name}" timed out after ${timeout}ms`,
@@ -191,10 +199,7 @@ export class TransformExecutor {
 
     const keepArr = await Promise.all(
       data.map(async (item, index) => {
-        if (signal?.aborted) {
-          this.logger.warn('Transform filter aborted by signal', { stepName: step?.name });
-          throw new Error('Transform filter operation aborted');
-        }
+        this.throwIfAborted(signal, 'filter', step);
         const context = { item, index };
         const keep = await this.expressionEvaluator.evaluate(op.using, context, step);
         this.logger.debug('Filter evaluation', { index, keep });
@@ -227,10 +232,7 @@ export class TransformExecutor {
 
     let acc = op.initial;
     for (let index = 0; index < data.length; index++) {
-      if (signal?.aborted) {
-        this.logger.warn('Transform reduce aborted by signal', { stepName: step?.name });
-        throw new Error('Transform reduce operation aborted');
-      }
+      this.throwIfAborted(signal, 'reduce', step);
       const item = data[index];
       const context = { acc, item, index };
       acc = await this.expressionEvaluator.evaluate(op.using, context, step);
@@ -280,10 +282,7 @@ export class TransformExecutor {
     const result = [...data];
     for (let i = 0; i < result.length; i++) {
       for (let j = i + 1; j < result.length; j++) {
-        if (signal?.aborted) {
-          this.logger.warn('Transform sort aborted by signal', { stepName: step?.name });
-          throw new Error('Transform sort operation aborted');
-        }
+        this.throwIfAborted(signal, 'sort', step);
         const context = { a: result[i], b: result[j], indexA: i, indexB: j };
         this.logger.debug('Sort comparison context', {
           aKey: context.a.key,
@@ -337,10 +336,7 @@ export class TransformExecutor {
 
     const groups: Record<string, any[]> = {};
     for (let index = 0; index < data.length; index++) {
-      if (signal?.aborted) {
-        this.logger.warn('Transform group aborted by signal', { stepName: step?.name });
-        throw new Error('Transform group operation aborted');
-      }
+      this.throwIfAborted(signal, 'group', step);
       const item = data[index];
       const context = { item, index };
       const key = await this.expressionEvaluator.evaluate(op.using, context, step);
@@ -392,7 +388,7 @@ export class TransformStepExecutor implements StepExecutor {
   constructor(
     expressionEvaluator: SafeExpressionEvaluator,
     referenceResolver: ReferenceResolver,
-    context: Record<string, any>,
+    context: ExecutionContextData,
     logger: Logger,
     policyResolver: PolicyResolver,
   ) {
@@ -413,7 +409,7 @@ export class TransformStepExecutor implements StepExecutor {
   async execute(
     step: Step,
     context: StepExecutionContext,
-    extraContext: Record<string, any> = {},
+    extraContext: ExecutionContextData = {},
     signal?: AbortSignal,
   ): Promise<StepExecutionResult> {
     if (!this.canExecute(step)) {

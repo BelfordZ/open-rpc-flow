@@ -1,11 +1,11 @@
-import { Step, StepExecutionContext } from '../types';
+import { Step, StepExecutionContext, ExecutionContextData } from '../types';
 import { StepExecutor, StepExecutionResult, StepType, LoopStep } from './types';
 import { Logger } from '../util/logger';
 import { ValidationError, LoopStepExecutionError } from '../errors/base';
 
 export type ExecuteStep = (
   step: Step,
-  extraContext?: Record<string, any>,
+  extraContext?: ExecutionContextData,
   signal?: AbortSignal,
 ) => Promise<StepExecutionResult>;
 
@@ -27,7 +27,7 @@ export class LoopStepExecutor implements StepExecutor {
   async execute(
     step: Step,
     context: StepExecutionContext,
-    extraContext: Record<string, any> = {},
+    extraContext: ExecutionContextData = {},
     signal?: AbortSignal,
   ): Promise<StepExecutionResult> {
     if (!this.canExecute(step)) {

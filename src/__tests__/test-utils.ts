@@ -1,4 +1,4 @@
-import { StepExecutionContext } from '../types';
+import { StepExecutionContext, ExecutionContextData } from '../types';
 import { SafeExpressionEvaluator } from '../expression-evaluator/safe-evaluator';
 import { ReferenceResolver } from '../reference-resolver';
 import { noLogger } from '../util/logger';
@@ -8,7 +8,7 @@ import { noLogger } from '../util/logger';
  */
 export function createMockContext(
   initialStepResults: Record<string, any> = {},
-  initialContext: Record<string, any> = {},
+  initialContext: ExecutionContextData = {},
 ): StepExecutionContext {
   const stepResults = new Map(Object.entries(initialStepResults));
   const context = { ...initialContext };

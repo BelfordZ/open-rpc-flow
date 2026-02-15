@@ -2,8 +2,33 @@ import { StepType, TransformOperation } from './step-executors/types';
 import { ReferenceResolver } from './reference-resolver';
 import { SafeExpressionEvaluator } from './expression-evaluator/safe-evaluator';
 import { Logger } from './util/logger';
+import { RetryPolicy } from './errors/recovery';
 
 export type { StepType } from './step-executors/types';
+
+/**
+ * Context object passed to flows and steps
+ */
+export interface ExecutionContextData {
+  [key: string]: unknown;
+}
+
+/**
+ * Overrides that can be provided to the PolicyResolver
+ */
+export interface PolicyOverrides {
+  retryPolicy?: RetryPolicy;
+  [key: string]: unknown;
+}
+
+/**
+ * Standard structure for error objects
+ */
+export interface ErrorData {
+  code: number;
+  message: string;
+  data?: unknown;
+}
 
 /**
  * Policies for a specific step type or as a default for all steps
@@ -91,7 +116,7 @@ export interface Flow {
   name: string;
   description: string;
   steps: Step[];
-  context?: Record<string, any>;
+  context?: ExecutionContextData;
   /**
    * Global and step-level policies for the flow (metaschema-compliant)
    */
@@ -129,6 +154,10 @@ export interface Step {
   stop?: {
     endWorkflow?: boolean;
   };
+  /**
+   * Optional custom metadata for this step
+   */
+  metadata?: Record<string, any>;
   timeout?: number;
 }
 
@@ -168,12 +197,8 @@ export type JsonRpcHandler = (
 export interface StepExecutionContext {
   referenceResolver: ReferenceResolver;
   expressionEvaluator: SafeExpressionEvaluator;
-  stepResults: Map<string, any>;
-  context: Record<string, any>;
-  /**
-   * Default timeout in milliseconds for steps when not otherwise specified
-   */
-  timeout?: number;
+  stepResults: Map<string, unknown>;
+  context: ExecutionContextData;
   logger: Logger;
   /**
    * AbortSignal that can be used to cancel operations

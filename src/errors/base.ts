@@ -3,7 +3,7 @@ import { ErrorCode } from './codes';
 /**
  * Base error class for all flow-related errors
  */
-export class FlowError<C extends Record<string, unknown> = Record<string, unknown>> extends Error {
+export class FlowError<C extends Record<string, unknown> = Record<string, any>> extends Error {
   constructor(
     message: string,
     public readonly code: ErrorCode,
@@ -46,7 +46,9 @@ export class FlowError<C extends Record<string, unknown> = Record<string, unknow
 /**
  * Error class for validation errors
  */
-export class ValidationError<C extends Record<string, unknown> = Record<string, unknown>> extends FlowError<C> {
+export class ValidationError<
+  C extends Record<string, unknown> = Record<string, any>,
+> extends FlowError<C> {
   constructor(message: string, context: C) {
     super(message, ErrorCode.VALIDATION_ERROR, context);
     this.name = 'ValidationError';
@@ -57,7 +59,9 @@ export class ValidationError<C extends Record<string, unknown> = Record<string, 
 /**
  * Error class for execution errors
  */
-export class ExecutionError<C extends Record<string, unknown> = Record<string, unknown>> extends FlowError<C> {
+export class ExecutionError<
+  C extends Record<string, unknown> = Record<string, any>,
+> extends FlowError<C> {
   constructor(message: string, context: C, cause?: Error) {
     const code = (context as any).code || ErrorCode.EXECUTION_ERROR;
     super(message, code, context, cause);
@@ -69,7 +73,9 @@ export class ExecutionError<C extends Record<string, unknown> = Record<string, u
 /**
  * Error class for state errors
  */
-export class StateError<C extends Record<string, unknown> = Record<string, unknown>> extends FlowError<C> {
+export class StateError<
+  C extends Record<string, unknown> = Record<string, any>,
+> extends FlowError<C> {
   constructor(message: string, context: C) {
     super(message, ErrorCode.STATE_ERROR, context);
     this.name = 'StateError';

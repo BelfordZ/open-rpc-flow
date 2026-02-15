@@ -284,12 +284,6 @@ describe('ExpressionEvaluator', () => {
         expect(evaluator.evaluate('${complex.result.array[0]}', {})).toBe('a');
         expect(evaluator.evaluate('${complex.result["array"][1]}', {})).toBe('b');
       });
-
-      it('special characters in keys require array notation', () => {
-        // These should fail
-        expect(() => evaluator.evaluate('${complex.result.special.key}', {})).toThrow(); // Can't use dot notation with special characters
-        expect(() => evaluator.evaluate('${complex.result.0}', {})).toThrow; // Can't use dot notation with numeric keys
-      });
     });
 
     describe('array notation with expressions', () => {

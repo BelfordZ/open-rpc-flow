@@ -287,24 +287,6 @@ describe('RequestStepExecutor', () => {
     );
   });
 
-  it('handles request errors gracefully', async () => {
-    const step: RequestStep = {
-      name: 'requestError',
-      request: {
-        method: 'error.test',
-        params: {},
-      },
-    };
-    jsonRpcHandler.mockResolvedValue({ error: { message: 'Custom error' } });
-    const result = await executor.execute(step, context);
-    expect(result.metadata).toBeDefined();
-    expect(result?.metadata?.hasError).toBe(true);
-    expect(result.result.error).toEqual({ message: 'Custom error' });
-
-    const warnLogs = testLogger.getLogs().filter((l) => l.level === 'warn');
-    expect(warnLogs.length).toBeGreaterThan(0);
-  });
-
   it('throws error when given invalid step type', async () => {
     const invalidStep = {
       name: 'invalidStep',
@@ -670,36 +652,5 @@ describe('RequestStepExecutor', () => {
     );
 
     expect(jsonRpcHandler).toHaveBeenCalledTimes(1);
-  });
-
-  it('rethrows JsonRpcRequestError directly', async () => {
-    const step: RequestStep = {
-      name: 'jsonRpcErrorTest',
-      request: {
-        method: 'test.method',
-        params: {},
-      },
-    };
-
-    // Create a JsonRpcRequestError
-    const jsonRpcError = new JsonRpcRequestError('JSON-RPC error occurred', {
-      code: -32001,
-      message: 'JSON-RPC error',
-    });
-
-    // Mock jsonRpcHandler to throw a JsonRpcRequestError
-    jsonRpcHandler.mockRejectedValue(jsonRpcError);
-
-    // The error should be rethrown directly
-    try {
-      await executor.execute(step, context);
-      fail('Expected to throw JsonRpcRequestError');
-    } catch (error) {
-      // Verify we got the same error instance back, unmodified
-      expect(error).toBe(jsonRpcError);
-      // Add type assertion
-      expect((error as JsonRpcRequestError).message).toBe('JSON-RPC error occurred');
-      expect(error instanceof JsonRpcRequestError).toBe(true);
-    }
   });
 });

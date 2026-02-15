@@ -80,14 +80,14 @@ export class ConditionStepExecutor implements StepExecutor {
 
         let value: StepExecutionResult | undefined;
         let branchTaken: 'then' | 'else' | undefined;
+        const nestedContext = {
+          ...extraContext,
+          _nestedStep: true,
+          _parentStep: step.name,
+        };
 
         if (conditionValue) {
           this.logger.debug('Executing then branch', { stepName: step.name });
-          const nestedContext = {
-            ...extraContext,
-            _nestedStep: true,
-            _parentStep: step.name,
-          };
           value = await this.executeStep(
             conditionStep.condition.then,
             nestedContext,
@@ -96,11 +96,6 @@ export class ConditionStepExecutor implements StepExecutor {
           branchTaken = 'then';
         } else if (conditionStep.condition.else) {
           this.logger.debug('Executing else branch', { stepName: step.name });
-          const nestedContext = {
-            ...extraContext,
-            _nestedStep: true,
-            _parentStep: step.name,
-          };
           value = await this.executeStep(
             conditionStep.condition.else,
             nestedContext,

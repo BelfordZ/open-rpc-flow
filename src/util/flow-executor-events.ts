@@ -15,6 +15,8 @@ export enum FlowEventType {
   STEP_ERROR = 'step:error',
   STEP_SKIP = 'step:skip',
   STEP_PROGRESS = 'step:progress',
+  STEP_ABORTED = 'step:aborted',
+  FLOW_ABORTED = 'flow:aborted',
   DEPENDENCY_RESOLVED = 'dependency:resolved',
 }
 
@@ -111,6 +113,25 @@ export interface StepProgressEvent extends FlowEvent {
   iteration: number;
   totalIterations: number;
   percent: number;
+}
+
+/**
+ * Step aborted event
+ */
+export interface StepAbortedEvent extends FlowEvent {
+  type: FlowEventType.STEP_ABORTED;
+  stepName: string;
+  stepType: StepType;
+  reason: string;
+}
+
+/**
+ * Flow aborted event
+ */
+export interface FlowAbortedEvent extends FlowEvent {
+  type: FlowEventType.FLOW_ABORTED;
+  flowName: string;
+  reason: string;
 }
 
 /**
@@ -324,6 +345,23 @@ export class FlowExecutorEvents extends EventEmitter {
   }
 
   /**
+   * Emit step aborted event
+   */
+  emitStepAborted(step: Step, reason: string): void {
+    if (!this.options.emitStepEvents) return;
+
+    const stepType = getStepType(step);
+
+    this.emit(FlowEventType.STEP_ABORTED, {
+      timestamp: Date.now(),
+      type: FlowEventType.STEP_ABORTED,
+      stepName: step.name,
+      stepType,
+      reason,
+    } as StepAbortedEvent);
+  }
+
+  /**
    * Emit dependency resolved event
    */
   emitDependencyResolved(orderedSteps: string[]): void {
@@ -334,5 +372,19 @@ export class FlowExecutorEvents extends EventEmitter {
       type: FlowEventType.DEPENDENCY_RESOLVED,
       orderedSteps,
     } as DependencyResolvedEvent);
+  }
+
+  /**
+   * Emit flow aborted event
+   */
+  emitFlowAborted(flowName: string, reason: string): void {
+    if (!this.options.emitFlowEvents) return;
+
+    this.emit(FlowEventType.FLOW_ABORTED, {
+      timestamp: Date.now(),
+      type: FlowEventType.FLOW_ABORTED,
+      flowName,
+      reason,
+    } as FlowAbortedEvent);
   }
 }

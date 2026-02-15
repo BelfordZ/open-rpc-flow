@@ -1,6 +1,7 @@
 import { Step, StepExecutionContext, ExecutionContextData } from '../types';
 import { StepExecutor, StepExecutionResult, StepType, ConditionStep } from './types';
 import { Logger } from '../util/logger';
+import { getDataType } from '../util/type-utils';
 import { ValidationError, ExecutionError } from '../errors/base';
 import { TimeoutError } from '../errors/timeout-error';
 import { PolicyResolver } from '../util/policy-resolver';
@@ -52,9 +53,7 @@ export class ConditionStepExecutor implements StepExecutor {
     });
 
     // Get the timeout for the condition step
-    const timeout = this.policyResolver?.resolveTimeout
-      ? this.policyResolver.resolveTimeout(step, StepType.Condition)
-      : 5000; // fallback default
+    const timeout = this.policyResolver?.resolveTimeout?.(step, StepType.Condition) ?? 5000;
 
     // Create an AbortController for this condition step
     const abortController = new AbortController();
@@ -73,38 +72,36 @@ export class ConditionStepExecutor implements StepExecutor {
           step,
         );
 
+        this.logger.debug('Input type check', {
+          stepName: step.name,
+          expected: 'boolean',
+          actual: getDataType(conditionValue),
+        });
+
         this.logger.debug('Condition evaluated', {
           stepName: step.name,
           result: conditionValue,
         });
 
         let value: StepExecutionResult | undefined;
-        let branchTaken: 'then' | 'else' | undefined;
         const nestedContext = {
           ...extraContext,
           _nestedStep: true,
           _parentStep: step.name,
         };
 
-        if (conditionValue) {
-          this.logger.debug('Executing then branch', { stepName: step.name });
-          value = await this.executeStep(
-            conditionStep.condition.then,
-            nestedContext,
-            abortController.signal,
-          );
-          branchTaken = 'then';
-        } else if (conditionStep.condition.else) {
-          this.logger.debug('Executing else branch', { stepName: step.name });
-          value = await this.executeStep(
-            conditionStep.condition.else,
-            nestedContext,
-            abortController.signal,
-          );
-          branchTaken = 'else';
-        } else {
-          branchTaken = 'else';
+        const branch = conditionValue
+          ? { name: 'then' as const, step: conditionStep.condition.then }
+          : conditionStep.condition.else
+            ? { name: 'else' as const, step: conditionStep.condition.else }
+            : undefined;
+
+        if (branch) {
+          this.logger.debug(`Executing ${branch.name} branch`, { stepName: step.name });
+          value = await this.executeStep(branch.step, nestedContext, abortController.signal);
         }
+
+        const branchTaken = branch?.name ?? 'else';
 
         this.logger.debug('Condition execution completed', {
           stepName: step.name,

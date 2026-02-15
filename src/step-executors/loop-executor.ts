@@ -2,6 +2,7 @@ import { Step, StepExecutionContext, ExecutionContextData } from '../types';
 import { StepExecutor, StepExecutionResult, StepType, LoopStep } from './types';
 import { Logger } from '../util/logger';
 import { ValidationError, LoopStepExecutionError } from '../errors/base';
+import { getDataType } from '../util/type-utils';
 
 export type ExecuteStep = (
   step: Step,
@@ -51,6 +52,12 @@ export class LoopStepExecutor implements StepExecutor {
     try {
       // Resolve the collection to iterate over using expressionEvaluator
       const collection = context.expressionEvaluator.evaluate(loopStep.loop.over, extraContext);
+
+      this.logger.debug('Input type check', {
+        stepName: step.name,
+        expected: 'array',
+        actual: getDataType(collection),
+      });
 
       if (!Array.isArray(collection)) {
         throw new ValidationError(`Loop "over" value must resolve to an array`, {

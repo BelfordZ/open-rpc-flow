@@ -74,7 +74,7 @@ export class ConditionStepExecutor implements StepExecutor {
           step,
         );
 
-        this.logger.debug('Condition input type', {
+        this.logger.debug('Input type check', {
           stepName: step.name,
           expected: 'boolean',
           actual: getDataType(conditionValue),

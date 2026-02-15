@@ -447,7 +447,7 @@ export class TransformStepExecutor implements StepExecutor {
         extraContext,
       );
 
-      this.logger.debug('Resolved transform input', {
+      this.logger.debug('Input type check', {
         stepName: step.name,
         expected: 'string | array',
         actual: getDataType(resolvedInput),

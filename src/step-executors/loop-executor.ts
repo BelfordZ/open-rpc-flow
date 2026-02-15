@@ -53,7 +53,7 @@ export class LoopStepExecutor implements StepExecutor {
       // Resolve the collection to iterate over using expressionEvaluator
       const collection = context.expressionEvaluator.evaluate(loopStep.loop.over, extraContext);
 
-      this.logger.debug('Loop collection type check', {
+      this.logger.debug('Input type check', {
         stepName: step.name,
         expected: 'array',
         actual: getDataType(collection),

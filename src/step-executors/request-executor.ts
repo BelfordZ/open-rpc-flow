@@ -80,7 +80,7 @@ export class RequestStepExecutor implements StepExecutor {
     const stepRetryPolicy = this.getStepRetryPolicy(requestStep, _context);
     const timeout = this.getStepTimeout(requestStep, _context);
 
-    this.logger.debug('Checking request input types', {
+    this.logger.debug('Input type check', {
       stepName: step.name,
       expected: { method: 'string', params: 'object | array | null' },
       actual: {

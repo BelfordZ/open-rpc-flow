@@ -37,7 +37,7 @@ export class StopStepExecutor implements StepExecutor {
     const stopStep = step as StopStep;
     const endWorkflow = stopStep.stop.endWorkflow ?? false;
 
-    this.logger.debug('Stop step input type', {
+    this.logger.debug('Input type check', {
       stepName: step.name,
       expected: 'boolean',
       actual: getDataType(stopStep.stop.endWorkflow),

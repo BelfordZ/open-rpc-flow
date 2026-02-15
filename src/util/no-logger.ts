@@ -19,10 +19,10 @@ export class NoLogger implements Logger {
     return NoLogger.instance;
   }
 
-  info(_message: string, ..._args: any[]): void {}
-  error(_message: string, ..._args: any[]): void {}
-  warn(_message: string, ..._args: any[]): void {}
-  debug(_message: string, ..._args: any[]): void {}
+  info(_message: string, ..._args: unknown[]): void {}
+  error(_message: string, ..._args: unknown[]): void {}
+  warn(_message: string, ..._args: unknown[]): void {}
+  debug(_message: string, ..._args: unknown[]): void {}
 
   createNested(_prefix: string): Logger {
     return NoLogger.instance;

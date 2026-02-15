@@ -84,6 +84,9 @@ export class TestLogger implements Logger {
   getLogs() {
     return this.logs;
   }
+  getLogsAs<T = unknown>() {
+    return this.logs as Array<{ level: string; message: string; data?: T }>;
+  }
   clear() {
     this.logs = [];
   }

@@ -4,6 +4,8 @@ import { StepType } from '../../step-executors/types';
 import { Logger } from '../logger';
 import { DEFAULT_TIMEOUTS } from '../../constants/timeouts';
 import { ErrorCode } from '../../errors/codes';
+import { DEFAULT_RETRY_POLICY } from '../../flow-executor';
+import { RetryPolicy } from '../../errors/recovery';
 
 describe('PolicyResolver', () => {
   const baseStep: Step = { name: 'myStep' };
@@ -43,13 +45,15 @@ describe('PolicyResolver', () => {
     expect(resolver.resolveTimeout(baseStep, StepType.Transform)).toBe(444);
   });
 
-  it('resolves global policy', () => {
+  it('ignores global timeout for step timeout resolution', () => {
     const flow: Flow = {
       ...baseFlow,
       policies: { global: { timeout: { timeout: 555 } } },
     };
     const resolver = new PolicyResolver(flow, logger);
-    expect(resolver.resolveTimeout(baseStep, StepType.Transform)).toBe(555);
+    expect(resolver.resolveTimeout(baseStep, StepType.Transform)).toBe(
+      (DEFAULT_TIMEOUTS as any)['transform'] ?? DEFAULT_TIMEOUTS.global,
+    );
   });
 
   it('returns fallback/default if nothing found', () => {
@@ -83,13 +87,15 @@ describe('PolicyResolver', () => {
     };
     const resolver2 = new PolicyResolver(flow2, logger);
     expect(resolver2.resolveTimeout(baseStep, StepType.Transform)).toBe(4);
-    // Remove step-type default, global wins
+    // Remove step-type default, global is ignored, fallback wins
     const flow3: Flow = {
       ...baseFlow,
       policies: { global: { timeout: { timeout: 5 } } },
     };
     const resolver3 = new PolicyResolver(flow3, logger);
-    expect(resolver3.resolveTimeout(baseStep, StepType.Transform)).toBe(5);
+    expect(resolver3.resolveTimeout(baseStep, StepType.Transform)).toBe(
+      (DEFAULT_TIMEOUTS as any)['transform'] ?? DEFAULT_TIMEOUTS.global,
+    );
     // Remove all, fallback
     const resolver4 = new PolicyResolver(baseFlow, logger);
     expect(resolver4.resolveTimeout(baseStep, StepType.Transform)).toBe(
@@ -163,5 +169,27 @@ describe('PolicyResolver', () => {
     const step: Step = { ...baseStep, policies: { timeout: { expressionEval: 321 } } };
     const resolver = new PolicyResolver(baseFlow, logger);
     expect(resolver.resolveExpressionTimeout(step, StepType.Transform)).toBe(321);
+  });
+
+  it('resolves expression evaluation timeout from overrides and step defaults', () => {
+    const overrides = { timeout: { expressionEval: 222 } };
+    const resolver = new PolicyResolver(baseFlow, logger, overrides);
+    expect(resolver.resolveExpressionTimeout(baseStep, StepType.Transform)).toBe(222);
+
+    const flow: Flow = {
+      ...baseFlow,
+      policies: { step: { timeout: { expressionEval: 333 } } },
+    };
+    const resolver2 = new PolicyResolver(flow, logger);
+    expect(resolver2.resolveExpressionTimeout(baseStep, StepType.Transform)).toBe(333);
+  });
+
+  it('resolvePolicy uses override when provided', () => {
+    const overrides = {
+      retryPolicy: { ...DEFAULT_RETRY_POLICY, maxAttempts: 9 },
+    };
+    const resolver = new PolicyResolver(baseFlow, logger, overrides);
+    const policy = resolver.resolvePolicy<RetryPolicy>(baseStep, StepType.Transform, 'retryPolicy');
+    expect(policy?.maxAttempts).toBe(9);
   });
 });

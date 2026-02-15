@@ -99,6 +99,18 @@ export class RequestStepExecutor implements StepExecutor {
       if (timeout) {
         abortController = new AbortController();
       }
+      if (abortController) {
+        const linkAbortSignal = (source?: AbortSignal) => {
+          if (!source) return;
+          if (source.aborted) {
+            abortController.abort(source.reason);
+          } else {
+            source.addEventListener('abort', () => abortController.abort(source.reason));
+          }
+        };
+        linkAbortSignal(_context.signal);
+        linkAbortSignal(signal);
+      }
 
       // Set up timeout to abort the request
       let timeoutPromise: Promise<any> | undefined = undefined;

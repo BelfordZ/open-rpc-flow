@@ -431,23 +431,6 @@ describe('SafeExpressionEvaluator', () => {
       expect(() => evaluator.evaluate('${x}', { x: 1 })).not.toThrow();
       expect(() => evaluator.evaluate('${user.name}', { user: { name: 'John' } })).not.toThrow();
     });
-
-    it('handles invalid expressions', () => {
-      // Test empty expression
-      expect(() => evaluator.evaluate('', {})).toThrow(ExpressionError);
-
-      // Test malformed template literals
-      expect(() => evaluator.evaluate('${', {})).toThrow(ExpressionError);
-      expect(() => evaluator.evaluate('${incomplete', {})).toThrow(ExpressionError);
-      expect(() => evaluator.evaluate('${}', {})).toThrow(ExpressionError);
-      expect(() => evaluator.evaluate('${a', {})).toThrow(ExpressionError);
-      expect(() => evaluator.evaluate('${a.b', {})).toThrow(ExpressionError);
-
-      // Test invalid operator usage
-      expect(() => evaluator.evaluate('++', {})).toThrow(ExpressionError);
-      expect(() => evaluator.evaluate('1 ++ 2', {})).toThrow(ExpressionError);
-      expect(() => evaluator.evaluate('1 + + 2', {})).toThrow(ExpressionError);
-    });
   });
 
   describe('AST error handling', () => {

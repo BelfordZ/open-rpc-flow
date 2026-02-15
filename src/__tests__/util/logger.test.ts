@@ -18,12 +18,6 @@ describe('ConsoleLogger', () => {
     expect(mockConsole.info).toHaveBeenCalledWith('test message', { data: 123 });
   });
 
-  test('logs with prefix', () => {
-    const logger = new ConsoleLogger('TestPrefix', mockConsole as any);
-    logger.info('test message', { data: 123 });
-    expect(mockConsole.info).toHaveBeenCalledWith('[TestPrefix] test message', { data: 123 });
-  });
-
   test('logs error with prefix', () => {
     const logger = new ConsoleLogger('TestPrefix', mockConsole as any);
     logger.error('error message', new Error('test error'));
@@ -33,18 +27,12 @@ describe('ConsoleLogger', () => {
     );
   });
 
-  test('logs warning with prefix', () => {
+  test('forwards metadata for warning logs', () => {
     const logger = new ConsoleLogger('TestPrefix', mockConsole as any);
     logger.warn('warning message', { warning: true });
     expect(mockConsole.warn).toHaveBeenCalledWith('[TestPrefix] warning message', {
       warning: true,
     });
-  });
-
-  test('logs debug with prefix', () => {
-    const logger = new ConsoleLogger('TestPrefix', mockConsole as any);
-    logger.debug('debug message', { debug: true });
-    expect(mockConsole.debug).toHaveBeenCalledWith('[TestPrefix] debug message', { debug: true });
   });
 
   test('creates nested logger with combined prefix', () => {

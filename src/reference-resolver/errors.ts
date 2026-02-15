@@ -44,7 +44,7 @@ export class ReferenceResolutionError extends ReferenceResolverError {
   constructor(
     message: string,
     public readonly path: string,
-    public readonly value: any,
+    public readonly value: unknown,
     cause?: Error,
   ) {
     super(message, cause);

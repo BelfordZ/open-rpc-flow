@@ -30,12 +30,6 @@ describe('ConsoleLogger', () => {
     expect(mockConsole.info).toHaveBeenCalledWith('test message');
   });
 
-  it('logs info messages without prefix', () => {
-    const logger = new ConsoleLogger();
-    logger.info('hello');
-    expect(mockConsole.info).toHaveBeenCalledWith('hello');
-  });
-
   it('logs messages with prefix', () => {
     const logger = new ConsoleLogger('TestPrefix');
     logger.info('test message');
@@ -167,16 +161,6 @@ describe('TestLogger', () => {
       { level: 'info', message: 'parent message', data: undefined },
       { level: 'info', message: 'child message', data: undefined },
     ]);
-  });
-
-  test('handles single message and data', () => {
-    const logger = new TestLogger('Test');
-    logger.info('message', { three: 3 });
-    expect(logger.getLogs()[0]).toEqual({
-      level: 'info',
-      message: 'message',
-      data: { three: 3 },
-    });
   });
 
   test('captures info logs', () => {

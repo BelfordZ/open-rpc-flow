@@ -1,6 +1,7 @@
 import { FlowExecutor } from '../flow-executor';
 import { Flow } from '../types';
 import { FlowEventType } from '../util/flow-executor-events';
+import { TimeoutError } from '../errors/timeout-error';
 import { TestLogger } from '../util/logger';
 
 describe('FlowExecutor event emission', () => {
@@ -177,6 +178,78 @@ describe('FlowExecutor event emission', () => {
     await expect(executor.execute()).rejects.toThrow();
     expect(events.some((e) => e.t === 's')).toBe(true);
     expect(events.some((e) => e.t === 'f')).toBe(true);
+  });
+
+  it('emits flow timeout error when aborted with a timeout reason', async () => {
+    const flow: Flow = {
+      name: 'TimeoutAbortFlow',
+      description: 'flow',
+      policies: { global: { timeout: { timeout: 5 } } },
+      steps: [{ name: 's', request: { method: 'foo', params: {} } }],
+    };
+    const executor = new FlowExecutor(flow, jsonRpcHandler, { logger: testLogger });
+    executor['globalAbortController'].abort('timeout');
+    const events: any[] = [];
+    executor.events.on(FlowEventType.FLOW_ERROR, (p) => events.push(p));
+    await expect(executor.execute()).rejects.toThrow(TimeoutError);
+    expect(events.length).toBe(1);
+    expect(events[0].error).toBeInstanceOf(TimeoutError);
+  });
+
+  it('honors an already aborted signal passed to execute', async () => {
+    const flow: Flow = {
+      name: 'ExternalAbort',
+      description: 'flow',
+      steps: [{ name: 's', request: { method: 'foo', params: {} } }],
+    };
+    const executor = new FlowExecutor(flow, jsonRpcHandler, { logger: testLogger });
+    const controller = new AbortController();
+    controller.abort('external');
+    const events: any[] = [];
+    executor.events.on(FlowEventType.FLOW_ABORTED, (p) => events.push(p));
+    await expect(executor.execute({ signal: controller.signal })).rejects.toThrow();
+    expect(events.length).toBe(1);
+    expect(events[0].reason).toBe('external');
+  });
+
+  it('aborts when the execute signal is aborted after start', async () => {
+    const flow: Flow = {
+      name: 'ExternalAbortAfterStart',
+      description: 'flow',
+      steps: [{ name: 's', request: { method: 'foo', params: {} } }],
+    };
+    const handler = (_request: any, options?: any) =>
+      new Promise((_, reject) => {
+        options?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+      });
+    const executor = new FlowExecutor(flow, handler, { logger: testLogger });
+    const controller = new AbortController();
+    const events: any[] = [];
+    executor.events.on(FlowEventType.FLOW_ABORTED, (p) => events.push(p));
+    const promise = executor.execute({ signal: controller.signal });
+    controller.abort('external');
+    await expect(promise).rejects.toThrow();
+    expect(events.length).toBe(1);
+    expect(events[0].reason).toBe('external');
+  });
+
+  it('aborts the flow when the global timeout elapses', async () => {
+    jest.useFakeTimers({ advanceTimers: true });
+    const flow: Flow = {
+      name: 'FlowTimeoutAbort',
+      description: 'flow',
+      policies: { global: { timeout: { timeout: 50 } } },
+      steps: [{ name: 's', request: { method: 'foo', params: {} } }],
+    };
+    const handler = (_request: any, options?: any) =>
+      new Promise((_, reject) => {
+        options?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+      });
+    const executor = new FlowExecutor(flow, handler, { logger: testLogger });
+    const promise = executor.execute();
+    jest.advanceTimersByTime(50);
+    await expect(promise).rejects.toThrow(TimeoutError);
+    jest.useRealTimers();
   });
 
   it('emits step progress events for loop steps', async () => {

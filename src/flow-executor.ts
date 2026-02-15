@@ -135,15 +135,6 @@ export class FlowExecutor {
       this.logger,
     );
 
-    this.executionContext = {
-      referenceResolver: this.referenceResolver,
-      expressionEvaluator: this.expressionEvaluator,
-      stepResults: this.stepResults,
-      context: this.context,
-      logger: this.logger,
-      flow: this.flow,
-    };
-
     // Initialize PolicyResolver for policy-based execution
     const policyOverrides: PolicyOverrides = {};
     if (options?.retryPolicy) {
@@ -153,6 +144,15 @@ export class FlowExecutor {
 
     // Initialize global abort controller
     const globalAbortController = new AbortController();
+    this.executionContext = {
+      referenceResolver: this.referenceResolver,
+      expressionEvaluator: this.expressionEvaluator,
+      stepResults: this.stepResults,
+      context: this.context,
+      logger: this.logger,
+      flow: this.flow,
+      signal: globalAbortController.signal,
+    };
 
     // Initialize step executors in order of specificity
     this.stepExecutors = [
@@ -198,7 +198,25 @@ export class FlowExecutor {
     this.logger.info('Executing flow with options:', options);
     const startTime = Date.now();
     let globalTimeoutId: NodeJS.Timeout | undefined;
+    let flowAbortEmitted = false;
     try {
+      const flowTimeout = this.flow.policies?.global?.timeout?.timeout;
+      if (typeof flowTimeout === 'number' && flowTimeout > 0) {
+        globalTimeoutId = setTimeout(() => {
+          if (!this.globalAbortController.signal.aborted) {
+            this.globalAbortController.abort('timeout');
+          }
+        }, flowTimeout);
+      }
+      if (options?.signal) {
+        if (options.signal.aborted) {
+          this.globalAbortController.abort(options.signal.reason ?? 'aborted');
+        } else {
+          options.signal.addEventListener('abort', () => {
+            this.globalAbortController.abort(options.signal?.reason ?? 'aborted');
+          });
+        }
+      }
       // Get steps in dependency order
       const orderedSteps = this.dependencyResolver.getExecutionOrder();
       const orderedStepNames = orderedSteps.map((s) => s.name);
@@ -208,7 +226,6 @@ export class FlowExecutor {
 
       this.logger.info('Executing steps in order:', orderedStepNames);
 
-      let flowAbortEmitted = false;
       for (const step of orderedSteps) {
         const stepStartTime = Date.now();
 
@@ -241,7 +258,11 @@ export class FlowExecutor {
             step.metadata || {},
           );
 
-          const result = await this.executeStep(step, stepContext);
+          const result = await this.executeStep(
+            step,
+            stepContext,
+            this.globalAbortController.signal,
+          );
           this.stepResults.set(step.name, result);
 
           this.events.emitStepComplete(step, result, stepStartTime, correlationId);
@@ -264,6 +285,11 @@ export class FlowExecutor {
       this.events.emitFlowComplete(this.flow.name, this.stepResults, startTime);
       return this.stepResults;
     } catch (error: any) {
+      if (this.globalAbortController.signal.aborted && !flowAbortEmitted) {
+        const reason = this.globalAbortController.signal.reason || 'Flow execution aborted';
+        this.events.emitFlowAborted(this.flow.name, String(reason));
+        flowAbortEmitted = true;
+      }
       // Enhance error with flow context if it's an abort due to timeout
       if (
         (this.globalAbortController.signal.aborted && error.message?.includes('timeout')) ||

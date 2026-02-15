@@ -80,14 +80,14 @@ export class ConditionStepExecutor implements StepExecutor {
 
         let value: StepExecutionResult | undefined;
         let branchTaken: 'then' | 'else' | undefined;
+        const nestedContext = {
+          ...extraContext,
+          _nestedStep: true,
+          _parentStep: step.name,
+        };
 
         if (conditionValue) {
           this.logger.debug('Executing then branch', { stepName: step.name });
-          const nestedContext = {
-            ...extraContext,
-            _nestedStep: true,
-            _parentStep: step.name,
-          };
           value = await this.executeStep(
             conditionStep.condition.then,
             nestedContext,
@@ -96,11 +96,6 @@ export class ConditionStepExecutor implements StepExecutor {
           branchTaken = 'then';
         } else if (conditionStep.condition.else) {
           this.logger.debug('Executing else branch', { stepName: step.name });
-          const nestedContext = {
-            ...extraContext,
-            _nestedStep: true,
-            _parentStep: step.name,
-          };
           value = await this.executeStep(
             conditionStep.condition.else,
             nestedContext,
@@ -141,14 +136,21 @@ export class ConditionStepExecutor implements StepExecutor {
     })();
 
     // Promise for the timeout
+    let timeoutId: NodeJS.Timeout | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
         abortController.abort();
         reject(TimeoutError.forStep(step, StepType.Condition, timeout, timeout));
       }, timeout);
     });
 
     // Race the condition logic against the timeout
-    return Promise.race([conditionPromise, timeoutPromise]);
+    try {
+      return await Promise.race([conditionPromise, timeoutPromise]);
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    }
   }
 }

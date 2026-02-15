@@ -464,12 +464,11 @@ describe('RequestStepExecutor', () => {
       // Verify correct backoff was used (captured by logger)
       expect(
         testLogger
-          .getLogs()
+          .getLogsAs<{ backoffStrategy?: string }>()
           .some(
             (log) =>
               log.message === 'Starting retryable operation' &&
-              log.data &&
-              log.data.backoffStrategy === 'linear',
+              log.data?.backoffStrategy === 'linear',
           ),
       ).toBeTruthy();
 

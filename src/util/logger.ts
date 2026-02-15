@@ -4,10 +4,10 @@ export interface Logger {
   /**
    * General informational messages.
    */
-  info(message: string, ...args: any[]): void;
-  error(message: string, ...args: any[]): void;
-  warn(message: string, ...args: any[]): void;
-  debug(message: string, ...args: any[]): void;
+  info(message: string, ...args: unknown[]): void;
+  error(message: string, ...args: unknown[]): void;
+  warn(message: string, ...args: unknown[]): void;
+  debug(message: string, ...args: unknown[]): void;
   createNested(prefix: string): Logger;
 }
 
@@ -17,7 +17,7 @@ export class ConsoleLogger implements Logger {
     private _console: Console = console,
   ) {}
 
-  info(message: string, data?: any) {
+  info(message: string, data?: unknown) {
     if (this.prefix) {
       message = `[${this.prefix}] ${message}`;
     }
@@ -28,7 +28,7 @@ export class ConsoleLogger implements Logger {
     }
   }
 
-  error(message: string, data?: any) {
+  error(message: string, data?: unknown) {
     if (this.prefix) {
       message = `[${this.prefix}] ${message}`;
     }
@@ -38,7 +38,7 @@ export class ConsoleLogger implements Logger {
       this._console.error(message);
     }
   }
-  warn(message: string, data?: any) {
+  warn(message: string, data?: unknown) {
     if (this.prefix) {
       message = `[${this.prefix}] ${message}`;
     }
@@ -48,7 +48,7 @@ export class ConsoleLogger implements Logger {
       this._console.warn(message);
     }
   }
-  debug(message: string, data?: any) {
+  debug(message: string, data?: unknown) {
     if (this.prefix) {
       message = `[${this.prefix}] ${message}`;
     }
@@ -65,24 +65,27 @@ export class ConsoleLogger implements Logger {
 }
 
 export class TestLogger implements Logger {
-  private logs: { level: string; message: string; data?: any }[] = [];
+  private logs: { level: string; message: string; data?: unknown }[] = [];
   constructor(private name: string = 'TestLogger') {}
 
-  info(message: string, data?: any) {
+  info(message: string, data?: unknown) {
     this.logs.push({ level: 'info', message, data });
   }
 
-  warn(message: string, data?: any) {
+  warn(message: string, data?: unknown) {
     this.logs.push({ level: 'warn', message, data });
   }
-  debug(message: string, data?: any) {
+  debug(message: string, data?: unknown) {
     this.logs.push({ level: 'debug', message, data });
   }
-  error(message: string, data?: any) {
+  error(message: string, data?: unknown) {
     this.logs.push({ level: 'error', message, data });
   }
   getLogs() {
     return this.logs;
+  }
+  getLogsAs<T = unknown>() {
+    return this.logs as Array<{ level: string; message: string; data?: T }>;
   }
   clear() {
     this.logs = [];

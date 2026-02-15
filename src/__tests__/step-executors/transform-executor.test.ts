@@ -406,7 +406,7 @@ describe('Transform Executors', () => {
             initial: undefined,
           },
         ],
-        inputType: 'array',
+        inputType: Array.isArray(items) ? 'array' : typeof items,
         resultType: 'array',
         timeout: 10000,
         timestamp: expect.any(String),
@@ -449,7 +449,7 @@ describe('Transform Executors', () => {
             initial: undefined,
           },
         ],
-        inputType: 'array',
+        inputType: Array.isArray(items) ? 'array' : typeof items,
         resultType: 'array',
         timeout: 10000,
         timestamp: expect.any(String),
@@ -490,7 +490,7 @@ describe('Transform Executors', () => {
             initial: 0,
           },
         ],
-        inputType: 'array',
+        inputType: Array.isArray(items) ? 'array' : typeof items,
         resultType: 'number',
         timeout: 10000,
         timestamp: expect.any(String),
@@ -609,7 +609,40 @@ describe('Transform Executors', () => {
             initial: undefined,
           },
         ],
-        inputType: 'array',
+        inputType: Array.isArray(items) ? 'array' : typeof items,
+        resultType: 'array',
+        timeout: 10000,
+        timestamp: expect.any(String),
+      });
+    });
+
+    it('records raw input type for expression inputs', async () => {
+      const step: TransformStep = {
+        name: 'literalExpression',
+        transform: {
+          input: '[1, 2, 3]',
+          operations: [
+            {
+              type: 'map',
+              using: '${item} * 2',
+            },
+          ],
+        },
+      };
+
+      const result = await stepExecutor.execute(step, context);
+
+      expect(result.type).toBe('transform');
+      expect(result.result).toEqual([2, 4, 6]);
+      expect(result.metadata).toEqual({
+        operations: [
+          {
+            type: 'map',
+            using: '${item} * 2',
+            initial: undefined,
+          },
+        ],
+        inputType: 'string',
         resultType: 'array',
         timeout: 10000,
         timestamp: expect.any(String),

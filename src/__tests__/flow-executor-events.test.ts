@@ -660,7 +660,7 @@ describe('FlowExecutor Events', () => {
     // Directly call the emitStepError method
     const testError = new Error('Test error');
     const startTime = Date.now() - 100; // Mock a start time 100ms ago
-    executor.events.emitStepError(testStep as any, testError, startTime);
+    executor.events.emitStepError(testStep as any, testError, startTime, 'ce1');
 
     // Verify error event was emitted
     expect(errorEvents.length).toBe(1);
@@ -699,7 +699,7 @@ describe('FlowExecutor Events', () => {
     // Directly call the emitStepError method
     const testError = new Error('Test error');
     const startTime = Date.now();
-    executor.events.emitStepError(testStep as any, testError, startTime);
+    executor.events.emitStepError(testStep as any, testError, startTime, 'ce2');
 
     // Verify no error event was emitted (because step events are disabled)
     expect(errorEvents.length).toBe(0);
@@ -763,12 +763,13 @@ describe('FlowExecutor Events', () => {
     });
 
     // Directly emit events for each step type
-    executor.events.emitStepStart(loopStep as any, { context: {} } as any);
-    executor.events.emitStepStart(requestStep as any, { context: {} } as any);
-    executor.events.emitStepStart(conditionStep as any, { context: {} } as any);
-    executor.events.emitStepStart(transformStep as any, { context: {} } as any);
-    executor.events.emitStepStart(stopStep as any, { context: {} } as any);
-    executor.events.emitStepStart(unknownStep as any, { context: {} } as any);
+    const ctx: any = { context: {} };
+    executor.events.emitStepStart(loopStep as any, ctx, {}, 'corr1');
+    executor.events.emitStepStart(requestStep as any, ctx, {}, 'corr2');
+    executor.events.emitStepStart(conditionStep as any, ctx, {}, 'corr3');
+    executor.events.emitStepStart(transformStep as any, ctx, {}, 'corr4');
+    executor.events.emitStepStart(stopStep as any, ctx, {}, 'corr5');
+    executor.events.emitStepStart(unknownStep as any, ctx, {}, 'corr6');
 
     // Verify all step types were correctly identified
     expect(events.length).toBe(6);
@@ -867,7 +868,7 @@ describe('FlowExecutor Events', () => {
     });
 
     // Emit a step start event with extra context
-    executor.events.emitStepStart(testStep as any, executionContext, extraContext);
+    executor.events.emitStepStart(testStep as any, executionContext, extraContext, 'cid1');
 
     // Verify context merging happened correctly
     expect(events.length).toBe(1);
@@ -880,7 +881,7 @@ describe('FlowExecutor Events', () => {
     events.length = 0; // Clear events array
 
     // Emit another step start event
-    executor.events.emitStepStart(testStep as any, executionContext, extraContext);
+    executor.events.emitStepStart(testStep as any, executionContext, extraContext, 'cid2');
 
     // Verify context is not included
     expect(events.length).toBe(1);
@@ -919,7 +920,7 @@ describe('FlowExecutor Events', () => {
     const extraContext = { extraValue: 'extra' };
 
     // Test line 188: Context ternary in emitStepStart
-    events.emitStepStart(testStep as any, executionContext, extraContext);
+    events.emitStepStart(testStep as any, executionContext, extraContext, 'cid3');
 
     // Verify context was merged when includeContext is true
     expect(receivedEvents.length).toBe(1);
@@ -948,7 +949,7 @@ describe('FlowExecutor Events', () => {
     });
 
     // These should not emit anything now
-    events.emitStepStart(testStep as any, executionContext, extraContext);
+    events.emitStepStart(testStep as any, executionContext, extraContext, 'cid4');
     events.emitDependencyResolved(orderedSteps);
 
     expect(receivedEvents.length).toBe(0);
@@ -1015,8 +1016,8 @@ describe('FlowExecutor Events', () => {
 
     // Call emitStepSkip on both instances
     const skipReason = 'Condition evaluated to false';
-    eventsEnabled.emitStepSkip(testStep as any, skipReason);
-    eventsDisabled.emitStepSkip(testStep as any, skipReason); // This should hit line 261 with the early return
+    eventsEnabled.emitStepSkip(testStep as any, skipReason, 'cid5');
+    eventsDisabled.emitStepSkip(testStep as any, skipReason, 'cid6'); // This should hit line 261 with the early return
 
     // Verify events were emitted correctly
     expect(enabledEvents.length).toBe(1);
@@ -1025,6 +1026,36 @@ describe('FlowExecutor Events', () => {
 
     // Verify no events were emitted when disabled
     expect(disabledEvents.length).toBe(0);
+  });
+
+  it('should emit step progress events', () => {
+    const events = new FlowExecutorEvents({ emitStepEvents: true });
+    const received: any[] = [];
+    const testStep = {
+      name: 'loop',
+      loop: { over: '${items}', as: 'item', step: { name: 'inner' } },
+    } as any;
+
+    events.on(FlowEventType.STEP_PROGRESS, (data) => received.push(data));
+
+    events.emitStepProgress(testStep, 2, 5);
+
+    expect(received.length).toBe(1);
+    expect(received[0].iteration).toBe(2);
+    expect(received[0].totalIterations).toBe(5);
+    expect(received[0].percent).toBe(40);
+  });
+
+  it('should not emit step progress when step events are disabled', () => {
+    const events = new FlowExecutorEvents({ emitStepEvents: false });
+    const received: any[] = [];
+    const testStep = { name: 'loop', loop: { over: '${items}', as: 'item' } } as any;
+
+    events.on(FlowEventType.STEP_PROGRESS, (data) => received.push(data));
+
+    events.emitStepProgress(testStep, 1, 3);
+
+    expect(received.length).toBe(0);
   });
 
   it('should not emit flow complete event when emitFlowEvents is false', async () => {

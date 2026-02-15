@@ -1,5 +1,6 @@
 import { StopStepExecutor } from '../../step-executors/stop-executor';
 import { noLogger } from '../../util/logger';
+import { createMockContext } from '../test-utils';
 
 describe('StopStepExecutor', () => {
   let executor: StopStepExecutor;
@@ -16,7 +17,8 @@ describe('StopStepExecutor', () => {
       },
     };
 
-    const result = await executor.execute(step, {});
+    const context = createMockContext();
+    const result = await executor.execute(step, context);
 
     expect(result.type).toBe('stop');
     expect(result.result.endWorkflow).toBe(true);
@@ -31,7 +33,8 @@ describe('StopStepExecutor', () => {
       },
     };
 
-    const result = await executor.execute(step, {});
+    const context = createMockContext();
+    const result = await executor.execute(step, context);
 
     expect(result.type).toBe('stop');
     expect(result.result.endWorkflow).toBe(false);
@@ -44,7 +47,8 @@ describe('StopStepExecutor', () => {
       stop: {},
     };
 
-    const result = await executor.execute(step, {});
+    const context = createMockContext();
+    const result = await executor.execute(step, context);
 
     expect(result.type).toBe('stop');
     expect(result.result.endWorkflow).toBe(false);
@@ -60,7 +64,8 @@ describe('StopStepExecutor', () => {
       },
     };
 
-    await expect(executor.execute(invalidStep as any, {})).rejects.toThrow(
+    const context = createMockContext();
+    await expect(executor.execute(invalidStep as any, context)).rejects.toThrow(
       'Invalid step type for StopStepExecutor',
     );
   });

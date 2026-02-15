@@ -1,7 +1,14 @@
 import { ReferenceResolver } from './reference-resolver';
 import { SafeExpressionEvaluator } from './expression-evaluator/safe-evaluator';
 import { DependencyResolver } from './dependency-resolver';
-import { Flow, Step, StepExecutionContext, JsonRpcHandler } from './types';
+import {
+  Flow,
+  Step,
+  StepExecutionContext,
+  JsonRpcHandler,
+  ExecutionContextData,
+  PolicyOverrides,
+} from './types';
 import {
   StepExecutor,
   StepExecutionResult,
@@ -56,8 +63,8 @@ export class FlowExecutor {
   public expressionEvaluator: SafeExpressionEvaluator;
   public events: FlowExecutorEvents;
 
-  private context: Record<string, any>;
-  private stepResults: Map<string, any>;
+  private context: ExecutionContextData;
+  private stepResults: Map<string, unknown>;
   private executionContext: StepExecutionContext;
   private stepExecutors: StepExecutor[];
   private logger: Logger;
@@ -138,7 +145,7 @@ export class FlowExecutor {
     };
 
     // Initialize PolicyResolver for policy-based execution
-    const policyOverrides: Record<string, any> = {};
+    const policyOverrides: PolicyOverrides = {};
     if (options?.retryPolicy) {
       policyOverrides.retryPolicy = options.retryPolicy;
     }
@@ -284,7 +291,7 @@ export class FlowExecutor {
    */
   private async executeStep(
     step: Step,
-    extraContext: Record<string, any> = {},
+    extraContext: ExecutionContextData = {},
     signal?: AbortSignal,
   ): Promise<StepExecutionResult> {
     const stepStartTime = Date.now();

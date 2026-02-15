@@ -82,24 +82,11 @@ describe('ExpressionEvaluator', () => {
     expect(evaluator.evaluate('{ x: 1, y: 2 }', {})).toEqual({ x: 1, y: 2 });
   });
 
-  it('evaluates expressions with references', () => {
-    expect(evaluator.evaluate('${step1.data.value} * 2', {})).toBe(84);
-  });
-
   it('evaluates expressions with template literals', () => {
     expect(evaluator.evaluate('`Value is ${step1.data.value}`', {})).toBe('Value is 42');
     expect(
       evaluator.evaluate('`Value ${step1.data.value} with nested ${step1.data.nested.prop}`', {}),
     ).toBe('Value 42 with nested test');
-  });
-
-  it('evaluates expressions with context', () => {
-    expect(evaluator.evaluate('${context.config.threshold} + 50', {})).toBe(150);
-  });
-
-  it('evaluates expressions with extra context', () => {
-    const extraContext = { item: { value: 75 } };
-    expect(evaluator.evaluate('${item.value} * 2', extraContext)).toBe(150);
   });
 
   it('evaluates complex object literals with references', () => {

@@ -1,6 +1,17 @@
 import { tokenize, TokenizerError, Token } from '../../expression-evaluator/tokenizer';
 import { TestLogger } from '../../util/logger';
 
+function expectTokenArrayValue(
+  token: Token,
+  expectedType: 'array_literal' | 'reference' | 'object_literal' | 'template_literal',
+): Token[] {
+  expect(token.type).toBe(expectedType);
+  if (token.type !== expectedType) {
+    throw new Error(`Expected ${expectedType} token`);
+  }
+  return token.value;
+}
+
 describe('Tokenizer Miscellaneous Tests', () => {
   let logger: TestLogger;
 
@@ -17,23 +28,20 @@ describe('Tokenizer Miscellaneous Tests', () => {
       // Standard reference with a plain identifier
       const result1 = tokenize('${abc}', logger);
       expect(result1).toHaveLength(1);
-      expect(result1[0].type).toBe('reference');
-      const ref1 = result1[0].value as Token[];
+      const ref1 = expectTokenArrayValue(result1[0], 'reference');
       expect(ref1).toHaveLength(1);
       expect(ref1[0].type).toBe('identifier');
       expect(ref1[0].value).toBe('abc');
 
       // A reference with non-alphanumeric characters that will also go through the same lines
       const result2 = tokenize('${_abc123}', logger);
-      expect(result2[0].type).toBe('reference');
-      const ref2 = result2[0].value as Token[];
+      const ref2 = expectTokenArrayValue(result2[0], 'reference');
       expect(ref2[0].type).toBe('identifier');
       expect(ref2[0].value).toBe('_abc123');
 
       // A more complex reference with operators that require the buffer to be flushed
       const result3 = tokenize('${a.b}', logger);
-      expect(result3[0].type).toBe('reference');
-      const ref3 = result3[0].value as Token[];
+      const ref3 = expectTokenArrayValue(result3[0], 'reference');
       expect(ref3).toHaveLength(3); // 'a', '.', 'b'
       expect(ref3[0].type).toBe('identifier');
       expect(ref3[0].value).toBe('a');
@@ -52,10 +60,8 @@ describe('Tokenizer Miscellaneous Tests', () => {
 
       // Basic validation
       expect(result.length).toBe(1);
-      expect(result[0].type).toBe('array_literal');
-
       // Get the outer array contents
-      const outerArray = result[0].value as Token[];
+      const outerArray = expectTokenArrayValue(result[0], 'array_literal');
 
       // Find the nested array
       const nestedArrayIndex = outerArray.findIndex((token) => token.type === 'array_literal');
@@ -71,8 +77,7 @@ describe('Tokenizer Miscellaneous Tests', () => {
 
       // Verify the structure is correct
       expect(result.length).toBe(1);
-      expect(result[0].type).toBe('array_literal');
-      const outerArray = result[0].value as Token[];
+      const outerArray = expectTokenArrayValue(result[0], 'array_literal');
 
       // Verify we have nested arrays
       const nestedArrays = outerArray.filter((token) => token.type === 'array_literal');
@@ -119,13 +124,13 @@ describe('Tokenizer Miscellaneous Tests', () => {
       expect(result[0].type).toBe('array_literal');
 
       // Verify we have the right number of array literals in the outer array
-      const outerArray = result[0].value as Token[];
+      const outerArray = expectTokenArrayValue(result[0], 'array_literal');
       const arrayLiterals = outerArray.filter((token) => token.type === 'array_literal');
       expect(arrayLiterals.length).toBe(3); // Should have 3 arrays
 
       // At least one of these arrays should have a nested array
       const hasNestedArray = arrayLiterals.some((token) => {
-        const innerArray = token.value as Token[];
+        const innerArray = expectTokenArrayValue(token, 'array_literal');
         return innerArray.some((t) => t.type === 'array_literal');
       });
 
@@ -141,7 +146,7 @@ describe('Tokenizer Miscellaneous Tests', () => {
       expect(result[0].type).toBe('array_literal');
 
       // Validate the structure to ensure bracket counting works
-      const outerArray = result[0].value as Token[];
+      const outerArray = expectTokenArrayValue(result[0], 'array_literal');
       expect(outerArray.length).toBeGreaterThan(0);
 
       // Find the nested array
@@ -149,7 +154,7 @@ describe('Tokenizer Miscellaneous Tests', () => {
       expect(nestedArrayIndex).not.toBe(-1);
 
       // Examine the nested array
-      const nestedArray = outerArray[nestedArrayIndex].value as Token[];
+      const nestedArray = expectTokenArrayValue(outerArray[nestedArrayIndex], 'array_literal');
       expect(nestedArray.length).toBeGreaterThan(0);
 
       // Verify there's another level of nesting
@@ -167,17 +172,17 @@ describe('Tokenizer Miscellaneous Tests', () => {
       expect(result[0].type).toBe('array_literal');
 
       // Validate first level
-      const level1 = result[0].value as Token[];
+      const level1 = expectTokenArrayValue(result[0], 'array_literal');
       expect(level1.length).toBe(1);
       expect(level1[0].type).toBe('array_literal');
 
       // Validate second level
-      const level2 = level1[0].value as Token[];
+      const level2 = expectTokenArrayValue(level1[0], 'array_literal');
       expect(level2.length).toBe(1);
       expect(level2[0].type).toBe('array_literal');
 
       // Validate third level (empty array)
-      const level3 = level2[0].value as Token[];
+      const level3 = expectTokenArrayValue(level2[0], 'array_literal');
       expect(level3.length).toBe(0);
     });
 
@@ -190,7 +195,7 @@ describe('Tokenizer Miscellaneous Tests', () => {
       expect(result[0].type).toBe('array_literal');
 
       // Validate the overall structure
-      const outerArray = result[0].value as Token[];
+      const outerArray = expectTokenArrayValue(result[0], 'array_literal');
       expect(outerArray.length).toBeGreaterThan(0);
 
       // Find array literals at first level
@@ -200,7 +205,7 @@ describe('Tokenizer Miscellaneous Tests', () => {
       // Verify at least one has further nested content
       let foundNesting = false;
       for (const arrayToken of firstLevelArrays) {
-        const innerTokens = arrayToken.value as Token[];
+        const innerTokens = expectTokenArrayValue(arrayToken, 'array_literal');
         if (innerTokens.some((t) => t.type === 'array_literal')) {
           foundNesting = true;
           break;
@@ -222,7 +227,7 @@ describe('Tokenizer Miscellaneous Tests', () => {
       expect(result[0].raw).toBe(input);
 
       // Verify that the structure is correctly preserved including the nesting
-      const outerArray = result[0].value as Token[];
+      const outerArray = expectTokenArrayValue(result[0], 'array_literal');
       expect(outerArray.length).toBeGreaterThan(0);
     });
   });
@@ -254,7 +259,7 @@ describe('Tokenizer Miscellaneous Tests', () => {
         expect(result[0].type).toBe('string');
 
         // Check that the escaped character is in the result
-        const value = result[0].value as string;
+        const value = result[0].value;
         expect(value).toContain(escapedChar);
       }
     });
@@ -525,16 +530,14 @@ describe('Tokenizer Miscellaneous Tests', () => {
   describe('Reference Handling Edge Cases', () => {
     it('handles nested reference with additional layers', () => {
       const result = tokenize('${foo[${bar[${baz}]}]}', logger);
-      expect(result[0].type).toBe('reference');
-      const refVal = result[0].value as Token[];
+      const refVal = expectTokenArrayValue(result[0], 'reference');
       expect(refVal.length).toBeGreaterThan(0);
       expect(result[0].raw).toBe('${foo[${bar[${baz}]}]}');
     });
 
     it('handles references with operators', () => {
       const result = tokenize('${foo.bar}', logger);
-      expect(result[0].type).toBe('reference');
-      const refVal2 = result[0].value as Token[];
+      const refVal2 = expectTokenArrayValue(result[0], 'reference');
       expect(refVal2.length).toBe(3); // foo, ., and bar
       expect(refVal2[1].type).toBe('operator');
       expect(refVal2[1].value).toBe('.');
@@ -582,7 +585,7 @@ describe('Tokenizer Miscellaneous Tests', () => {
       const result = tokenize('{ "a": 1, b: 2 }', logger);
       expect(result[0].type).toBe('object_literal');
       // Check it contains the right elements
-      const values = result[0].value as Token[];
+      const values = expectTokenArrayValue(result[0], 'object_literal');
       expect(values.some((v: Token) => v.type === 'string' && v.value === 'a')).toBe(true);
       expect(values.some((v: Token) => v.type === 'string' && v.value === 'b')).toBe(true);
       // Check number values

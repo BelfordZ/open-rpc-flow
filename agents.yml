@@ -1,0 +1,2 @@
+notes:
+  - Always run `npm run lint` and `npm run build` after making changes.

@@ -5,6 +5,7 @@ import { PathSyntaxError, PropertyAccessError } from '../path-accessor';
 import { tokenize } from './tokenizer';
 import { TokenizerError } from './tokenizer';
 import type { Token, AstNode, OperatorSymbol, LiteralValue } from './types';
+import { hasKeyValue } from './types';
 import { TimeoutError } from '../errors/timeout-error';
 import { PolicyResolver } from '../util/policy-resolver';
 import { Step, getStepType } from '../types';
@@ -171,7 +172,7 @@ export class SafeExpressionEvaluator {
               return token.value;
             }
             if (token.type === 'reference') {
-              const path = this.buildReferencePath(token.value as Token[]);
+              const path = this.buildReferencePath(token.value);
               try {
                 const value = this.referenceResolver.resolvePath(path, context);
                 return String(value);
@@ -188,7 +189,7 @@ export class SafeExpressionEvaluator {
 
       // Handle single references
       if (tokens.length === 1 && tokens[0].type === 'reference') {
-        const path = this.buildReferencePath(tokens[0].value as Token[]);
+        const path = this.buildReferencePath(tokens[0].value);
         try {
           return this.referenceResolver.resolvePath(path, context);
         } catch (error) {
@@ -328,24 +329,24 @@ export class SafeExpressionEvaluator {
     if (tokens.length === 1) {
       const token = tokens[0];
       if (token.type === 'number') {
-        return { type: 'literal', value: token.value as number };
+        return { type: 'literal', value: token.value };
       }
       if (token.type === 'string') {
-        return { type: 'literal', value: token.value as string };
+        return { type: 'literal', value: token.value };
       }
       if (token.type === 'identifier') {
-        return { type: 'literal', value: this.tokenToLiteral(token.value as string) };
+        return { type: 'literal', value: this.tokenToLiteral(token.value) };
       }
       if (token.type === 'reference') {
-        return { type: 'reference', path: this.buildReferencePath(token.value as Token[]) };
+        return { type: 'reference', path: this.buildReferencePath(token.value) };
       }
       // New: handle object and array literal tokens
       if (token.type === 'object_literal') {
-        const properties = this.parseObjectProperties(token.value as Token[]);
+        const properties = this.parseObjectProperties(token.value);
         return { type: 'object', properties };
       }
       if (token.type === 'array_literal') {
-        const elements = this.parseArrayElements(token.value as Token[]);
+        const elements = this.parseArrayElements(token.value);
         return { type: 'array', elements };
       }
     }
@@ -402,7 +403,7 @@ export class SafeExpressionEvaluator {
           }
         }
         if (current.length > 0) args.push(this.parse(current));
-        outputQueue.push({ type: 'function_call', name: token.value as string, args });
+        outputQueue.push({ type: 'function_call', name: token.value, args });
         i = j - 1;
         expectOperator = true;
         continue;
@@ -445,20 +446,35 @@ export class SafeExpressionEvaluator {
         if (expectOperator) {
           throw new ExpressionError('Unexpected number');
         }
-        outputQueue.push({ type: 'literal', value: token.value as number });
+        outputQueue.push({ type: 'literal', value: token.value });
         expectOperator = true;
       } else if (token.type === 'string') {
         if (expectOperator) {
           throw new ExpressionError('Unexpected string');
         }
-        outputQueue.push({ type: 'literal', value: token.value as string });
+        outputQueue.push({ type: 'literal', value: token.value });
         expectOperator = true;
       } else if (token.type === 'identifier') {
         // If the identifier is actually an operator symbol (e.g., '*', '/', '+', '-', etc.), treat it as an operator
         if (
-          ['*', '/', '%', '+', '-', '==', '===', '!=', '!==', '>', '>=', '<', '<='].includes(
-            token.value as string,
-          )
+          [
+            '*',
+            '/',
+            '%',
+            '+',
+            '-',
+            '==',
+            '===',
+            '!=',
+            '!==',
+            '>',
+            '>=',
+            '<',
+            '<=',
+            '&&',
+            '||',
+            '??',
+          ].includes(token.value)
         ) {
           if (!expectOperator) {
             throw new ExpressionError('Unexpected operator');
@@ -471,7 +487,7 @@ export class SafeExpressionEvaluator {
           if (expectOperator) {
             throw new ExpressionError('Unexpected identifier');
           }
-          outputQueue.push({ type: 'literal', value: this.tokenToLiteral(token.value as string) });
+          outputQueue.push({ type: 'literal', value: this.tokenToLiteral(token.value) });
           expectOperator = true;
         }
       } else if (token.type === 'reference') {
@@ -480,15 +496,10 @@ export class SafeExpressionEvaluator {
         }
         outputQueue.push({
           type: 'reference',
-          path: this.buildReferencePath(token.value as Token[]),
+          path: this.buildReferencePath(token.value),
         });
         expectOperator = true;
-      } else if (
-        token.type === 'operator' ||
-        ['&&', '||', '??', '==', '===', '!=', '!==', '>', '>=', '<', '<='].includes(
-          token.value as string,
-        )
-      ) {
+      } else if (token.type === 'operator') {
         if (!expectOperator) {
           throw new ExpressionError('Unexpected operator');
         }
@@ -590,7 +601,11 @@ export class SafeExpressionEvaluator {
         if (currentTokens.length !== 1) {
           throw new ExpressionError('Invalid object literal: invalid key');
         }
-        key = currentTokens[0].value as string;
+        const keyToken = currentTokens[0];
+        if (!hasKeyValue(keyToken)) {
+          throw new ExpressionError('Invalid object literal: invalid key');
+        }
+        key = keyToken.value;
         currentTokens = [];
         continue;
       }

@@ -1,6 +1,17 @@
 import { tokenize, TokenizerError, Token } from '../../expression-evaluator/tokenizer';
 import { TestLogger } from '../../util/logger';
 
+function expectTokenArrayValue(
+  token: Token,
+  expectedType: 'array_literal' | 'reference' | 'object_literal' | 'template_literal',
+): Token[] {
+  expect(token.type).toBe(expectedType);
+  if (token.type !== expectedType) {
+    throw new Error(`Expected ${expectedType} token`);
+  }
+  return token.value;
+}
+
 describe('Tokenizer Reference Tests', () => {
   let logger: TestLogger;
 
@@ -203,8 +214,7 @@ describe('Tokenizer Reference Tests', () => {
       expect(result[0].type).toBe('reference');
 
       // Check that the reference token has the identifier 'foo'
-      const referenceToken = result[0];
-      const refValue = referenceToken.value as Token[];
+      const refValue = expectTokenArrayValue(result[0], 'reference');
       expect(refValue).toHaveLength(1);
       expect(refValue[0].type).toBe('identifier');
       expect(refValue[0].value).toBe('foo');
@@ -218,8 +228,7 @@ describe('Tokenizer Reference Tests', () => {
       expect(result).toHaveLength(1);
       expect(result[0].type).toBe('reference');
 
-      const referenceToken = result[0];
-      const refValue = referenceToken.value as Token[];
+      const refValue = expectTokenArrayValue(result[0], 'reference');
       expect(refValue).toHaveLength(2);
       expect(refValue[0].type).toBe('identifier');
       expect(refValue[0].value).toBe('foo');
@@ -235,8 +244,7 @@ describe('Tokenizer Reference Tests', () => {
       expect(result).toHaveLength(1);
       expect(result[0].type).toBe('reference');
 
-      const referenceToken = result[0];
-      const refValue = referenceToken.value as Token[];
+      const refValue = expectTokenArrayValue(result[0], 'reference');
       expect(refValue).toHaveLength(3);
       expect(refValue[0].type).toBe('identifier');
       expect(refValue[0].value).toBe('foo');
@@ -254,8 +262,7 @@ describe('Tokenizer Reference Tests', () => {
       expect(result).toHaveLength(1);
       expect(result[0].type).toBe('reference');
 
-      const referenceToken = result[0];
-      const refValue = referenceToken.value as Token[];
+      const refValue = expectTokenArrayValue(result[0], 'reference');
       expect(refValue).toHaveLength(1);
       expect(refValue[0].type).toBe('identifier');
       expect(refValue[0].value).toBe('foo');
@@ -269,8 +276,7 @@ describe('Tokenizer Reference Tests', () => {
       expect(result).toHaveLength(1);
       expect(result[0].type).toBe('reference');
 
-      const referenceToken = result[0];
-      const refValue = referenceToken.value as Token[];
+      const refValue = expectTokenArrayValue(result[0], 'reference');
       // Verify we have the expected tokens in the reference
       expect(refValue.length).toBeGreaterThan(3);
 
@@ -312,7 +318,7 @@ describe('Tokenizer Reference Tests', () => {
       expect(result).toHaveLength(1);
       expect(result[0].type).toBe('reference');
 
-      const referenceValue = result[0].value as Token[];
+      const referenceValue = expectTokenArrayValue(result[0], 'reference');
       expect(referenceValue).toHaveLength(2);
       expect(referenceValue[0].type).toBe('identifier');
       expect(referenceValue[0].value).toBe('abc');

@@ -71,6 +71,29 @@ describe('FlowExecutor', () => {
     expect(jsonRpcHandler).toHaveBeenCalledTimes(1);
   });
 
+  it('skips execution when the flow is already aborted', async () => {
+    const flow: Flow = {
+      name: 'Test Flow',
+      description: 'Test flow for unit tests',
+      steps: [
+        {
+          name: 'get_data',
+          request: {
+            method: 'getData',
+            params: {},
+          },
+        },
+      ],
+    };
+
+    executor = new FlowExecutor(flow, jsonRpcHandler, { logger: testLogger });
+    const executorAny = executor as any;
+    executorAny.globalAbortController.abort('manual abort');
+
+    await expect(executor.execute()).rejects.toThrow('manual abort');
+    expect(jsonRpcHandler).not.toHaveBeenCalled();
+  });
+
   it('executes a loop step', async () => {
     const flow: Flow = {
       name: 'Test Flow',

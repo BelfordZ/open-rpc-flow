@@ -18,7 +18,7 @@ describe('Reference keys with spaces', () => {
     const tokens = tokenize("${item['PR Link']}", logger);
     const ref = tokens[0];
     if (ref.type !== 'reference') throw new Error('expected reference token');
-    const strToken = (ref.value as any[]).find((t) => t.type === 'string');
+    const strToken = ref.value.find((t) => t.type === 'string');
     expect(strToken).toBeDefined();
     expect(strToken?.value).toBe('PR Link');
   });

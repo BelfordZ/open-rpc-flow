@@ -1,6 +1,7 @@
 import { Logger } from '../util/logger';
 import type { Token } from './types';
-export type { Token } from './types';
+export type { Token, TokenType, TokenWithKeyValue, TokenWithTokenArrayValue } from './types';
+export { hasKeyValue, hasTokenArrayValue } from './types';
 
 export class TokenizerError extends Error {
   constructor(message: string) {

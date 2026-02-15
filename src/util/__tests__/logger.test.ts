@@ -206,7 +206,7 @@ describe('NoLogger', () => {
   it('silently handles all log methods', () => {
     const logger = NoLogger.getInstance();
     // These should not throw
-    logger.log('test');
+    logger.info('test');
     logger.error('test');
     logger.warn('test');
     logger.info('test', { ok: true });

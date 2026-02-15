@@ -5,13 +5,8 @@ export interface Logger {
    * General informational messages.
    */
   info(message: string, ...args: any[]): void;
-  /**
-   * @deprecated Use `info` instead.
-   */
-  log(message: string, ...args: any[]): void;
   error(message: string, ...args: any[]): void;
   warn(message: string, ...args: any[]): void;
-  info(message: string, ...args: any[]): void;
   debug(message: string, ...args: any[]): void;
   createNested(prefix: string): Logger;
 }
@@ -33,9 +28,6 @@ export class ConsoleLogger implements Logger {
     }
   }
 
-  log(message: string, data?: any) {
-    this.info(message, data);
-  }
   error(message: string, data?: any) {
     if (this.prefix) {
       message = `[${this.prefix}] ${message}`;
@@ -54,16 +46,6 @@ export class ConsoleLogger implements Logger {
       this._console.warn(message, data);
     } else {
       this._console.warn(message);
-    }
-  }
-  info(message: string, data?: any) {
-    if (this.prefix) {
-      message = `[${this.prefix}] ${message}`;
-    }
-    if (data !== undefined) {
-      this._console.info(message, data);
-    } else {
-      this._console.info(message);
     }
   }
   debug(message: string, data?: any) {
@@ -90,9 +72,6 @@ export class TestLogger implements Logger {
     this.logs.push({ level: 'info', message, data });
   }
 
-  log(message: string, data?: any) {
-    this.info(message, data);
-  }
   warn(message: string, data?: any) {
     this.logs.push({ level: 'warn', message, data });
   }

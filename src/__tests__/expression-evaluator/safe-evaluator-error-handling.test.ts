@@ -231,7 +231,7 @@ describe('SafeExpressionEvaluator - Error Handling', () => {
       logger.warn('WARNING: Could not test line 151 directly using standard approaches.');
 
       // Document this as a known coverage gap
-      logger.log(
+      logger.info(
         'RECOMMENDATION: Document line 151 as a known coverage gap due to private method access limitations.',
       );
 

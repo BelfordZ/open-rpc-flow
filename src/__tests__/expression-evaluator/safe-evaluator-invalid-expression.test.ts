@@ -28,7 +28,7 @@ describe('SafeExpressionEvaluator - Invalid Expression Handling', () => {
 
       // Directly test the parseExpression method if possible
       if (typeof evaluatorAny.parseExpression === 'function') {
-        logger.log('Testing parseExpression with empty tokens array');
+        logger.info('Testing parseExpression with empty tokens array');
 
         // This should result in an empty output queue at the end of processing
         expect(() => {
@@ -39,9 +39,9 @@ describe('SafeExpressionEvaluator - Invalid Expression Handling', () => {
           evaluatorAny.parseExpression([]);
         }).toThrow('Invalid expression');
 
-        logger.log('Successfully tested line 448 (empty queue) directly!');
+        logger.info('Successfully tested line 448 (empty queue) directly!');
       } else {
-        logger.log('Cannot access parseExpression method directly');
+        logger.info('Cannot access parseExpression method directly');
       }
     });
 
@@ -73,11 +73,11 @@ describe('SafeExpressionEvaluator - Invalid Expression Handling', () => {
           outputQueue.push({ type: 'literal', value: 456 });
 
           // This is the key part - force execution to reach line 448
-          logger.log(`Output queue length: ${outputQueue.length} - We should hit line 448`);
+          logger.info(`Output queue length: ${outputQueue.length} - We should hit line 448`);
 
           // Create similar state to what's in parseExpression method
           if (outputQueue.length !== 1) {
-            logger.log('About to throw "Invalid expression" error - will hit line 448');
+            logger.info('About to throw "Invalid expression" error - will hit line 448');
             throw new ExpressionError('Invalid expression');
           }
 
@@ -90,7 +90,7 @@ describe('SafeExpressionEvaluator - Invalid Expression Handling', () => {
             evaluator.evaluate('test', {});
           }).toThrow('Invalid expression');
 
-          logger.log('Successfully hit line 448 with "Invalid expression" error!');
+          logger.info('Successfully hit line 448 with "Invalid expression" error!');
         } finally {
           // Restore original method
           evaluatorAny.parse = originalParse;
@@ -116,11 +116,11 @@ describe('SafeExpressionEvaluator - Invalid Expression Handling', () => {
             outputQueue.push({ type: 'literal', value: 1 });
             outputQueue.push({ type: 'literal', value: 2 });
 
-            logger.log(`Modified parseExpression: outputQueue.length = ${outputQueue.length}`);
+            logger.info(`Modified parseExpression: outputQueue.length = ${outputQueue.length}`);
 
             // This simulates the exact state inside the function where line 448 is
             if (outputQueue.length !== 1) {
-              logger.log('About to throw "Invalid expression" error - directly hitting line 448');
+              logger.info('About to throw "Invalid expression" error - directly hitting line 448');
               throw new ExpressionError('Invalid expression');
             }
 
@@ -138,7 +138,7 @@ describe('SafeExpressionEvaluator - Invalid Expression Handling', () => {
             ]);
           }).toThrow('Invalid expression');
 
-          logger.log('Successfully tested line 448!');
+          logger.info('Successfully tested line 448!');
         } finally {
           // Restore original method
           evaluatorAny.parseExpression = originalParseExpression;
@@ -189,7 +189,7 @@ describe('SafeExpressionEvaluator - Invalid Expression Handling', () => {
           directTest();
         }).toThrow('Invalid expression');
 
-        logger.log('Direct reproduction of line 448 condition passed!');
+        logger.info('Direct reproduction of line 448 condition passed!');
       }
     });
   });

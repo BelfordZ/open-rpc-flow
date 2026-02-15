@@ -41,7 +41,7 @@ describe('Tokenizer Spread Tests', () => {
 
       // Check what tokens were created - we should have either a combined token or separate tokens
       const tokenValues = arrayTokens.map((token) => `${token.type}:${token.value}`).join(', ');
-      logger.log('Tokens created:', tokenValues);
+      logger.info('Tokens created:', tokenValues);
     });
 
     // Try with dots as part of an identifier

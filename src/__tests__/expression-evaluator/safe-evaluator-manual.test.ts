@@ -42,8 +42,8 @@ describe('SafeExpressionEvaluator Manual Coverage', () => {
         const contentTokens = tokens.slice(1, tokens.length - 1);
 
         // Log what we're doing
-        logger.log('Testing with expression:', expression);
-        logger.log('Extracted tokens:', JSON.stringify(contentTokens, null, 2));
+        logger.info('Testing with expression:', expression);
+        logger.info('Extracted tokens:', JSON.stringify(contentTokens, null, 2));
 
         // Create a processor function for testing
         const processor = (currentTokens: any, isSpread: boolean, key?: string) => {
@@ -62,7 +62,7 @@ describe('SafeExpressionEvaluator Manual Coverage', () => {
         ) {
           // Success! We hit the code path we wanted
           expect(error.message).toBe('Invalid object literal: invalid key');
-          logger.log('Successfully hit the code path at line 478-480!');
+          logger.info('Successfully hit the code path at line 478-480!');
         } else {
           logger.warn('Unexpected error or could not access private method:', error);
           // Don't fail the test - we're just trying to get coverage

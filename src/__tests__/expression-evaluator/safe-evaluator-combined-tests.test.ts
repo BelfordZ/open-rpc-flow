@@ -235,7 +235,7 @@ describe('SafeExpressionEvaluator - Combined Line Coverage Tests', () => {
         } catch (error) {
           // Some combinations might cause evaluation errors, but we still
           // hit the precedence comparison in parseExpression
-          logger.log(`Error evaluating expression with operators ${op1} and ${op2}: ${error}`);
+          logger.info(`Error evaluating expression with operators ${op1} and ${op2}: ${error}`);
         }
       }
     });

@@ -180,7 +180,7 @@ describe('NoLogger', () => {
     const mockDebug = jest.fn();
     Object.assign(console, { log: mockLog, error: mockError, warn: mockWarn, debug: mockDebug });
 
-    noLogger.log('test');
+    noLogger.info('test');
     noLogger.error('test');
     noLogger.warn('test');
     noLogger.debug('test');

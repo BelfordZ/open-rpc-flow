@@ -75,14 +75,14 @@ export class FlowExecutor {
     // Handle both new options object and legacy logger parameter
     let options: FlowExecutorOptions | undefined;
 
-    if (loggerOrOptions instanceof Object && !(loggerOrOptions as Logger).log) {
-      // It's an options object
+    if (loggerOrOptions && typeof (loggerOrOptions as Logger).info === 'function') {
+      // It's a logger instance
+      this.logger = loggerOrOptions as Logger;
+      options = { logger: this.logger };
+    } else {
+      // It's an options object (or undefined)
       options = loggerOrOptions as FlowExecutorOptions;
       this.logger = options?.logger || defaultLogger;
-    } else {
-      // It's a logger instance (or undefined)
-      this.logger = (loggerOrOptions as Logger) || defaultLogger;
-      options = { logger: this.logger };
     }
 
     this.context = flow.context || {};

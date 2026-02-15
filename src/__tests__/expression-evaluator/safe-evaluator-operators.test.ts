@@ -93,7 +93,7 @@ describe('SafeExpressionEvaluator - Operators', () => {
         try {
           // This should process according to operator precedence
           const result = testWithCustomTokens(tokens);
-          logger.log('Successfully parsed with operator precedence:', result);
+          logger.info('Successfully parsed with operator precedence:', result);
         } catch (error) {
           logger.error('Failed to test operator precedence:', error);
         }
@@ -188,7 +188,7 @@ describe('SafeExpressionEvaluator - Operators', () => {
           // For numeric strings, it seems the implementation converts them to numbers
           expect(evaluatorAny.tokenToLiteral('123')).toBe(123); // Appears to be converted to number
 
-          logger.log('Successfully tested tokenToLiteral method (line 390)');
+          logger.info('Successfully tested tokenToLiteral method (line 390)');
         }
       });
 
@@ -212,7 +212,7 @@ describe('SafeExpressionEvaluator - Operators', () => {
         // Should be: true || (false && true) = true || false = true
         expect(logicalExpr).toBe(true);
 
-        logger.log('Successfully tested operator precedence comparisons in line 382');
+        logger.info('Successfully tested operator precedence comparisons in line 382');
       });
     });
   });
@@ -271,7 +271,7 @@ describe('SafeExpressionEvaluator - Operators', () => {
           // We expect an error, but don't check the specific message
           expect(error).toBeInstanceOf(ExpressionError);
           // Just log the message for debugging
-          logger.log(`Error for operator '${unknownOp}': ${(error as Error).message}`);
+          logger.info(`Error for operator '${unknownOp}': ${(error as Error).message}`);
         }
       }
 
@@ -285,7 +285,7 @@ describe('SafeExpressionEvaluator - Operators', () => {
 
         // Only proceed if we can access it
         if (typeof originalGetPrecedence === 'function') {
-          logger.log('Successfully accessed getPrecedence method!');
+          logger.info('Successfully accessed getPrecedence method!');
 
           // Create a test-only implementation that directly exercises the default case
           // This is the crucial part of the test that hits line 478
@@ -294,7 +294,7 @@ describe('SafeExpressionEvaluator - Operators', () => {
 
           // The default case should return 0
           expect(result).toBe(0);
-          logger.log(`Precedence of unknown operator '${testOperator}' is: ${result}`);
+          logger.info(`Precedence of unknown operator '${testOperator}' is: ${result}`);
 
           // Test a few more unusual operators to be thorough
           expect(originalGetPrecedence.call(evaluatorAny, '@')).toBe(0);

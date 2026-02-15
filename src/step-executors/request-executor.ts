@@ -7,6 +7,7 @@ import {
 } from '../types';
 import { StepExecutor, StepExecutionResult, JsonRpcRequestError, StepType } from './types';
 import { Logger } from '../util/logger';
+import { getDataType } from '../util/type-utils';
 import { RequestStep } from './types';
 import { RetryPolicy, RetryableOperation } from '../errors/recovery';
 import { ExecutionError, ValidationError } from '../errors/base';
@@ -79,6 +80,15 @@ export class RequestStepExecutor implements StepExecutor {
     const stepRetryPolicy = this.getStepRetryPolicy(requestStep, _context);
     const timeout = this.getStepTimeout(requestStep, _context);
 
+    this.logger.debug('Input type check', {
+      stepName: step.name,
+      expected: { method: 'string', params: 'object | array | null' },
+      actual: {
+        method: typeof requestStep.request.method,
+        params: getDataType(requestStep.request.params),
+      },
+    });
+
     this.logger.debug('Executing request step', {
       stepName: step.name,
       method: requestStep.request.method,
@@ -98,6 +108,18 @@ export class RequestStepExecutor implements StepExecutor {
       let abortController: AbortController | undefined;
       if (timeout) {
         abortController = new AbortController();
+      }
+      if (abortController) {
+        const linkAbortSignal = (source?: AbortSignal) => {
+          if (!source) return;
+          if (source.aborted) {
+            abortController.abort(source.reason);
+          } else {
+            source.addEventListener('abort', () => abortController.abort(source.reason));
+          }
+        };
+        linkAbortSignal(_context.signal);
+        linkAbortSignal(signal);
       }
 
       // Set up timeout to abort the request

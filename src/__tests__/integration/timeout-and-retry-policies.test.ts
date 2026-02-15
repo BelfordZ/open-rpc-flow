@@ -317,8 +317,8 @@ describe('Timeout and Retry Policies', () => {
         // Execute and expect timeout error
         jest.advanceTimersByTime(globalTimeout);
         await expectError(executor.execute(), {
-          errorClass: ExecutionError,
-          messageIncludes: 'timed out',
+          errorClass: TimeoutError,
+          messageIncludes: 'Flow execution timed out',
         });
       });
 
@@ -357,6 +357,36 @@ describe('Timeout and Retry Policies', () => {
         // We can't directly access executionTime, but we can check that all steps completed
         expect(results.get('step1')).toBeDefined();
         expect(results.get('step2')).toBeDefined();
+      });
+    });
+
+    it('should respect default step timeout from flow.policies.step.timeout', async () => {
+      const stepTimeout = 75;
+      const flow: Flow = {
+        name: 'step-default-timeout-test',
+        description: 'Test flow-level default step timeout',
+        policies: {
+          step: {
+            timeout: {
+              timeout: stepTimeout,
+            },
+          },
+        },
+        steps: [
+          {
+            name: 'slowStep',
+            request: { method: 'slow', params: [] },
+          },
+        ],
+      };
+
+      const mockHandler = createMockHandler({ delay: stepTimeout * 2 });
+      const executor = new FlowExecutor(flow, mockHandler, testLogger);
+
+      jest.advanceTimersByTime(stepTimeout);
+      await expectError(executor.execute(), {
+        errorClass: ExecutionError,
+        messageIncludes: 'timed out',
       });
     });
   });
@@ -451,11 +481,13 @@ describe('Timeout and Retry Policies', () => {
           description: 'Test global retry policy',
           policies: {
             global: {
-              timeout: {
-                timeout: 1000, // Long global timeout
-              },
               retryPolicy: {
                 maxAttempts: 3,
+              },
+            },
+            step: {
+              timeout: {
+                timeout: 1000, // Long default step timeout
               },
             },
           },
@@ -766,11 +798,13 @@ describe('Timeout and Retry Policies', () => {
         description: 'Test policy priority',
         policies: {
           global: {
-            timeout: {
-              timeout: 1000, // Long global timeout
-            },
             retryPolicy: {
               maxAttempts: 1,
+            },
+          },
+          step: {
+            timeout: {
+              timeout: 1000, // Long default step timeout
             },
           },
         },
@@ -1003,8 +1037,8 @@ describe('Timeout and Retry Policies', () => {
 
       // Pass the signal to executor.execute
       await expectError(executor.execute({ signal: controller.signal }), {
-        errorClass: ExecutionError,
-        messageIncludes: 'timed out',
+        errorClass: TimeoutError,
+        messageIncludes: 'Flow execution timed out',
       });
     });
   });

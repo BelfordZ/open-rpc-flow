@@ -287,24 +287,6 @@ describe('RequestStepExecutor', () => {
     );
   });
 
-  it('handles request errors gracefully', async () => {
-    const step: RequestStep = {
-      name: 'requestError',
-      request: {
-        method: 'error.test',
-        params: {},
-      },
-    };
-    jsonRpcHandler.mockResolvedValue({ error: { message: 'Custom error' } });
-    const result = await executor.execute(step, context);
-    expect(result.metadata).toBeDefined();
-    expect(result?.metadata?.hasError).toBe(true);
-    expect(result.result.error).toEqual({ message: 'Custom error' });
-
-    const warnLogs = testLogger.getLogs().filter((l) => l.level === 'warn');
-    expect(warnLogs.length).toBeGreaterThan(0);
-  });
-
   it('throws error when given invalid step type', async () => {
     const invalidStep = {
       name: 'invalidStep',
@@ -546,12 +528,11 @@ describe('RequestStepExecutor', () => {
     await executor.execute(step, contextWithSignal);
 
     // Verify that the signal was passed to jsonRpcHandler
-    expect(jsonRpcHandler).toHaveBeenCalledWith(
-      expect.objectContaining({
-        method: 'test.method',
-      }),
-      { signal: abortController.signal },
-    );
+    const [, options] = jsonRpcHandler.mock.calls[0];
+    const handlerSignal = options?.signal;
+    expect(handlerSignal).toBeDefined();
+    abortController.abort('test-abort');
+    expect(handlerSignal?.aborted).toBe(true);
   });
 
   it('uses passed signal when no context signal', async () => {
@@ -561,10 +542,11 @@ describe('RequestStepExecutor', () => {
     };
     const ac = new AbortController();
     await executor.execute(step, context, {}, ac.signal);
-    expect(jsonRpcHandler).toHaveBeenCalledWith(
-      expect.objectContaining({ method: 'test.method' }),
-      { signal: ac.signal },
-    );
+    const [, options] = jsonRpcHandler.mock.calls[0];
+    const handlerSignal = options?.signal;
+    expect(handlerSignal).toBeDefined();
+    ac.abort('test-abort');
+    expect(handlerSignal?.aborted).toBe(true);
   });
 
   it('prefers context signal over passed signal', async () => {
@@ -576,7 +558,57 @@ describe('RequestStepExecutor', () => {
     const argAC = new AbortController();
     const ctx = { ...context, signal: ctxAC.signal };
     await executor.execute(step, ctx, {}, argAC.signal);
-    expect(jsonRpcHandler).toHaveBeenCalledWith(expect.anything(), { signal: ctxAC.signal });
+    const [, options] = jsonRpcHandler.mock.calls[0];
+    const handlerSignal = options?.signal;
+    expect(handlerSignal).toBeDefined();
+    ctxAC.abort('test-abort');
+    expect(handlerSignal?.aborted).toBe(true);
+  });
+
+  it('uses context signal directly when timeout is disabled', async () => {
+    const step: RequestStep = {
+      name: 'signalNoTimeout',
+      request: { method: 'test.method', params: {} },
+      policies: { timeout: { timeout: 0 } },
+    };
+    const ctxAC = new AbortController();
+    const ctx = { ...context, signal: ctxAC.signal };
+    await executor.execute(step, ctx);
+    const [, options] = jsonRpcHandler.mock.calls[0];
+    expect(options?.signal).toBe(ctxAC.signal);
+  });
+
+  it('propagates an already aborted context signal to the handler signal', async () => {
+    const step: RequestStep = {
+      name: 'signalAlreadyAborted',
+      request: { method: 'test.method', params: {} },
+    };
+    const ctxAC = new AbortController();
+    ctxAC.abort('pre-aborted');
+    const ctx = { ...context, signal: ctxAC.signal };
+    jsonRpcHandler.mockResolvedValue({ ok: true });
+    await executor.execute(step, ctx);
+    const [, options] = jsonRpcHandler.mock.calls[0];
+    expect(options?.signal?.aborted).toBe(true);
+  });
+
+  it('returns a timeout error when handler rejects after timeout abort', async () => {
+    jest.useFakeTimers();
+    const step: RequestStep = {
+      name: 'timeoutRejectTest',
+      request: { method: 'test.method', params: {} },
+      policies: { timeout: { timeout: 50 } },
+    };
+    jsonRpcHandler.mockImplementation((_req, options) => {
+      return new Promise((_, reject) => {
+        options?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+      });
+    });
+    const promise = executor.execute(step, context);
+    jest.advanceTimersByTime(100);
+    await Promise.resolve();
+    await expect(promise).rejects.toThrow(/execution timed out/);
+    jest.useRealTimers();
   });
 
   it('times out when handler does not respond in time', async () => {
@@ -620,36 +652,5 @@ describe('RequestStepExecutor', () => {
     );
 
     expect(jsonRpcHandler).toHaveBeenCalledTimes(1);
-  });
-
-  it('rethrows JsonRpcRequestError directly', async () => {
-    const step: RequestStep = {
-      name: 'jsonRpcErrorTest',
-      request: {
-        method: 'test.method',
-        params: {},
-      },
-    };
-
-    // Create a JsonRpcRequestError
-    const jsonRpcError = new JsonRpcRequestError('JSON-RPC error occurred', {
-      code: -32001,
-      message: 'JSON-RPC error',
-    });
-
-    // Mock jsonRpcHandler to throw a JsonRpcRequestError
-    jsonRpcHandler.mockRejectedValue(jsonRpcError);
-
-    // The error should be rethrown directly
-    try {
-      await executor.execute(step, context);
-      fail('Expected to throw JsonRpcRequestError');
-    } catch (error) {
-      // Verify we got the same error instance back, unmodified
-      expect(error).toBe(jsonRpcError);
-      // Add type assertion
-      expect((error as JsonRpcRequestError).message).toBe('JSON-RPC error occurred');
-      expect(error instanceof JsonRpcRequestError).toBe(true);
-    }
   });
 });

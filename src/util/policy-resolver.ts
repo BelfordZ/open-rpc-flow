@@ -87,13 +87,20 @@ export class PolicyResolver {
    * Helper to resolve timeout policy (returns the timeout number or a sensible default)
    */
   resolveTimeout(step: Step, stepType: StepType): number {
-    const timeoutObj = this.resolvePolicy<{ timeout?: number }>(step, stepType, 'timeout');
-    // Use the resolved timeout, or the default for the stepType, or the global default
-    return (
-      timeoutObj?.timeout ??
-      (DEFAULT_TIMEOUTS as Record<string, number>)[stepType] ??
-      DEFAULT_TIMEOUTS.global
-    );
+    // Resolve step timeouts without using flow-level global timeout.
+    if (this.overrides && this.overrides.timeout !== undefined) {
+      return (this.overrides.timeout as { timeout?: number })?.timeout ?? DEFAULT_TIMEOUTS.global;
+    }
+    if (step.policies?.timeout?.timeout !== undefined) {
+      return step.policies.timeout.timeout;
+    }
+    if (this.flow.policies?.step?.[stepType]?.timeout?.timeout !== undefined) {
+      return this.flow.policies.step[stepType]!.timeout!.timeout!;
+    }
+    if (this.flow.policies?.step?.timeout?.timeout !== undefined) {
+      return this.flow.policies.step.timeout.timeout;
+    }
+    return (DEFAULT_TIMEOUTS as Record<string, number>)[stepType] ?? DEFAULT_TIMEOUTS.global;
   }
 
   /**
@@ -123,11 +130,22 @@ export class PolicyResolver {
    * Helper to resolve expression evaluation timeout (returns the timeout number or a sensible default)
    */
   resolveExpressionTimeout(step: Step, stepType: StepType): number {
-    const timeoutObj = this.resolvePolicy<{ expressionEval?: number }>(step, stepType, 'timeout');
-    return (
-      (typeof timeoutObj?.expressionEval === 'number' ? timeoutObj.expressionEval : undefined) ??
-      DEFAULT_TIMEOUTS.expression!
-    );
+    if (this.overrides && this.overrides.timeout !== undefined) {
+      return (
+        (this.overrides.timeout as { expressionEval?: number })?.expressionEval ??
+        DEFAULT_TIMEOUTS.expression!
+      );
+    }
+    if (step.policies?.timeout?.expressionEval !== undefined) {
+      return step.policies.timeout.expressionEval;
+    }
+    if (this.flow.policies?.step?.[stepType]?.timeout?.expressionEval !== undefined) {
+      return this.flow.policies.step[stepType]!.timeout!.expressionEval!;
+    }
+    if (this.flow.policies?.step?.timeout?.expressionEval !== undefined) {
+      return this.flow.policies.step.timeout.expressionEval;
+    }
+    return DEFAULT_TIMEOUTS.expression!;
   }
 
   // Future: add helpers for other policy types (circuitBreaker, rateLimit, etc)

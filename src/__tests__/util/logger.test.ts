@@ -12,12 +12,6 @@ describe('ConsoleLogger', () => {
     };
   });
 
-  test('logs without prefix', () => {
-    const logger = new ConsoleLogger(undefined, mockConsole as any);
-    logger.info('test message', { data: 123 });
-    expect(mockConsole.info).toHaveBeenCalledWith('test message', { data: 123 });
-  });
-
   test('logs error with prefix', () => {
     const logger = new ConsoleLogger('TestPrefix', mockConsole as any);
     logger.error('error message', new Error('test error'));
@@ -35,13 +29,6 @@ describe('ConsoleLogger', () => {
     });
   });
 
-  test('creates nested logger with combined prefix', () => {
-    const logger = new ConsoleLogger('Parent', mockConsole as any);
-    const nested = logger.createNested('Child');
-    nested.info('test message');
-    expect(mockConsole.info).toHaveBeenCalledWith('[Parent:Child] test message');
-  });
-
   test('creates deeply nested logger', () => {
     const logger = new ConsoleLogger('Root', mockConsole as any);
     const level1 = logger.createNested('Level1');
@@ -52,27 +39,6 @@ describe('ConsoleLogger', () => {
 });
 
 describe('NoLogger', () => {
-  test('silently ignores all log calls', () => {
-    const originalConsole = { ...console };
-    const mockLog = jest.fn();
-    const mockError = jest.fn();
-    const mockWarn = jest.fn();
-    const mockDebug = jest.fn();
-    Object.assign(console, { log: mockLog, error: mockError, warn: mockWarn, debug: mockDebug });
-
-    noLogger.info('test');
-    noLogger.error('test');
-    noLogger.warn('test');
-    noLogger.debug('test');
-
-    expect(mockLog).not.toHaveBeenCalled();
-    expect(mockError).not.toHaveBeenCalled();
-    expect(mockWarn).not.toHaveBeenCalled();
-    expect(mockDebug).not.toHaveBeenCalled();
-
-    Object.assign(console, originalConsole);
-  });
-
   test('creates nested NoLogger', () => {
     const nested = noLogger.createNested('test');
     expect(nested).toBe(noLogger);

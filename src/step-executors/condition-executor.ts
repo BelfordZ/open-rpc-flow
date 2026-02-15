@@ -136,14 +136,21 @@ export class ConditionStepExecutor implements StepExecutor {
     })();
 
     // Promise for the timeout
+    let timeoutId: NodeJS.Timeout | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
         abortController.abort();
         reject(TimeoutError.forStep(step, StepType.Condition, timeout, timeout));
       }, timeout);
     });
 
     // Race the condition logic against the timeout
-    return Promise.race([conditionPromise, timeoutPromise]);
+    try {
+      return await Promise.race([conditionPromise, timeoutPromise]);
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    }
   }
 }

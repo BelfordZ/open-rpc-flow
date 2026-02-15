@@ -1,5 +1,16 @@
-import { tokenize, TokenizerError, Token } from '../../expression-evaluator/tokenizer';
+import { tokenize, TokenizerError, Token, hasKeyValue } from '../../expression-evaluator/tokenizer';
 import { TestLogger } from '../../util/logger';
+
+function expectTokenArrayValue(
+  token: Token,
+  expectedType: 'array_literal' | 'reference' | 'object_literal' | 'template_literal',
+): Token[] {
+  expect(token.type).toBe(expectedType);
+  if (token.type !== expectedType) {
+    throw new Error(`Expected ${expectedType} token`);
+  }
+  return token.value;
+}
 
 describe('Tokenizer Object Tests', () => {
   let logger: TestLogger;
@@ -18,7 +29,7 @@ describe('Tokenizer Object Tests', () => {
       const result = tokenize('{ key: `template value` }', logger);
 
       expect(result[0].type).toBe('object_literal');
-      const objectValues = result[0].value as any[];
+      const objectValues = expectTokenArrayValue(result[0], 'object_literal');
 
       expect(objectValues).toHaveLength(3); // key, :, and template value
       expect(objectValues[0].value).toBe('key');
@@ -31,7 +42,7 @@ describe('Tokenizer Object Tests', () => {
       const result = tokenize('{ key: `value ${123}` }', logger);
 
       expect(result[0].type).toBe('object_literal');
-      const objectValues = result[0].value as any[];
+      const objectValues = expectTokenArrayValue(result[0], 'object_literal');
 
       // Should have key, :, string part, and reference part
       expect(objectValues.length).toBeGreaterThan(3);
@@ -43,7 +54,7 @@ describe('Tokenizer Object Tests', () => {
       const referenceToken = objectValues.find(
         (token) =>
           token.type === 'reference' &&
-          token.value.some((v: any) => v.type === 'number' && v.value === 123),
+          token.value.some((v) => v.type === 'number' && v.value === 123),
       );
       expect(referenceToken).toBeDefined();
     });
@@ -52,7 +63,7 @@ describe('Tokenizer Object Tests', () => {
       const result = tokenize('{ key1: `value1`, key2: `value2` }', logger);
 
       expect(result[0].type).toBe('object_literal');
-      const objectValues = result[0].value as any[];
+      const objectValues = expectTokenArrayValue(result[0], 'object_literal');
 
       // Find the key and template value pairs
       const key1Index = objectValues.findIndex((token) => token.value === 'key1');
@@ -70,7 +81,7 @@ describe('Tokenizer Object Tests', () => {
       const result = tokenize('{ key: `prefix ${a + b} suffix` }', logger);
 
       expect(result[0].type).toBe('object_literal');
-      const objectValues = result[0].value as any[];
+      const objectValues = expectTokenArrayValue(result[0], 'object_literal');
 
       // Verify key and colon
       expect(objectValues[0].value).toBe('key');
@@ -83,7 +94,7 @@ describe('Tokenizer Object Tests', () => {
       const referenceToken = objectValues.find(
         (token) =>
           token.type === 'reference' &&
-          token.value.some((v: any) => v.type === 'operator' && v.value === '+'),
+          token.value.some((v) => v.type === 'operator' && v.value === '+'),
       );
       expect(referenceToken).toBeDefined();
 
@@ -98,14 +109,17 @@ describe('Tokenizer Object Tests', () => {
       const result = tokenize('{ outer: { inner: `template` } }', logger);
 
       expect(result[0].type).toBe('object_literal');
-      const outerValues = result[0].value as any[];
+      const outerValues = expectTokenArrayValue(result[0], 'object_literal');
 
       // Find the inner object
       const innerObjectToken = outerValues.find((token) => token.type === 'object_literal');
       expect(innerObjectToken).toBeDefined();
+      if (!innerObjectToken) {
+        throw new Error('Expected inner object literal token');
+      }
 
       // Verify the inner object has the template literal
-      const innerValues = innerObjectToken.value;
+      const innerValues = expectTokenArrayValue(innerObjectToken, 'object_literal');
       expect(innerValues[0].value).toBe('inner');
       expect(innerValues[1].value).toBe(':');
       expect(innerValues[2].value).toBe('template');
@@ -119,7 +133,7 @@ describe('Tokenizer Object Tests', () => {
       const result = tokenize('{ key: `line1\nline2` }', logger);
 
       expect(result[0].type).toBe('object_literal');
-      const objectValues = result[0].value as any[];
+      const objectValues = expectTokenArrayValue(result[0], 'object_literal');
 
       expect(objectValues[0].value).toBe('key');
       expect(objectValues[1].value).toBe(':');
@@ -137,7 +151,7 @@ describe('Tokenizer Object Tests', () => {
       expect(result[0].type).toBe('object_literal');
 
       // Extract the tokens inside the object literal
-      const objectTokens = result[0].value as Token[];
+      const objectTokens = expectTokenArrayValue(result[0], 'object_literal');
 
       // Find the spread operator
       const spreadOperatorIndex = objectTokens.findIndex(
@@ -162,7 +176,7 @@ describe('Tokenizer Object Tests', () => {
       expect(result.length).toBe(1);
       expect(result[0].type).toBe('object_literal');
 
-      const objectTokens = result[0].value as Token[];
+      const objectTokens = expectTokenArrayValue(result[0], 'object_literal');
 
       // Find the first spread operator
       const firstSpreadIndex = objectTokens.findIndex(
@@ -178,7 +192,10 @@ describe('Tokenizer Object Tests', () => {
       expect(nestedObjectIndex).toBeGreaterThan(firstSpreadIndex);
 
       // Check the nested object contains a spread operator as well
-      const nestedObjectTokens = objectTokens[nestedObjectIndex].value as Token[];
+      const nestedObjectTokens = expectTokenArrayValue(
+        objectTokens[nestedObjectIndex],
+        'object_literal',
+      );
       const nestedSpreadIndex = nestedObjectTokens.findIndex(
         (token) => token.type === 'operator' && token.value === '...',
       );
@@ -193,7 +210,7 @@ describe('Tokenizer Object Tests', () => {
       expect(result.length).toBe(1);
       expect(result[0].type).toBe('object_literal');
 
-      const objectTokens = result[0].value as Token[];
+      const objectTokens = expectTokenArrayValue(result[0], 'object_literal');
 
       // Find all spread operators
       const spreadIndices: number[] = [];
@@ -213,7 +230,7 @@ describe('Tokenizer Object Tests', () => {
       expect(result.length).toBe(1);
       expect(result[0].type).toBe('object_literal');
 
-      const objectTokens = result[0].value as Token[];
+      const objectTokens = expectTokenArrayValue(result[0], 'object_literal');
 
       // The first token should be a spread operator
       expect(objectTokens[0].type).toBe('operator');
@@ -226,7 +243,7 @@ describe('Tokenizer Object Tests', () => {
       expect(result.length).toBe(1);
       expect(result[0].type).toBe('object_literal');
 
-      const objectTokens = result[0].value as Token[];
+      const objectTokens = expectTokenArrayValue(result[0], 'object_literal');
 
       // First token should be spread
       expect(objectTokens[0].type).toBe('operator');
@@ -258,14 +275,13 @@ describe('Tokenizer Object Tests', () => {
       expect(result.length).toBe(1);
       expect(result[0].type).toBe('object_literal');
 
-      const objectTokens = result[0].value as Token[];
+      const objectTokens = expectTokenArrayValue(result[0], 'object_literal');
 
       // Find x token and spread token
-      const xIndex = objectTokens.findIndex(
-        (token) =>
-          (token.type === 'string' || token.type === 'identifier') &&
-          (token.value === 'x' || token.value.includes('x')),
-      );
+      const xIndex = objectTokens.findIndex((token) => {
+        if (!hasKeyValue(token)) return false;
+        return token.value === 'x' || token.value.includes('x');
+      });
 
       // Find spread operator
       const spreadIndex = objectTokens.findIndex(
@@ -284,7 +300,7 @@ describe('Tokenizer Object Tests', () => {
       expect(result.length).toBe(1);
       expect(result[0].type).toBe('object_literal');
 
-      const objectTokens = result[0].value as Token[];
+      const objectTokens = expectTokenArrayValue(result[0], 'object_literal');
 
       // Find the spread operator
       const spreadIndex = objectTokens.findIndex(
@@ -300,7 +316,7 @@ describe('Tokenizer Object Tests', () => {
       expect(result.length).toBe(1);
       expect(result[0].type).toBe('object_literal');
 
-      const objectTokens = result[0].value as Token[];
+      const objectTokens = expectTokenArrayValue(result[0], 'object_literal');
 
       // Find the spread operator
       const spreadIndex = objectTokens.findIndex(

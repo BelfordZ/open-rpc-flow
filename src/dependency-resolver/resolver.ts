@@ -1,4 +1,5 @@
 import { Flow, Step, DependencyGraph, DependencyNode } from '../types';
+import { StepType } from '../step-executors/types';
 import { Logger } from '../util/logger';
 import {
   isLoopStep,
@@ -295,10 +296,10 @@ export class DependencyResolver {
       const dependents = this.getDependents(step.name);
 
       // Determine step type
-      let type: DependencyNode['type'] = 'request'; // default
-      if (isLoopStep(step)) type = 'loop';
-      if (isConditionStep(step)) type = 'condition';
-      if (isTransformStep(step)) type = 'transform';
+      let type: DependencyNode['type'] = StepType.Request; // default
+      if (isLoopStep(step)) type = StepType.Loop;
+      if (isConditionStep(step)) type = StepType.Condition;
+      if (isTransformStep(step)) type = StepType.Transform;
 
       nodes.push({
         name: step.name,

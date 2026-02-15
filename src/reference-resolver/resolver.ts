@@ -68,16 +68,11 @@ export class ReferenceResolver {
     value: any,
     path: string,
     extraContext: Record<string, any>,
-    isDirectCall: boolean,
   ): any {
     if (typeof value === 'string' && value.startsWith('${') && value.endsWith('}')) {
       const refPath = value.slice(2, -1);
       this.checkForCircularReference(refPath);
       value = this.resolveReference(value, extraContext);
-    }
-
-    if (isDirectCall) {
-      this.resolvingPaths.pop();
     }
 
     return value;
@@ -225,7 +220,11 @@ export class ReferenceResolver {
 
       // For simple values that don't need further resolution, we can return directly
       if (path === source) {
-        return this.handleSimplePathResolution(value, path, extraContext, isDirectCall);
+        const result = this.handleSimplePathResolution(value, path, extraContext);
+        if (isDirectCall) {
+          this.resolvingPaths.pop();
+        }
+        return result;
       }
 
       const restPath = path.slice(source.length);

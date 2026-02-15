@@ -1,4 +1,4 @@
-import { tokenize } from '../../expression-evaluator/tokenizer';
+import { tokenize, hasKeyValue, hasTokenArrayValue } from '../../expression-evaluator/tokenizer';
 import { TestLogger } from '../../util/logger';
 
 describe('tokenize', () => {
@@ -30,6 +30,33 @@ describe('tokenize', () => {
         { type: 'operator', value: '+', raw: '+' },
         { type: 'number', value: 2, raw: '2' },
       ]);
+    });
+  });
+
+  describe('type guard helpers', () => {
+    it('narrows token value shapes with guards', () => {
+      const arrayTokens = tokenize('[${a}]', logger);
+      const arrayToken = arrayTokens[0];
+      expect(hasTokenArrayValue(arrayToken)).toBe(true);
+      if (hasTokenArrayValue(arrayToken)) {
+        expect(arrayToken.value[0].type).toBe('reference');
+      }
+
+      const numberToken = tokenize('1', logger)[0];
+      expect(hasTokenArrayValue(numberToken)).toBe(false);
+
+      const objectTokens = tokenize('{ key: 1 }', logger);
+      const objectToken = objectTokens[0];
+      if (objectToken.type !== 'object_literal') {
+        throw new Error('Expected object literal token');
+      }
+      const keyToken = objectToken.value.find((t) => t.type === 'string');
+      expect(keyToken).toBeDefined();
+      if (!keyToken) {
+        throw new Error('Expected string token');
+      }
+      expect(hasKeyValue(keyToken)).toBe(true);
+      expect(hasKeyValue(numberToken)).toBe(false);
     });
   });
 

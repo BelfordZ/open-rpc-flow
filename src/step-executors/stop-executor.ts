@@ -1,6 +1,7 @@
 import { Step, StepExecutionContext, ExecutionContextData } from '../types';
 import { StepExecutor, StepExecutionResult, StepType } from './types';
 import { Logger } from '../util/logger';
+import { getDataType } from '../util/type-utils';
 import { ValidationError } from '../errors/base';
 
 export interface StopStep extends Step {
@@ -35,6 +36,12 @@ export class StopStepExecutor implements StepExecutor {
 
     const stopStep = step as StopStep;
     const endWorkflow = stopStep.stop.endWorkflow ?? false;
+
+    this.logger.debug('Input type check', {
+      stepName: step.name,
+      expected: 'boolean',
+      actual: getDataType(stopStep.stop.endWorkflow),
+    });
 
     this.logger.debug('Executing stop step', {
       stepName: step.name,

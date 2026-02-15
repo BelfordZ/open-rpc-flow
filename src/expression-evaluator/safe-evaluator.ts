@@ -2,29 +2,18 @@ import { Logger } from '../util/logger';
 import { ExpressionError } from '../expression-evaluator/errors';
 import { ReferenceResolver } from '../reference-resolver';
 import { PathSyntaxError, PropertyAccessError } from '../path-accessor';
-import { tokenize, Token } from './tokenizer';
+import { tokenize } from './tokenizer';
 import { TokenizerError } from './tokenizer';
+import type { Token, AstNode, OperatorSymbol, LiteralValue } from './types';
+import { hasKeyValue } from './types';
 import { TimeoutError } from '../errors/timeout-error';
 import { PolicyResolver } from '../util/policy-resolver';
 import { Step, getStepType } from '../types';
 import { StepType } from '../step-executors/types';
 import { DEFAULT_TIMEOUTS } from '../constants/timeouts';
 
-type Operator = keyof typeof SafeExpressionEvaluator.OPERATORS;
+type Operator = OperatorSymbol;
 type StackOperator = Operator | '(' | ')';
-
-interface AstNode {
-  type: 'literal' | 'reference' | 'operation' | 'object' | 'array' | 'function_call';
-  value?: any;
-  path?: string;
-  operator?: Operator;
-  left?: AstNode;
-  right?: AstNode;
-  properties?: { key: string; value: AstNode; spread?: boolean }[];
-  elements?: { value: AstNode; spread?: boolean }[];
-  name?: string;
-  args?: AstNode[];
-}
 
 export class _UnknownReferenceError extends Error {
   constructor(message: string) {
@@ -40,7 +29,7 @@ export class SafeExpressionEvaluator {
   private defaultExpressionTimeout: number = DEFAULT_TIMEOUTS.expression!;
 
   // Helper functions for operators
-  private static ensureNumbers(a: any, b: any, operation: string): void {
+  private static ensureNumbers(a: unknown, b: unknown, operation: string): void {
     if (typeof a !== 'number' || typeof b !== 'number') {
       throw new ExpressionError(
         `Cannot perform ${operation} on non-numeric values: ${a} ${operation} ${b}`,
@@ -48,67 +37,67 @@ export class SafeExpressionEvaluator {
     }
   }
 
-  private static ensureSameType(a: any, b: any, operation: string): void {
+  private static ensureSameType(a: unknown, b: unknown, operation: string): void {
     if (typeof a !== typeof b) {
       throw new ExpressionError(`Cannot compare values of different types: ${a} ${operation} ${b}`);
     }
   }
 
-  private static checkDivisionByZero(b: any): void {
+  private static checkDivisionByZero(b: unknown): void {
     if (b === 0) {
       throw new ExpressionError('Division/modulo by zero');
     }
   }
 
-  public static readonly OPERATORS = {
-    '+': (a: any, b: any) => {
+  public static readonly OPERATORS: Record<OperatorSymbol, (a: unknown, b: unknown) => unknown> = {
+    '+': (a: unknown, b: unknown) => {
       if (typeof a === 'string' || typeof b === 'string') {
         return String(a) + String(b);
       }
       SafeExpressionEvaluator.ensureNumbers(a, b, '+');
-      return a + b;
+      return (a as number) + (b as number);
     },
-    '-': (a: any, b: any) => {
+    '-': (a: unknown, b: unknown) => {
       SafeExpressionEvaluator.ensureNumbers(a, b, '-');
-      return a - b;
+      return (a as number) - (b as number);
     },
-    '*': (a: any, b: any) => {
+    '*': (a: unknown, b: unknown) => {
       SafeExpressionEvaluator.ensureNumbers(a, b, '*');
-      return a * b;
+      return (a as number) * (b as number);
     },
-    '/': (a: any, b: any) => {
+    '/': (a: unknown, b: unknown) => {
       SafeExpressionEvaluator.ensureNumbers(a, b, '/');
       SafeExpressionEvaluator.checkDivisionByZero(b);
-      return a / b;
+      return (a as number) / (b as number);
     },
-    '%': (a: any, b: any) => {
+    '%': (a: unknown, b: unknown) => {
       SafeExpressionEvaluator.ensureNumbers(a, b, '%');
       SafeExpressionEvaluator.checkDivisionByZero(b);
-      return a % b;
+      return (a as number) % (b as number);
     },
-    '==': (a: any, b: any) => a == b,
-    '===': (a: any, b: any) => a === b,
-    '!=': (a: any, b: any) => a != b,
-    '!==': (a: any, b: any) => a !== b,
-    '>': (a: any, b: any) => {
+    '==': (a: unknown, b: unknown) => a == b,
+    '===': (a: unknown, b: unknown) => a === b,
+    '!=': (a: unknown, b: unknown) => a != b,
+    '!==': (a: unknown, b: unknown) => a !== b,
+    '>': (a: unknown, b: unknown) => {
       SafeExpressionEvaluator.ensureSameType(a, b, '>');
-      return a > b;
+      return (a as number | string) > (b as number | string);
     },
-    '>=': (a: any, b: any) => {
+    '>=': (a: unknown, b: unknown) => {
       SafeExpressionEvaluator.ensureSameType(a, b, '>=');
-      return a >= b;
+      return (a as number | string) >= (b as number | string);
     },
-    '<': (a: any, b: any) => {
+    '<': (a: unknown, b: unknown) => {
       SafeExpressionEvaluator.ensureSameType(a, b, '<');
-      return a < b;
+      return (a as number | string) < (b as number | string);
     },
-    '<=': (a: any, b: any) => {
+    '<=': (a: unknown, b: unknown) => {
       SafeExpressionEvaluator.ensureSameType(a, b, '<=');
-      return a <= b;
+      return (a as number | string) <= (b as number | string);
     },
-    '&&': (a: any, b: any) => a && b,
-    '||': (a: any, b: any) => a || b,
-    '??': (a: any, b: any) => a ?? b,
+    '&&': (a: unknown, b: unknown) => (a as any) && (b as any),
+    '||': (a: unknown, b: unknown) => (a as any) || (b as any),
+    '??': (a: unknown, b: unknown) => (a as any) ?? (b as any),
   } as const;
 
   // Add whitelist of allowed global functions
@@ -322,7 +311,7 @@ export class SafeExpressionEvaluator {
   /**
    * Helper method to convert token values to JavaScript literal values
    */
-  private tokenToLiteral(value: string): any {
+  private tokenToLiteral(value: string): LiteralValue {
     if (value === 'true') return true;
     if (value === 'false') return false;
     if (value === 'null') return null;
@@ -340,7 +329,7 @@ export class SafeExpressionEvaluator {
     if (tokens.length === 1) {
       const token = tokens[0];
       if (token.type === 'number') {
-        return { type: 'literal', value: this.tokenToLiteral(token.value) };
+        return { type: 'literal', value: token.value };
       }
       if (token.type === 'string') {
         return { type: 'literal', value: token.value };
@@ -457,7 +446,7 @@ export class SafeExpressionEvaluator {
         if (expectOperator) {
           throw new ExpressionError('Unexpected number');
         }
-        outputQueue.push({ type: 'literal', value: this.tokenToLiteral(token.value) });
+        outputQueue.push({ type: 'literal', value: token.value });
         expectOperator = true;
       } else if (token.type === 'string') {
         if (expectOperator) {
@@ -468,9 +457,24 @@ export class SafeExpressionEvaluator {
       } else if (token.type === 'identifier') {
         // If the identifier is actually an operator symbol (e.g., '*', '/', '+', '-', etc.), treat it as an operator
         if (
-          ['*', '/', '%', '+', '-', '==', '===', '!=', '!==', '>', '>=', '<', '<='].includes(
-            token.value,
-          )
+          [
+            '*',
+            '/',
+            '%',
+            '+',
+            '-',
+            '==',
+            '===',
+            '!=',
+            '!==',
+            '>',
+            '>=',
+            '<',
+            '<=',
+            '&&',
+            '||',
+            '??',
+          ].includes(token.value)
         ) {
           if (!expectOperator) {
             throw new ExpressionError('Unexpected operator');
@@ -490,12 +494,12 @@ export class SafeExpressionEvaluator {
         if (expectOperator) {
           throw new ExpressionError('Unexpected reference');
         }
-        outputQueue.push({ type: 'reference', path: this.buildReferencePath(token.value) });
+        outputQueue.push({
+          type: 'reference',
+          path: this.buildReferencePath(token.value),
+        });
         expectOperator = true;
-      } else if (
-        token.type === 'operator' ||
-        ['&&', '||', '??', '==', '===', '!=', '!==', '>', '>=', '<', '<='].includes(token.value)
-      ) {
+      } else if (token.type === 'operator') {
         if (!expectOperator) {
           throw new ExpressionError('Unexpected operator');
         }
@@ -567,14 +571,14 @@ export class SafeExpressionEvaluator {
   }
 
   // Helper method to parse grouped elements (arrays and objects)
-  private parseGroupedElements(
+  private parseGroupedElements<T>(
     tokens: Token[],
     delimiter: string = ',',
-    elementProcessor: (currentTokens: Token[], isSpread: boolean, key?: string) => any,
-  ): any[] {
+    elementProcessor: (currentTokens: Token[], isSpread: boolean, key?: string) => T,
+  ): T[] {
     if (tokens.length === 0) return [];
 
-    const result: any[] = [];
+    const result: T[] = [];
     let currentTokens: Token[] = [];
     let depth = 0;
     let isSpread = false;
@@ -597,7 +601,11 @@ export class SafeExpressionEvaluator {
         if (currentTokens.length !== 1) {
           throw new ExpressionError('Invalid object literal: invalid key');
         }
-        key = currentTokens[0].value;
+        const keyToken = currentTokens[0];
+        if (!hasKeyValue(keyToken)) {
+          throw new ExpressionError('Invalid object literal: invalid key');
+        }
+        key = keyToken.value;
         currentTokens = [];
         continue;
       }

@@ -1,4 +1,16 @@
-export { Flow, Step, JsonRpcRequest } from './types';
+/* istanbul ignore file */
+export { Flow, Step, JsonRpcRequest, StepExecutionContext } from './types';
+export {
+  StepExecutor,
+  StepExecutionResult,
+  StepType,
+  JsonRpcRequestError,
+  RequestStepExecutor,
+  LoopStepExecutor,
+  ConditionStepExecutor,
+  TransformStepExecutor,
+  StopStepExecutor,
+} from './step-executors';
 export { FlowExecutor, FlowExecutorOptions, DEFAULT_RETRY_POLICY } from './flow-executor';
 export { SafeExpressionEvaluator } from './expression-evaluator/safe-evaluator';
 export {
@@ -11,6 +23,7 @@ export {
 } from './reference-resolver';
 export {
   PathAccessor,
+  PathSegment,
   PathAccessorError,
   PathSyntaxError,
   PropertyAccessError,
@@ -34,12 +47,13 @@ export {
   StepCompleteEvent,
   StepErrorEvent,
   StepSkipEvent,
+  StepProgressEvent,
   DependencyResolvedEvent,
   FlowEventOptions,
 } from './util/flow-executor-events';
 
 // Export error handling related types
-export { FlowError, ExecutionError, ValidationError, StateError } from './errors/base';
+export { FlowError, ExecutionError, ValidationError, TimeoutError, StateError } from './errors';
 export { ErrorCode, ErrorCategory } from './errors/codes';
 export { RetryPolicy, RetryableOperation } from './errors/recovery';
 

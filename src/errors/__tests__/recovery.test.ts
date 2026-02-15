@@ -48,6 +48,9 @@ describe('RetryableOperation', () => {
 
       expect(result).toBe('success');
       expect(operation).toHaveBeenCalledTimes(2);
+
+      const warnings = testLogger.getLogs().filter((l) => l.level === 'warn');
+      expect(warnings.length).toBeGreaterThan(0);
     });
 
     it('should throw immediately on non-retryable error', async () => {
@@ -609,6 +612,24 @@ describe('RetryableOperation', () => {
         Object.defineProperty(error, 'constructor', { value: { name: 'RandomError' } });
         const result = (retryable as any).isRetryable(error);
         expect(result).toBe(false);
+      });
+    });
+
+    describe('calculateDelay', () => {
+      it('calculates exponential delay', () => {
+        const retryable = new RetryableOperation(jest.fn(), defaultPolicy, testLogger);
+        const delay = (retryable as any).calculateDelay(2);
+        expect(delay).toBe(200);
+      });
+
+      it('calculates linear delay', () => {
+        const linearPolicy = {
+          ...defaultPolicy,
+          backoff: { ...defaultPolicy.backoff, strategy: 'linear' },
+        } as const;
+        const retryable = new RetryableOperation(jest.fn(), linearPolicy, testLogger);
+        const delay = (retryable as any).calculateDelay(3);
+        expect(delay).toBe(104);
       });
     });
   });

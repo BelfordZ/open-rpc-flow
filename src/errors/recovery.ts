@@ -118,6 +118,12 @@ export class RetryableOperation<T> {
           );
         }
 
+        this.logger.warn('Retrying operation after failure', {
+          attempt,
+          maxAttempts: this.policy.maxAttempts,
+          error: error instanceof Error ? error.message : String(error),
+        });
+
         attempt++;
 
         const delay = this.calculateDelay(attempt);
@@ -199,6 +205,7 @@ export class RetryableOperation<T> {
         (retryableError) => String(retryableError) === errorCodeStr,
       );
 
+      /* istanbul ignore next -- debug logging */
       this.logger.debug('Retryable check result', {
         errorCode,
         errorCodeAsString: errorCodeStr,

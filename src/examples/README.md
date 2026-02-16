@@ -44,6 +44,7 @@ This directory contains example flows demonstrating various patterns and use cas
 - **event-emitter-example.ts** - Stream step updates during execution
 - **abort-signal-example.ts** - Respect `AbortSignal` for request cancellation
 - **error-handling-example.ts** - Demonstrates retry and circuit breaker logic
+- **resume-retry-example.ts** - Shows how to seed context/results before `resume()` and `retry()`
 
 ## Key Concepts Demonstrated
 

@@ -95,6 +95,13 @@ Integrate `AbortSignal` to cancel long running requests.
 
 [**src/examples/abort-signal-example.ts**](src/examples/abort-signal-example.ts)
 
+### 7. Resume and Retry with Seeded State
+
+Resume a partially completed flow or retry from a failure without re-running completed
+work. This is useful when restoring execution state from a job queue or database.
+
+[**src/examples/resume-retry-example.ts**](src/examples/resume-retry-example.ts)
+
 ## Installation
 
 ```bash
@@ -306,6 +313,36 @@ const executor = new FlowExecutor(flow, jsonRpcHandler, {
   },
 });
 ```
+
+### Resume, Retry, and State Seeding
+
+You can safely seed context and prior step results before calling `resume()` or `retry()`.
+
+- `setContext(context)` replaces the execution context used by references like
+  `${context.foo}`.
+- `setStepResults(results)` seeds completed step outputs and marks those steps as successful.
+- `resume()` starts from the step after the last successful step.
+- `retry()` starts from the last failed step and clears results for that step and all following
+  steps.
+
+```typescript
+const executor = new FlowExecutor(flow, jsonRpcHandler);
+
+// Typically loaded from durable storage
+executor.setContext({ requestId: 'req-123', actorId: 'user-42' });
+executor.setStepResults({
+  fetchProfile: { result: { id: 'user-42', status: 'active' } },
+});
+
+// Continue from the next unfinished step
+const resumedResults = await executor.resume();
+
+// If a later run fails, retry from the last failed step
+const retriedResults = await executor.retry();
+```
+
+See [**src/examples/resume-retry-example.ts**](src/examples/resume-retry-example.ts) for a
+complete, runnable example that shows how to snapshot and restore state.
 
 ##### Error Events
 

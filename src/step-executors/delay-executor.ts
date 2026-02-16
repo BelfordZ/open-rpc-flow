@@ -65,8 +65,10 @@ export class DelayStepExecutor implements StepExecutor {
         }
       };
       onAbort = () => {
+        const abortError = new Error('Delay aborted');
+        abortError.name = 'AbortError';
         cleanup();
-        reject(new Error('Delay aborted'));
+        reject(abortError);
       };
 
       timeoutId = setTimeout(() => {

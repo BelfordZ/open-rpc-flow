@@ -1,0 +1,34 @@
+{
+  "$schema": "../meta-schema.json",
+  "name": "flow-executor-resume",
+  "description": "Demonstrates pausing a flow and resuming from the paused step",
+  "steps": [
+    {
+      "name": "loadAccount",
+      "request": {
+        "method": "account.load",
+        "params": { "accountId": "acct-123" }
+      }
+    },
+    {
+      "name": "syncProfile",
+      "request": {
+        "method": "profile.sync",
+        "params": {
+          "accountId": "${loadAccount.result.accountId}",
+          "status": "${loadAccount.result.status}"
+        }
+      }
+    },
+    {
+      "name": "publishSummary",
+      "request": {
+        "method": "summary.publish",
+        "params": {
+          "accountId": "${syncProfile.result.accountId}",
+          "synced": "${syncProfile.result.synced}"
+        }
+      }
+    }
+  ]
+}

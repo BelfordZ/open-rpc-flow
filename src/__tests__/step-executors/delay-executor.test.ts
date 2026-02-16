@@ -13,6 +13,21 @@ describe('DelayStepExecutor', () => {
     jest.clearAllMocks();
   });
 
+  it('canExecute returns true for delay steps', () => {
+    const executor = new DelayStepExecutor(jest.fn(), noLogger);
+    const step = {
+      name: 'delayTest',
+      delay: { duration: 1, step: { name: 'inner', request: { method: 'm', params: {} } } },
+    };
+    expect(executor.canExecute(step as any)).toBe(true);
+  });
+
+  it('canExecute returns false for non-delay steps', () => {
+    const executor = new DelayStepExecutor(jest.fn(), noLogger);
+    const step = { name: 'req', request: { method: 'm', params: {} } };
+    expect(executor.canExecute(step as any)).toBe(false);
+  });
+
   it('executes the nested step after the delay', async () => {
     const nestedResult = { type: StepType.Request, result: { ok: true } } as any;
     const executeStep = jest.fn().mockResolvedValue(nestedResult);
@@ -63,6 +78,37 @@ describe('DelayStepExecutor', () => {
 
     await expect(executor.execute(step, context)).rejects.toThrow(
       'Delay duration must be non-negative',
+    );
+  });
+
+  it('throws for non-numeric duration', async () => {
+    const executor = new DelayStepExecutor(jest.fn(), noLogger);
+    const context = createMockContext();
+
+    const step = {
+      name: 'badDuration',
+      delay: {
+        duration: 'bad' as any,
+        step: { name: 'inner', request: { method: 'm', params: {} } },
+      },
+    } as any;
+
+    await expect(executor.execute(step, context)).rejects.toThrow(
+      'Delay duration must be a number',
+    );
+  });
+
+  it('throws when nested step is missing', async () => {
+    const executor = new DelayStepExecutor(jest.fn(), noLogger);
+    const context = createMockContext();
+
+    const step = {
+      name: 'missingNested',
+      delay: { duration: 10 },
+    } as any;
+
+    await expect(executor.execute(step, context)).rejects.toThrow(
+      'Delay step must include a nested step',
     );
   });
 

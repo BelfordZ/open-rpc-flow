@@ -1,14 +1,7 @@
 import { Step, StepExecutionContext } from '../types';
-import { StepExecutor, StepExecutionResult, StepType } from './types';
+import { DelayStep, StepExecutor, StepExecutionResult, StepType } from './types';
 import { Logger } from '../util/logger';
 import { ValidationError } from '../errors/base';
-
-export interface DelayStep extends Step {
-  delay: {
-    duration: number;
-    step: Step;
-  };
-}
 
 type ExecuteStep = (
   step: Step,
@@ -40,11 +33,22 @@ export class DelayStepExecutor implements StepExecutor {
       throw new ValidationError('Invalid step type for DelayStepExecutor', { step });
     }
 
-    const delayStep = step as DelayStep;
+    const delayStep: DelayStep = step;
     const { duration, step: nestedStep } = delayStep.delay;
+
+    if (typeof duration !== 'number' || Number.isNaN(duration)) {
+      throw new ValidationError('Delay duration must be a number', {
+        stepName: step.name,
+      });
+    }
 
     if (duration < 0) {
       throw new ValidationError('Delay duration must be non-negative', {
+        stepName: step.name,
+      });
+    }
+    if (!nestedStep) {
+      throw new ValidationError('Delay step must include a nested step', {
         stepName: step.name,
       });
     }
@@ -52,17 +56,27 @@ export class DelayStepExecutor implements StepExecutor {
     this.logger.debug('Starting delay', { stepName: step.name, duration });
 
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(resolve, duration);
+      let timeoutId: NodeJS.Timeout | undefined;
+      let onAbort = () => {};
+      const cleanup = () => {
+        if (timeoutId) clearTimeout(timeoutId);
+        if (signal) {
+          signal.removeEventListener('abort', onAbort);
+        }
+      };
+      onAbort = () => {
+        cleanup();
+        reject(new Error('Delay aborted'));
+      };
+
+      timeoutId = setTimeout(() => {
+        cleanup();
+        resolve();
+      }, duration);
       if (signal) {
         if (signal.aborted) {
-          clearTimeout(timeout);
-          return reject(new Error('Delay aborted'));
+          return onAbort();
         }
-        const onAbort = () => {
-          clearTimeout(timeout);
-          signal.removeEventListener('abort', onAbort);
-          reject(new Error('Delay aborted'));
-        };
         signal.addEventListener('abort', onAbort);
       }
     });

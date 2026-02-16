@@ -359,4 +359,56 @@ describe('FlowExecutor resume/retry/pause', () => {
     const calledMethods = handler.mock.calls.map((call) => call[0].method);
     expect(calledMethods).toEqual(['two']);
   });
+  it('returns a state snapshot for debugging', async () => {
+    const flow: Flow = {
+      name: 'state-snapshot-flow',
+      description: 'state snapshot validation',
+      context: { env: 'test' },
+      steps: [
+        { name: 'step1', request: { method: 'one', params: {} } },
+        { name: 'step2', request: { method: 'two', params: {} } },
+      ],
+    };
+
+    const executor = new FlowExecutor(flow, jest.fn(), {
+      logger: new TestLogger('state-snapshot'),
+    });
+
+    executor.setContext({ env: 'updated' });
+    executor.setStepResults({ step1: { result: 'one' } });
+
+    const state = executor.getState();
+
+    expect(state).toEqual({
+      context: { env: 'updated' },
+      stepResultKeys: ['step1'],
+      lastFailedStepName: null,
+      statusMap: { step1: 'success' },
+    });
+  });
+
+  it('returns an isolated copy of state snapshot values', () => {
+    const flow: Flow = {
+      name: 'state-snapshot-copy-flow',
+      description: 'state snapshot copy validation',
+      context: { env: 'test' },
+      steps: [{ name: 'step1', request: { method: 'one', params: {} } }],
+    };
+
+    const executor = new FlowExecutor(flow, jest.fn(), {
+      logger: new TestLogger('state-snapshot-copy'),
+    });
+
+    const state = executor.getState();
+    state.context.env = 'changed';
+    state.stepResultKeys.push('fake-step');
+    state.statusMap.step1 = 'failed';
+
+    expect(executor.getState()).toEqual({
+      context: { env: 'test' },
+      stepResultKeys: [],
+      lastFailedStepName: null,
+      statusMap: {},
+    });
+  });
 });

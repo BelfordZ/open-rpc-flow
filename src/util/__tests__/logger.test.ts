@@ -51,6 +51,19 @@ describe('ConsoleLogger', () => {
     expect(mockConsole.debug).toHaveBeenCalledWith('[Test] debug message');
   });
 
+  it('forwards metadata for error and warn logs', () => {
+    const logger = new ConsoleLogger('Test');
+    const errorData = new Error('boom');
+
+    logger.error('error with data', errorData);
+    logger.warn('warn with data', { warning: true });
+
+    expect(mockConsole.error).toHaveBeenCalledWith('[Test] error with data', errorData);
+    expect(mockConsole.warn).toHaveBeenCalledWith('[Test] warn with data', {
+      warning: true,
+    });
+  });
+
   it('creates nested loggers with combined prefix', () => {
     const logger = new ConsoleLogger('Parent');
     const nested = logger.createNested('Child');

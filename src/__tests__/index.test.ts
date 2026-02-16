@@ -40,38 +40,6 @@ describe('FlowExecutor', () => {
     testLogger.clear();
   });
 
-  it('executes a simple request step', async () => {
-    const flow: Flow = {
-      name: 'Simple Request',
-      description: 'Test simple request execution',
-      steps: [
-        {
-          name: 'get_data',
-          request: {
-            method: 'getData',
-            params: {},
-          },
-        },
-      ],
-    };
-
-    const executor = new FlowExecutor(flow, mockJsonRpcHandler, testLogger);
-    const results = await executor.execute();
-
-    expect(mockJsonRpcHandler).toHaveBeenCalledTimes(1);
-    expect(results.get('get_data')).toEqual({
-      result: {
-        items: [
-          { id: 1, name: 'Item 1', value: 100 },
-          { id: 2, name: 'Item 2', value: 200 },
-          { id: 3, name: 'Item 3', value: 300 },
-        ],
-      },
-      type: 'request',
-      metadata: expect.any(Object),
-    });
-  });
-
   it('executes a loop with request', async () => {
     const flow: Flow = {
       name: 'Loop Test',

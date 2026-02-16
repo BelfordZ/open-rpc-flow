@@ -1151,6 +1151,43 @@ describe('FlowExecutor Events', () => {
     expect(received.length).toBe(0);
   });
 
+  it('should emit flow finish events with complete status', () => {
+    const events = new FlowExecutorEvents({ emitFlowEvents: true });
+    const received: any[] = [];
+
+    events.on(FlowEventType.FLOW_FINISH, (d) => received.push(d));
+    events.emitFlowFinish('FlowDone', 'complete', Date.now());
+
+    expect(received.length).toBe(1);
+    expect(received[0].flowName).toBe('FlowDone');
+    expect(received[0].status).toBe('complete');
+  });
+
+  it('should emit flow finish events with paused and aborted metadata', () => {
+    const events = new FlowExecutorEvents({ emitFlowEvents: true });
+    const received: any[] = [];
+
+    events.on(FlowEventType.FLOW_FINISH, (d) => received.push(d));
+    events.emitFlowFinish('FlowPaused', 'paused', Date.now(), { reason: 'paused' });
+    events.emitFlowFinish('FlowAborted', 'aborted', Date.now(), { reason: 'manual abort' });
+
+    expect(received.length).toBe(2);
+    expect(received[0].status).toBe('paused');
+    expect(received[0].reason).toBe('paused');
+    expect(received[1].status).toBe('aborted');
+    expect(received[1].reason).toBe('manual abort');
+  });
+
+  it('should not emit flow finish events when emitFlowEvents is disabled', () => {
+    const events = new FlowExecutorEvents({ emitFlowEvents: false });
+    const received: any[] = [];
+
+    events.on(FlowEventType.FLOW_FINISH, (d) => received.push(d));
+    events.emitFlowFinish('FlowDisabled', 'error', Date.now(), { error: new Error('boom') });
+
+    expect(received.length).toBe(0);
+  });
+
   it('should emit flow timeout events from FlowExecutorEvents', () => {
     const events = new FlowExecutorEvents({ emitFlowEvents: true });
     const received: any[] = [];

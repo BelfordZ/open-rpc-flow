@@ -1144,6 +1144,41 @@ describe('FlowExecutor Events', () => {
     expect(received.length).toBe(0);
   });
 
+  it('should emit flow timeout events from FlowExecutorEvents', () => {
+    const events = new FlowExecutorEvents({ emitFlowEvents: true });
+    const received: any[] = [];
+    events.on(FlowEventType.FLOW_TIMEOUT, (d) => received.push(d));
+    events.emitFlowTimeout('FlowTimeout', 500, 250);
+    expect(received.length).toBe(1);
+    expect(received[0].flowName).toBe('FlowTimeout');
+    expect(received[0].timeout).toBe(500);
+    expect(received[0].duration).toBe(250);
+  });
+
+  it('should not emit flow timeout events when emitFlowEvents is disabled', () => {
+    const events = new FlowExecutorEvents({ emitFlowEvents: false });
+    const received: any[] = [];
+    events.on(FlowEventType.FLOW_TIMEOUT, (d) => received.push(d));
+    events.emitFlowTimeout('FlowTimeout', 500, 250);
+    expect(received.length).toBe(0);
+  });
+
+  it('should not emit step retry or timeout events when emitStepEvents is disabled', () => {
+    const events = new FlowExecutorEvents({ emitStepEvents: false });
+    const retryEvents: any[] = [];
+    const timeoutEvents: any[] = [];
+    const step = { name: 's1', request: { method: 'm', params: {} } } as any;
+
+    events.on(FlowEventType.STEP_RETRY, (d) => retryEvents.push(d));
+    events.on(FlowEventType.STEP_TIMEOUT, (d) => timeoutEvents.push(d));
+
+    events.emitStepRetry(step, 2, new Error('retry'), 100);
+    events.emitStepTimeout(step, 200, 150);
+
+    expect(retryEvents.length).toBe(0);
+    expect(timeoutEvents.length).toBe(0);
+  });
+
   it('should emit step retry events', async () => {
     const attempts = { count: 0 };
     const flow: Flow = {

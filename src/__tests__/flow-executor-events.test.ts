@@ -460,6 +460,115 @@ describe('FlowExecutor Events', () => {
     expect(nestedErrorEvents.length).toBe(1);
   });
 
+  it('emits step:aborted for nested loop steps and the loop parent when aborted', async () => {
+    const abortableHandler = jest.fn().mockImplementation(() => {
+      throw new Error('request aborted');
+    });
+
+    const flow: Flow = {
+      name: 'NestedLoopAbortFlow',
+      description: 'Ensures loop nested abort events are propagated',
+      context: {
+        items: [1],
+      },
+      steps: [
+        {
+          name: 'outerLoop',
+          loop: {
+            over: '${context.items}',
+            as: 'item',
+            step: {
+              name: 'loopInnerRequest',
+              request: {
+                method: 'test.method',
+                params: { item: '${item}' },
+              },
+            },
+          },
+        },
+      ],
+    };
+
+    const executor = new FlowExecutor(flow, abortableHandler, { logger: new TestLogger() });
+    const abortedStepNames: string[] = [];
+    executor.events.on(FlowEventType.STEP_ABORTED, (data) => {
+      abortedStepNames.push(data.stepName);
+    });
+
+    await expect(executor.execute()).rejects.toThrow(/abort/i);
+    expect(abortedStepNames).toEqual(expect.arrayContaining(['loopInnerRequest', 'outerLoop']));
+  });
+
+  it('emits step:aborted for nested condition steps and the condition parent when aborted', async () => {
+    const abortableHandler = jest.fn().mockImplementation(() => {
+      throw new Error('request aborted');
+    });
+
+    const flow: Flow = {
+      name: 'NestedConditionAbortFlow',
+      description: 'Ensures condition nested abort events are propagated',
+      steps: [
+        {
+          name: 'outerCondition',
+          condition: {
+            if: 'true',
+            then: {
+              name: 'conditionInnerRequest',
+              request: {
+                method: 'test.method',
+                params: {},
+              },
+            },
+          },
+        },
+      ],
+    };
+
+    const executor = new FlowExecutor(flow, abortableHandler, { logger: new TestLogger() });
+    const abortedStepNames: string[] = [];
+    executor.events.on(FlowEventType.STEP_ABORTED, (data) => {
+      abortedStepNames.push(data.stepName);
+    });
+
+    await expect(executor.execute()).rejects.toThrow(/abort/i);
+    expect(abortedStepNames).toEqual(
+      expect.arrayContaining(['conditionInnerRequest', 'outerCondition']),
+    );
+  });
+
+  it('emits step:aborted for transform steps when execution starts with an aborted signal', async () => {
+    const flow: Flow = {
+      name: 'TransformAbortFlow',
+      description: 'Ensures transform aborts emit step:aborted consistently',
+      steps: [
+        {
+          name: 'transformStep',
+          transform: {
+            input: [1, 2, 3],
+            operations: [
+              {
+                type: 'map',
+                using: '${item}',
+              },
+            ],
+          },
+        },
+      ],
+    };
+
+    const controller = new AbortController();
+    controller.abort('manual-abort');
+
+    const executor = new FlowExecutor(flow, mockJsonRpcHandler, { logger: new TestLogger() });
+    const abortedStepNames: string[] = [];
+    executor.events.on(FlowEventType.STEP_ABORTED, (data) => {
+      abortedStepNames.push(data.stepName);
+    });
+
+    await expect(executor.execute({ signal: controller.signal })).rejects.toThrow(/manual-abort/i);
+    expect(abortedStepNames).toContain('transformStep');
+  });
+
   it('should check for nested stop results correctly', async () => {
     // Create a flow with a condition that has a stop step in the then branch
     const nestedStopFlow = {

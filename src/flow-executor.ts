@@ -365,7 +365,7 @@ export class FlowExecutor {
     const startTime = Date.now();
     let globalTimeoutId: NodeJS.Timeout | undefined;
     let flowAbortEmitted = false;
-    let flowFinishStatus: 'complete' | 'error' | 'aborted' | 'paused' | null = null;
+    let flowCompleteStatus: 'complete' | 'error' | 'aborted' | 'paused' | null = null;
     try {
       const flowTimeout = this.flow.policies?.global?.timeout?.timeout;
       if (typeof flowTimeout === 'number' && flowTimeout > 0) {
@@ -485,16 +485,18 @@ export class FlowExecutor {
         }
       }
 
-      this.events.emitFlowComplete(this.flow.name, this.stepResults, startTime);
-      this.events.emitFlowFinish(this.flow.name, 'complete', startTime);
-      flowFinishStatus = 'complete';
+      this.events.emitFlowComplete(this.flow.name, this.stepResults, startTime, {
+        status: 'complete',
+      });
+      flowCompleteStatus = 'complete';
       return this.stepResults;
     } catch (error: any) {
       if (error instanceof PauseError) {
-        this.events.emitFlowFinish(this.flow.name, 'paused', startTime, {
+        this.events.emitFlowComplete(this.flow.name, this.stepResults, startTime, {
+          status: 'paused',
           reason: String(this.globalAbortController.signal.reason),
         });
-        flowFinishStatus = 'paused';
+        flowCompleteStatus = 'paused';
         throw error;
       }
       if (this.globalAbortController.signal.aborted && !flowAbortEmitted) {
@@ -505,10 +507,11 @@ export class FlowExecutor {
       const reason = this.globalAbortController.signal.reason;
       const isPause = this.isPaused || reason === 'paused';
       if (!isPause && this.globalAbortController.signal.aborted && reason !== 'timeout') {
-        this.events.emitFlowFinish(this.flow.name, 'aborted', startTime, {
+        this.events.emitFlowComplete(this.flow.name, this.stepResults, startTime, {
+          status: 'aborted',
           reason: String(reason),
         });
-        flowFinishStatus = 'aborted';
+        flowCompleteStatus = 'aborted';
       }
       if (
         !isPause &&
@@ -525,17 +528,21 @@ export class FlowExecutor {
 
         this.events.emitFlowTimeout(this.flow.name, flowTimeout, duration);
         this.events.emitFlowError(this.flow.name, timeoutError, startTime);
-        this.events.emitFlowFinish(this.flow.name, 'error', startTime, { error: timeoutError });
-        flowFinishStatus = 'error';
+        this.events.emitFlowComplete(this.flow.name, this.stepResults, startTime, {
+          status: 'error',
+          error: timeoutError,
+        });
+        flowCompleteStatus = 'error';
         throw timeoutError;
       }
 
       this.events.emitFlowError(this.flow.name, error, startTime);
-      if (flowFinishStatus === null) {
-        this.events.emitFlowFinish(this.flow.name, 'error', startTime, {
+      if (flowCompleteStatus === null) {
+        this.events.emitFlowComplete(this.flow.name, this.stepResults, startTime, {
+          status: 'error',
           error: new Error(String(error)),
         });
-        flowFinishStatus = 'error';
+        flowCompleteStatus = 'error';
       }
       throw error;
     } finally {

@@ -8,7 +8,6 @@ import { StepExecutionResult, StepType } from '../step-executors';
  */
 export enum FlowEventType {
   FLOW_START = 'flow:start',
-  FLOW_FINISH = 'flow:finish',
   FLOW_COMPLETE = 'flow:complete',
   FLOW_ERROR = 'flow:error',
   STEP_START = 'step:start',
@@ -24,7 +23,7 @@ export enum FlowEventType {
   FLOW_TIMEOUT = 'flow:timeout',
 }
 
-export type FlowFinishStatus = 'complete' | 'error' | 'aborted' | 'paused';
+export type FlowCompletionStatus = 'complete' | 'error' | 'aborted' | 'paused';
 
 /**
  * Base interface for all flow events
@@ -44,25 +43,16 @@ export interface FlowStartEvent extends FlowEvent {
 }
 
 /**
- * Flow finish event
- */
-export interface FlowFinishEvent extends FlowEvent {
-  type: FlowEventType.FLOW_FINISH;
-  flowName: string;
-  status: FlowFinishStatus;
-  duration: number;
-  error?: Error;
-  reason?: string;
-}
-
-/**
  * Flow complete event
  */
 export interface FlowCompleteEvent extends FlowEvent {
   type: FlowEventType.FLOW_COMPLETE;
   flowName: string;
+  status: FlowCompletionStatus;
   results: Record<string, any>;
   duration: number;
+  error?: Error;
+  reason?: string;
 }
 
 /**
@@ -254,30 +244,18 @@ export class FlowExecutorEvents extends EventEmitter {
   }
 
   /**
-   * Emit flow finish event
-   */
-  emitFlowFinish(
-    flowName: string,
-    status: FlowFinishStatus,
-    startTime: number,
-    options: { error?: Error; reason?: string } = {},
-  ): void {
-    if (!this.options.emitFlowEvents) return;
-
-    this.emit(FlowEventType.FLOW_FINISH, {
-      timestamp: Date.now(),
-      type: FlowEventType.FLOW_FINISH,
-      flowName,
-      status,
-      duration: Date.now() - startTime,
-      ...options,
-    } as FlowFinishEvent);
-  }
-
-  /**
    * Emit flow complete event
    */
-  emitFlowComplete(flowName: string, results: Map<string, any>, startTime: number): void {
+  emitFlowComplete(
+    flowName: string,
+    results: Map<string, any>,
+    startTime: number,
+    options: {
+      status?: FlowCompletionStatus;
+      error?: Error;
+      reason?: string;
+    } = {},
+  ): void {
     if (!this.options.emitFlowEvents) return;
 
     const resultsObj = this.options.includeResults
@@ -288,8 +266,11 @@ export class FlowExecutorEvents extends EventEmitter {
       timestamp: Date.now(),
       type: FlowEventType.FLOW_COMPLETE,
       flowName,
+      status: options.status ?? 'complete',
       results: resultsObj,
       duration: Date.now() - startTime,
+      ...(options.error ? { error: options.error } : {}),
+      ...(options.reason ? { reason: options.reason } : {}),
     } as FlowCompleteEvent);
   }
 

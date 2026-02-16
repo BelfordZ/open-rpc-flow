@@ -5,6 +5,49 @@
 
 * update readme ([#59](https://github.com/BelfordZ/open-rpc-flow/issues/59)) ([7f5d691](https://github.com/BelfordZ/open-rpc-flow/commit/7f5d6915880bb02c6bbe6e93f6f98abc95cc5c39))
 
+## [1.5.0](https://github.com/BelfordZ/open-rpc-flow/compare/v1.4.4...v1.5.0) (2026-02-16)
+
+
+### Features
+
+* add correlation id metadata to step events ([#100](https://github.com/BelfordZ/open-rpc-flow/issues/100)) ([dcebdb0](https://github.com/BelfordZ/open-rpc-flow/commit/dcebdb0ac655abdf5d3c3f5e64aa8935677bc7b3))
+* add delay step ([#92](https://github.com/BelfordZ/open-rpc-flow/issues/92)) ([368087a](https://github.com/BelfordZ/open-rpc-flow/commit/368087a26f95156e93b6dd9f3de8a381eb024205))
+* add flow resume retry pause api ([#123](https://github.com/BelfordZ/open-rpc-flow/issues/123)) ([6608778](https://github.com/BelfordZ/open-rpc-flow/commit/6608778ee02c3d05a5fea3107260a99b26619105))
+* add input type debug logs ([#104](https://github.com/BelfordZ/open-rpc-flow/issues/104)) ([a50d894](https://github.com/BelfordZ/open-rpc-flow/commit/a50d894c49b32fd95a43f4a699dac768a14297c0))
+* add parallel flow execution policies ([#134](https://github.com/BelfordZ/open-rpc-flow/issues/134)) ([d3f7679](https://github.com/BelfordZ/open-rpc-flow/commit/d3f7679c1b5b4c16c9088ae8ce32a2c67601f889))
+* add resumeFrom API for restarting at a specific step ([#132](https://github.com/BelfordZ/open-rpc-flow/issues/132)) ([99353fb](https://github.com/BelfordZ/open-rpc-flow/commit/99353fbae3d2820f1670b1162729a36d449608bf))
+* add warning logs for retries and request errors ([#91](https://github.com/BelfordZ/open-rpc-flow/issues/91)) ([d69f1f4](https://github.com/BelfordZ/open-rpc-flow/commit/d69f1f4f5097b2323cf435d4d3cefb61498a120d))
+* emit loop progress events ([#95](https://github.com/BelfordZ/open-rpc-flow/issues/95)) ([e97cf9d](https://github.com/BelfordZ/open-rpc-flow/commit/e97cf9dd032a7e5f7f1f1a202bb9640c53207510))
+* export PathSegment ([#84](https://github.com/BelfordZ/open-rpc-flow/issues/84)) ([0914d64](https://github.com/BelfordZ/open-rpc-flow/commit/0914d64a8ef6b050793f07f0db692334473210f8))
+* export StepExecutionContext ([#85](https://github.com/BelfordZ/open-rpc-flow/issues/85)) ([255bab7](https://github.com/BelfordZ/open-rpc-flow/commit/255bab7ecbf7280130f2cfc4a29eb5b1e34cb1fa))
+* export TimeoutError from index ([#88](https://github.com/BelfordZ/open-rpc-flow/issues/88)) ([9e19332](https://github.com/BelfordZ/open-rpc-flow/commit/9e19332ad982bdc8e9ca20614bd98420d1215b2f))
+* expose step executors via public API ([#86](https://github.com/BelfordZ/open-rpc-flow/issues/86)) ([1e9c16c](https://github.com/BelfordZ/open-rpc-flow/commit/1e9c16c52eb5307e3b2263680edc7a4f2b388a50))
+* introduce strong types for context and policy ([#89](https://github.com/BelfordZ/open-rpc-flow/issues/89)) ([425bbcb](https://github.com/BelfordZ/open-rpc-flow/commit/425bbcbb05cd41820f578e2876cd106a0f154555))
+* re-export StepExecutor classes ([#87](https://github.com/BelfordZ/open-rpc-flow/issues/87)) ([b310d43](https://github.com/BelfordZ/open-rpc-flow/commit/b310d43707827936160774e551a367adbdf81f19))
+* **schema:** add step description field ([#94](https://github.com/BelfordZ/open-rpc-flow/issues/94)) ([11e74bf](https://github.com/BelfordZ/open-rpc-flow/commit/11e74bf945263b0a9da8d8d671e4885dcd27973b))
+* strongly type step events ([#82](https://github.com/BelfordZ/open-rpc-flow/issues/82)) ([2c8a6ba](https://github.com/BelfordZ/open-rpc-flow/commit/2c8a6ba2e31b736384db8bb074564fbe8f1f34e3))
+
+
+### Bug Fixes
+
+* add agents ([38bd926](https://github.com/BelfordZ/open-rpc-flow/commit/38bd926616a72c2c32ef2584d8592a73bb6fdf1e))
+* add engines to packagejson ([#61](https://github.com/BelfordZ/open-rpc-flow/issues/61)) ([be556f7](https://github.com/BelfordZ/open-rpc-flow/commit/be556f71e5d40926112c250ce5129a884e5e4b16))
+* add license and contributing ([#58](https://github.com/BelfordZ/open-rpc-flow/issues/58)) ([166d57d](https://github.com/BelfordZ/open-rpc-flow/commit/166d57dbc5788d76395deb6b80508ea7c91e7b1d))
+* add repo to package.json ([#60](https://github.com/BelfordZ/open-rpc-flow/issues/60)) ([ab2cfd2](https://github.com/BelfordZ/open-rpc-flow/commit/ab2cfd2b93192676e8b7a7a184714f3f4d85cade))
+* align flow-level timeouts and abort events ([#97](https://github.com/BelfordZ/open-rpc-flow/issues/97)) ([34dd9b5](https://github.com/BelfordZ/open-rpc-flow/commit/34dd9b5847e1cfdfaacb301c19eaa5ed3482ae98))
+* correct repository url for release ([#135](https://github.com/BelfordZ/open-rpc-flow/issues/135)) ([c6db131](https://github.com/BelfordZ/open-rpc-flow/commit/c6db131f9601ed5df2fb94ed2e28d7d1f7726f03))
+* de-duplicate getStepType ([#80](https://github.com/BelfordZ/open-rpc-flow/issues/80)) ([340b9ac](https://github.com/BelfordZ/open-rpc-flow/commit/340b9ac33b5385a13f041dc7d669974a935fc695))
+* format fix ([#65](https://github.com/BelfordZ/open-rpc-flow/issues/65)) ([a933329](https://github.com/BelfordZ/open-rpc-flow/commit/a933329caf68a518fb93ca760b439ed45d931b56))
+* improved typing on flow error and arrays ([#62](https://github.com/BelfordZ/open-rpc-flow/issues/62)) ([d0b0a4b](https://github.com/BelfordZ/open-rpc-flow/commit/d0b0a4bf2579e64f1a30150517193c1316a664b7))
+* issue with basic refs ([#52](https://github.com/BelfordZ/open-rpc-flow/issues/52)) ([121b93b](https://github.com/BelfordZ/open-rpc-flow/commit/121b93b2263e53156ece04e39218d9e3d69f74d5))
+* logger type safety ([#68](https://github.com/BelfordZ/open-rpc-flow/issues/68)) ([be87736](https://github.com/BelfordZ/open-rpc-flow/commit/be87736f1cf330ff3f7c1b3d6f7f6a1a52719aa8))
+* policty resolver for timeouts ([#63](https://github.com/BelfordZ/open-rpc-flow/issues/63)) ([89b8658](https://github.com/BelfordZ/open-rpc-flow/commit/89b86581872d041a7dd5bf29a4c108522f28f5ee))
+* switch from log to info for logging ([#54](https://github.com/BelfordZ/open-rpc-flow/issues/54)) ([f6cb605](https://github.com/BelfordZ/open-rpc-flow/commit/f6cb60589e24765bc6ac6c6309dca5ccfbe2bdb8))
+* typed interface for AST nodes ([#67](https://github.com/BelfordZ/open-rpc-flow/issues/67)) ([db41e94](https://github.com/BelfordZ/open-rpc-flow/commit/db41e9482bdc306075189c2ac1a3be10e93941e3))
+* update metadata inputType logic ([#53](https://github.com/BelfordZ/open-rpc-flow/issues/53)) ([e669ae0](https://github.com/BelfordZ/open-rpc-flow/commit/e669ae042bc9f70e4ba39954533cd63e5ff89f0d))
+* update repo name in readme ([#66](https://github.com/BelfordZ/open-rpc-flow/issues/66)) ([11605f0](https://github.com/BelfordZ/open-rpc-flow/commit/11605f047ecf19d8f2d153f2e04a5faa947eae8a))
+* whitespace removal in literal ([#64](https://github.com/BelfordZ/open-rpc-flow/issues/64)) ([e354609](https://github.com/BelfordZ/open-rpc-flow/commit/e35460989a61a78ce9b64c7ce126cf6bd1fb2ed8))
+
 ## [1.4.3](https://github.com/BelfordZ/open-rpc-flow/compare/v1.4.2...v1.4.3) (2025-05-16)
 
 

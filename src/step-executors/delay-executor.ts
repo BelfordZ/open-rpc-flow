@@ -56,7 +56,10 @@ export class DelayStepExecutor implements StepExecutor {
     this.logger.debug('Starting delay', { stepName: step.name, duration });
 
     await new Promise<void>((resolve, reject) => {
-      let timeoutId: NodeJS.Timeout | undefined;
+      const timeoutId: NodeJS.Timeout = setTimeout(() => {
+        cleanup();
+        resolve();
+      }, duration);
       let onAbort = () => {};
       const cleanup = () => {
         if (timeoutId) clearTimeout(timeoutId);
@@ -71,10 +74,6 @@ export class DelayStepExecutor implements StepExecutor {
         reject(abortError);
       };
 
-      timeoutId = setTimeout(() => {
-        cleanup();
-        resolve();
-      }, duration);
       if (signal) {
         if (signal.aborted) {
           return onAbort();

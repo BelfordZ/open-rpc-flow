@@ -462,7 +462,11 @@ export class FlowExecutor {
         const queue = [...dependentsByStep.get(rootStepName)!];
         while (queue.length > 0) {
           const dependentName = queue.shift()!;
-          if (completed.has(dependentName) || failed.has(dependentName) || skipped.has(dependentName)) {
+          if (
+            completed.has(dependentName) ||
+            failed.has(dependentName) ||
+            skipped.has(dependentName)
+          ) {
             continue;
           }
           markSkipped(dependentName, reason);
@@ -646,11 +650,7 @@ export class FlowExecutor {
           }
         }
 
-        while (
-          !stopScheduling &&
-          readyQueue.length > 0 &&
-          running.size < concurrencyLimit
-        ) {
+        while (!stopScheduling && readyQueue.length > 0 && running.size < concurrencyLimit) {
           const step = readyQueue.shift()!;
           startStep(step);
         }

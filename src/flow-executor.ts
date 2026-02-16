@@ -16,6 +16,7 @@ import {
   LoopStepExecutor,
   ConditionStepExecutor,
   TransformStepExecutor,
+  DelayStepExecutor,
   StopStepExecutor,
   StepType,
 } from './step-executors';
@@ -170,6 +171,7 @@ export class FlowExecutor {
         this.logger,
         this.policyResolver,
       ),
+      new DelayStepExecutor(this.executeStep.bind(this), this.logger),
       new StopStepExecutor(this.logger, globalAbortController),
     ];
     this.globalAbortController = globalAbortController;

@@ -50,6 +50,7 @@ export enum StepType {
   Loop = 'loop',
   Condition = 'condition',
   Transform = 'transform',
+  Delay = 'delay',
   Stop = 'stop',
   Unknown = 'unknown',
 }
@@ -117,6 +118,13 @@ export interface ConditionStep extends Step {
   };
 }
 
+export interface DelayStep extends Step {
+  delay: {
+    duration: number;
+    step: Step;
+  };
+}
+
 /**
  * Type guards for each step type
  */
@@ -131,6 +139,9 @@ export const isConditionStep = (step: Step): step is ConditionStep =>
 
 export const isTransformStep = (step: Step): step is TransformStep =>
   !!step.transform && typeof step.transform === 'object';
+
+export const isDelayStep = (step: Step): step is DelayStep =>
+  'delay' in step && typeof (step as any).delay === 'object';
 
 /**
  * Type guard for loop results

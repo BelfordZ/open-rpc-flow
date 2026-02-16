@@ -95,7 +95,7 @@ export class FlowExecutor {
       this.logger = options?.logger || defaultLogger;
     }
 
-    this.context = flow.context || {};
+    this.context = Object.freeze({ ...(flow.context || {}) });
     this.stepResults = new Map();
     this.stepStatus = new Map();
     this.lastFailedStepName = null;
@@ -241,7 +241,7 @@ export class FlowExecutor {
         contextType: typeof context,
       });
     }
-    this.context = context;
+    this.context = Object.freeze({ ...context });
     this.rebuildExecutionContext();
     this.rebuildStepExecutors();
   }

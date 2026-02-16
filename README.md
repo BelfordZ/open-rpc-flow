@@ -496,6 +496,9 @@ for a full working example.
 | `flow:start`          | Emitted when flow execution begins                 |
 | `flow:complete`       | Emitted when flow execution completes successfully |
 | `flow:error`          | Emitted when flow execution fails                  |
+| `flow:aborted`        | Emitted when flow execution is externally aborted  |
+| `flow:paused`         | Emitted when `executor.pause()` interrupts a flow  |
+| `flow:timeout`        | Emitted when global flow timeout is reached        |
 | `step:start`          | Emitted when a step execution begins               |
 | `step:complete`       | Emitted when a step execution completes            |
 | `step:error`          | Emitted when a step execution fails                |
@@ -513,6 +516,9 @@ most useful fields:
 | `flow:start`    | `flowName`, `orderedSteps`                                        |
 | `flow:complete` | `flowName`, `results`, `duration`                                 |
 | `flow:error`    | `flowName`, `error`, `duration`                                   |
+| `flow:aborted`  | `flowName`, `reason`                                              |
+| `flow:paused`   | `flowName`, `reason`                                              |
+| `flow:timeout`  | `flowName`, `timeout`, `duration`                                 |
 | `step:start`    | `stepName`, `stepType`, `context?`                                |
 | `step:complete` | `stepName`, `stepType`, `result`, `duration`                      |
 | `step:error`    | `stepName`, `stepType`, `error`, `duration`                       |

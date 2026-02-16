@@ -17,6 +17,7 @@ export enum FlowEventType {
   STEP_PROGRESS = 'step:progress',
   STEP_ABORTED = 'step:aborted',
   FLOW_ABORTED = 'flow:aborted',
+  FLOW_PAUSED = 'flow:paused',
   STEP_RETRY = 'step:retry',
   STEP_TIMEOUT = 'step:timeout',
   DEPENDENCY_RESOLVED = 'dependency:resolved',
@@ -143,6 +144,15 @@ export interface StepAbortedEvent extends FlowEvent {
  */
 export interface FlowAbortedEvent extends FlowEvent {
   type: FlowEventType.FLOW_ABORTED;
+  flowName: string;
+  reason: string;
+}
+
+/**
+ * Flow paused event
+ */
+export interface FlowPausedEvent extends FlowEvent {
+  type: FlowEventType.FLOW_PAUSED;
   flowName: string;
   reason: string;
 }
@@ -474,5 +484,19 @@ export class FlowExecutorEvents extends EventEmitter {
       flowName,
       reason,
     } as FlowAbortedEvent);
+  }
+
+  /**
+   * Emit flow paused event
+   */
+  emitFlowPaused(flowName: string, reason: string): void {
+    if (!this.options.emitFlowEvents) return;
+
+    this.emit(FlowEventType.FLOW_PAUSED, {
+      timestamp: Date.now(),
+      type: FlowEventType.FLOW_PAUSED,
+      flowName,
+      reason,
+    } as FlowPausedEvent);
   }
 }

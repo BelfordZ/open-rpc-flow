@@ -567,7 +567,7 @@ export class FlowExecutor {
             if (this.globalAbortController.signal.aborted && isPause) {
               this.events.emitStepAborted(step, String(reason));
               if (!flowAbortEmitted) {
-                this.events.emitFlowAborted(this.flow.name, String(reason));
+                this.events.emitFlowPaused(this.flow.name, String(reason));
                 flowAbortEmitted = true;
               }
               pauseError = new PauseError('Flow execution paused', {
@@ -639,7 +639,11 @@ export class FlowExecutor {
             workflowStopped = true;
           }
           if (!flowAbortEmitted) {
-            this.events.emitFlowAborted(this.flow.name, String(reason));
+            if (this.isPaused || reason === 'paused') {
+              this.events.emitFlowPaused(this.flow.name, String(reason));
+            } else {
+              this.events.emitFlowAborted(this.flow.name, String(reason));
+            }
             flowAbortEmitted = true;
           }
           if (this.isPaused || reason === 'paused') {
@@ -729,7 +733,11 @@ export class FlowExecutor {
       }
       if (this.globalAbortController.signal.aborted && !flowAbortEmitted) {
         const reason = this.globalAbortController.signal.reason || 'Flow execution aborted';
-        this.events.emitFlowAborted(this.flow.name, String(reason));
+        if (this.isPaused || reason === 'paused') {
+          this.events.emitFlowPaused(this.flow.name, String(reason));
+        } else {
+          this.events.emitFlowAborted(this.flow.name, String(reason));
+        }
         flowAbortEmitted = true;
       }
       const reason = this.globalAbortController.signal.reason;

@@ -16,7 +16,6 @@ import {
   LoopStepExecutor,
   ConditionStepExecutor,
   TransformStepExecutor,
-  DelayStepExecutor,
   StopStepExecutor,
   StepType,
 } from './step-executors';
@@ -26,7 +25,7 @@ import { randomUUID } from 'crypto';
 import { RetryPolicy } from './errors/recovery';
 import { ErrorCode } from './errors/codes';
 import { TimeoutError } from './errors/timeout-error';
-import { ExecutionError } from './errors/base';
+import { ExecutionError, PauseError, StateError, ValidationError } from './errors/base';
 import { PolicyResolver } from './util/policy-resolver';
 
 /**
@@ -66,14 +65,17 @@ export class FlowExecutor {
 
   private context: ExecutionContextData;
   private stepResults: Map<string, unknown>;
-  private executionContext: StepExecutionContext;
-  private stepExecutors: StepExecutor[];
+  private stepStatus: Map<string, { status: 'success' | 'failed'; error?: Error }>;
+  private lastFailedStepName: string | null;
+  private executionContext!: StepExecutionContext;
+  private stepExecutors!: StepExecutor[];
   private logger: Logger;
   private retryPolicy: RetryPolicy | null;
   private policyResolver: PolicyResolver;
-  private globalAbortController: AbortController;
-  private stepCorrelationIds: Map<string, string>;
-  private correlationPrefix: string;
+  private globalAbortController!: AbortController;
+  private stepCorrelationIds!: Map<string, string>;
+  private correlationPrefix!: string;
+  private isPaused: boolean;
 
   constructor(
     private flow: Flow,
@@ -95,6 +97,9 @@ export class FlowExecutor {
 
     this.context = flow.context || {};
     this.stepResults = new Map();
+    this.stepStatus = new Map();
+    this.lastFailedStepName = null;
+    this.isPaused = false;
 
     // Initialize the event emitter
     this.events = new FlowExecutorEvents(options?.eventOptions);
@@ -143,40 +148,8 @@ export class FlowExecutor {
     }
     this.policyResolver = new PolicyResolver(this.flow, this.logger, policyOverrides);
 
-    // Initialize global abort controller
-    const globalAbortController = new AbortController();
-    this.executionContext = {
-      referenceResolver: this.referenceResolver,
-      expressionEvaluator: this.expressionEvaluator,
-      stepResults: this.stepResults,
-      context: this.context,
-      logger: this.logger,
-      flow: this.flow,
-      signal: globalAbortController.signal,
-    };
-
-    // Initialize step executors in order of specificity
-    this.stepExecutors = [
-      this.createRequestStepExecutor(),
-      new LoopStepExecutor(
-        this.executeStep.bind(this),
-        this.logger,
-        this.events.emitStepProgress.bind(this.events),
-      ),
-      new ConditionStepExecutor(this.executeStep.bind(this), this.logger, this.policyResolver),
-      new TransformStepExecutor(
-        this.expressionEvaluator,
-        this.referenceResolver,
-        this.context,
-        this.logger,
-        this.policyResolver,
-      ),
-      new DelayStepExecutor(this.executeStep.bind(this), this.logger),
-      new StopStepExecutor(this.logger, globalAbortController),
-    ];
-    this.globalAbortController = globalAbortController;
-    this.stepCorrelationIds = new Map();
-    this.correlationPrefix = randomUUID();
+    // Initialize runtime state
+    this.initializeRunState({ clearResults: false, clearStatus: false });
   }
 
   /**
@@ -199,9 +172,194 @@ export class FlowExecutor {
   }
 
   /**
-   * Execute the flow and return all step results
+   * Reset run state and rebuild execution context
    */
-  async execute(options?: { signal?: AbortSignal }): Promise<Map<string, any>> {
+  private initializeRunState(options: { clearResults: boolean; clearStatus: boolean }): void {
+    this.isPaused = false;
+    this.globalAbortController = new AbortController();
+    this.stepCorrelationIds = new Map();
+    this.correlationPrefix = randomUUID();
+
+    if (options.clearResults) {
+      this.stepResults.clear();
+    }
+    if (options.clearStatus) {
+      this.stepStatus.clear();
+      this.lastFailedStepName = null;
+    }
+
+    this.rebuildExecutionContext();
+    this.rebuildStepExecutors();
+  }
+
+  private rebuildExecutionContext(): void {
+    this.referenceResolver = new ReferenceResolver(this.stepResults, this.context, this.logger);
+    this.expressionEvaluator = new SafeExpressionEvaluator(this.logger, this.referenceResolver);
+    this.dependencyResolver = new DependencyResolver(this.flow, this.expressionEvaluator, this.logger);
+    this.executionContext = {
+      referenceResolver: this.referenceResolver,
+      expressionEvaluator: this.expressionEvaluator,
+      stepResults: this.stepResults,
+      context: this.context,
+      logger: this.logger,
+      signal: this.globalAbortController.signal,
+      flow: this.flow,
+    };
+  }
+
+  private rebuildStepExecutors(): void {
+    this.stepExecutors = [
+      this.createRequestStepExecutor(),
+      new LoopStepExecutor(
+        this.executeStep.bind(this),
+        this.logger,
+        (step, iteration, totalIterations) =>
+          this.events.emitStepProgress(step, iteration, totalIterations),
+      ),
+      new ConditionStepExecutor(this.executeStep.bind(this), this.logger, this.policyResolver),
+      new TransformStepExecutor(
+        this.expressionEvaluator,
+        this.referenceResolver,
+        this.context,
+        this.logger,
+        this.policyResolver,
+      ),
+      new StopStepExecutor(this.logger, this.globalAbortController),
+    ];
+  }
+
+  /**
+   * Replace the execution context for future runs
+   */
+  setContext(context: ExecutionContextData): void {
+    if (!context || typeof context !== 'object' || Array.isArray(context)) {
+      throw new ValidationError('Context must be a non-null object', {
+        contextType: typeof context,
+      });
+    }
+    this.context = context;
+    this.rebuildExecutionContext();
+    this.rebuildStepExecutors();
+  }
+
+  /**
+   * Replace all step results for future runs
+   */
+  setStepResults(results: Map<string, unknown> | Record<string, unknown>): void {
+    const normalizedResults =
+      results instanceof Map ? results : new Map(Object.entries(results || {}));
+    const validStepNames = new Set(this.flow.steps.map((step) => step.name));
+
+    for (const stepName of normalizedResults.keys()) {
+      if (!validStepNames.has(stepName)) {
+        throw new ValidationError('Unknown step name in step results', { stepName });
+      }
+    }
+
+    this.stepResults.clear();
+    this.stepStatus.clear();
+    for (const [stepName, value] of normalizedResults.entries()) {
+      this.stepResults.set(stepName, value);
+      this.stepStatus.set(stepName, { status: 'success' });
+    }
+    this.lastFailedStepName = null;
+    this.rebuildExecutionContext();
+    this.rebuildStepExecutors();
+  }
+
+  /**
+   * Pause the currently running flow
+   */
+  pause(): void {
+    if (this.globalAbortController.signal.aborted) {
+      return;
+    }
+    this.isPaused = true;
+    this.globalAbortController.abort('paused');
+  }
+
+  /**
+   * Resume execution after the last completed step
+   */
+  async resume(options?: { signal?: AbortSignal }): Promise<Map<string, any>> {
+    this.initializeRunState({ clearResults: false, clearStatus: false });
+    const orderedSteps = this.dependencyResolver.getExecutionOrder();
+    this.ensureStatusFromResults(orderedSteps);
+    const lastSuccessIndex = this.findLastStatusIndex(orderedSteps, 'success');
+    const startIndex = lastSuccessIndex + 1;
+    return this.runFromIndex(startIndex, options);
+  }
+
+  /**
+   * Retry execution starting from the last failed step
+   */
+  async retry(options?: { signal?: AbortSignal }): Promise<Map<string, any>> {
+    this.initializeRunState({ clearResults: false, clearStatus: false });
+    const orderedSteps = this.dependencyResolver.getExecutionOrder();
+    this.ensureStatusFromResults(orderedSteps);
+
+    const lastFailedStep =
+      this.lastFailedStepName ||
+      orderedSteps
+        .slice()
+        .reverse()
+        .find((step) => this.stepStatus.get(step.name)?.status === 'failed')?.name ||
+      null;
+
+    if (!lastFailedStep) {
+      throw new StateError('No failed step to retry', { flowName: this.flow.name });
+    }
+
+    const failedIndex = orderedSteps.findIndex((step) => step.name === lastFailedStep);
+    if (failedIndex === -1) {
+      throw new StateError('Failed step not found in flow', {
+        stepName: lastFailedStep,
+        flowName: this.flow.name,
+      });
+    }
+
+    this.clearResultsFromIndex(orderedSteps, failedIndex);
+    return this.runFromIndex(failedIndex, options);
+  }
+
+  private ensureStatusFromResults(orderedSteps: Step[]): void {
+    for (const step of orderedSteps) {
+      if (this.stepResults.has(step.name) && !this.stepStatus.has(step.name)) {
+        this.stepStatus.set(step.name, { status: 'success' });
+      }
+    }
+  }
+
+  private findLastStatusIndex(
+    orderedSteps: Step[],
+    status: 'success' | 'failed',
+  ): number {
+    let lastIndex = -1;
+    for (let i = 0; i < orderedSteps.length; i++) {
+      const stepStatus = this.stepStatus.get(orderedSteps[i].name);
+      if (stepStatus?.status === status) {
+        lastIndex = i;
+      }
+    }
+    return lastIndex;
+  }
+
+  private clearResultsFromIndex(orderedSteps: Step[], startIndex: number): void {
+    for (let i = startIndex; i < orderedSteps.length; i++) {
+      const stepName = orderedSteps[i].name;
+      this.stepResults.delete(stepName);
+      this.stepStatus.delete(stepName);
+      if (this.lastFailedStepName === stepName) {
+        this.lastFailedStepName = null;
+      }
+    }
+  }
+
+  private async runFromIndex(
+    startIndex: number,
+    options?: { signal?: AbortSignal },
+  ): Promise<Map<string, any>> {
+    const safeStartIndex = Math.max(0, startIndex);
     this.logger.info('Executing flow with options:', options);
     const startTime = Date.now();
     let globalTimeoutId: NodeJS.Timeout | undefined;
@@ -224,7 +382,7 @@ export class FlowExecutor {
           });
         }
       }
-      // Get steps in dependency order
+
       const orderedSteps = this.dependencyResolver.getExecutionOrder();
       const orderedStepNames = orderedSteps.map((s) => s.name);
 
@@ -233,15 +391,16 @@ export class FlowExecutor {
 
       this.logger.info('Executing steps in order:', orderedStepNames);
 
-      for (const step of orderedSteps) {
+      for (let index = safeStartIndex; index < orderedSteps.length; index++) {
+        const step = orderedSteps[index];
         const stepStartTime = Date.now();
 
         const correlationId = this.generateCorrelationId(step.name);
         this.stepCorrelationIds.set(step.name, correlationId);
         try {
-          // Check if we've been aborted before executing step
           if (this.globalAbortController.signal.aborted) {
             const reason = this.globalAbortController.signal.reason || 'Flow execution aborted';
+            const isPause = this.isPaused || reason === 'paused';
             this.logger.debug('Skipping step due to abort', {
               stepName: step.name,
               reason: String(reason),
@@ -251,6 +410,12 @@ export class FlowExecutor {
             if (!flowAbortEmitted) {
               this.events.emitFlowAborted(this.flow.name, String(reason));
               flowAbortEmitted = true;
+            }
+            if (isPause) {
+              throw new PauseError('Flow execution paused', {
+                flowName: this.flow.name,
+                stepName: step.name,
+              });
             }
             throw new Error(String(reason));
           }
@@ -271,39 +436,70 @@ export class FlowExecutor {
             this.globalAbortController.signal,
           );
           this.stepResults.set(step.name, result);
+          this.stepStatus.set(step.name, { status: 'success' });
+          if (this.lastFailedStepName === step.name) {
+            this.lastFailedStepName = null;
+          }
 
           this.events.emitStepComplete(step, result, stepStartTime, correlationId);
 
-          // Check if the step or any nested step resulted in a stop
           const shouldStop = this.checkForStopResult(result);
 
           if (shouldStop) {
             this.logger.info('Workflow stopped by step:', step.name);
-            this.events.emitFlowAborted(this.flow.name, 'Stopped by stop step');
+            if (!flowAbortEmitted) {
+              this.events.emitFlowAborted(this.flow.name, 'Stopped by stop step');
+              flowAbortEmitted = true;
+            }
             this.events.emitStepSkip(step, 'Workflow stopped by previous step', correlationId);
             break;
           }
         } catch (error: any) {
+          const reason = this.globalAbortController.signal.reason;
+          const isPause = this.isPaused || reason === 'paused';
+          if (this.globalAbortController.signal.aborted && isPause) {
+            this.events.emitStepAborted(step, String(reason));
+            if (!flowAbortEmitted) {
+              this.events.emitFlowAborted(this.flow.name, String(reason));
+              flowAbortEmitted = true;
+            }
+            throw new PauseError('Flow execution paused', {
+              flowName: this.flow.name,
+              stepName: step.name,
+            });
+          }
+
+          this.stepStatus.set(step.name, {
+            status: 'failed',
+            error: error instanceof Error ? error : undefined,
+          });
+          this.lastFailedStepName = step.name;
+
           if (error instanceof TimeoutError) {
             this.events.emitStepTimeout(step, error.timeout, error.executionTime);
           }
           this.events.emitStepError(step, error, stepStartTime, correlationId);
-          throw error; // Re-throw to be caught by the outer try/catch
+          throw error;
         }
       }
 
       this.events.emitFlowComplete(this.flow.name, this.stepResults, startTime);
       return this.stepResults;
     } catch (error: any) {
+      if (error instanceof PauseError) {
+        throw error;
+      }
       if (this.globalAbortController.signal.aborted && !flowAbortEmitted) {
         const reason = this.globalAbortController.signal.reason || 'Flow execution aborted';
         this.events.emitFlowAborted(this.flow.name, String(reason));
         flowAbortEmitted = true;
       }
-      // Enhance error with flow context if it's an abort due to timeout
+      const reason = this.globalAbortController.signal.reason;
+      const isPause = this.isPaused || reason === 'paused';
       if (
-        (this.globalAbortController.signal.aborted && error.message?.includes('timeout')) ||
-        error.name === 'AbortError'
+        !isPause &&
+        ((this.globalAbortController.signal.aborted && reason === 'timeout') ||
+          error.name === 'AbortError')
       ) {
         const duration = Date.now() - startTime;
         const flowTimeout = this.flow.policies?.global?.timeout?.timeout || 0;
@@ -321,11 +517,24 @@ export class FlowExecutor {
       this.events.emitFlowError(this.flow.name, error, startTime);
       throw error;
     } finally {
-      // Clean up timeout if it was set
       if (globalTimeoutId) {
         clearTimeout(globalTimeoutId);
       }
     }
+  }
+
+  /**
+   * Execute the flow and return all step results
+   */
+  async execute(options?: { signal?: AbortSignal }): Promise<Map<string, any>> {
+    const priorAbortReason = this.globalAbortController?.signal.aborted
+      ? this.globalAbortController.signal.reason
+      : null;
+    this.initializeRunState({ clearResults: true, clearStatus: true });
+    if (priorAbortReason !== null && priorAbortReason !== undefined) {
+      this.globalAbortController.abort(priorAbortReason);
+    }
+    return this.runFromIndex(0, options);
   }
 
   /**

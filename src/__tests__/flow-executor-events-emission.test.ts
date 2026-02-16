@@ -282,6 +282,26 @@ describe('FlowExecutor event emission', () => {
     expect(pausedEvents[0].reason).toBe('paused');
     expect(abortedEvents.length).toBe(0);
   });
+  it('emits flow paused when pre-aborted and dependency resolution fails', async () => {
+    const flow: Flow = {
+      name: 'PreAbortPaused',
+      description: 'flow',
+      steps: [
+        { name: 'stepA', request: { method: 'a', params: { value: '${stepB.result}' } } },
+        { name: 'stepB', request: { method: 'b', params: { value: '${stepA.result}' } } },
+      ],
+    };
+
+    const executor = new FlowExecutor(flow, jsonRpcHandler, { logger: testLogger });
+    const pausedEvents: any[] = [];
+    executor.events.on(FlowEventType.FLOW_PAUSED, (p) => pausedEvents.push(p));
+    executor['globalAbortController'].abort('paused');
+
+    await expect(executor.execute()).rejects.toThrow();
+
+    expect(pausedEvents.length).toBe(1);
+    expect(pausedEvents[0].reason).toBe('paused');
+  });
   it('emits step progress events for loop steps', async () => {
     const flow: Flow = {
       name: 'ProgressFlow',

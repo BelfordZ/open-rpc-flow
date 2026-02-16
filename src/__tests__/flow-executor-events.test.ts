@@ -3,6 +3,8 @@ import { TestLogger } from '../util/logger';
 import { Flow, JsonRpcRequest } from '../types';
 import { FlowExecutorEvents } from '../util/flow-executor-events';
 import { StepType } from '../step-executors';
+import { FlowError, TimeoutError } from '../errors';
+import { ErrorCode } from '../errors/codes';
 
 describe('FlowExecutor Events', () => {
   const simpleFlow: Flow = {
@@ -1147,5 +1149,124 @@ describe('FlowExecutor Events', () => {
     events.on(FlowEventType.FLOW_ABORTED, (d) => received.push(d));
     events.emitFlowAborted('FlowA', 'canceled');
     expect(received.length).toBe(0);
+  });
+
+  it('should emit flow timeout events from FlowExecutorEvents', () => {
+    const events = new FlowExecutorEvents({ emitFlowEvents: true });
+    const received: any[] = [];
+    events.on(FlowEventType.FLOW_TIMEOUT, (d) => received.push(d));
+    events.emitFlowTimeout('FlowTimeout', 500, 250);
+    expect(received.length).toBe(1);
+    expect(received[0].flowName).toBe('FlowTimeout');
+    expect(received[0].timeout).toBe(500);
+    expect(received[0].duration).toBe(250);
+  });
+
+  it('should not emit flow timeout events when emitFlowEvents is disabled', () => {
+    const events = new FlowExecutorEvents({ emitFlowEvents: false });
+    const received: any[] = [];
+    events.on(FlowEventType.FLOW_TIMEOUT, (d) => received.push(d));
+    events.emitFlowTimeout('FlowTimeout', 500, 250);
+    expect(received.length).toBe(0);
+  });
+
+  it('should not emit step retry or timeout events when emitStepEvents is disabled', () => {
+    const events = new FlowExecutorEvents({ emitStepEvents: false });
+    const retryEvents: any[] = [];
+    const timeoutEvents: any[] = [];
+    const step = { name: 's1', request: { method: 'm', params: {} } } as any;
+
+    events.on(FlowEventType.STEP_RETRY, (d) => retryEvents.push(d));
+    events.on(FlowEventType.STEP_TIMEOUT, (d) => timeoutEvents.push(d));
+
+    events.emitStepRetry(step, 2, new Error('retry'), 100);
+    events.emitStepTimeout(step, 200, 150);
+
+    expect(retryEvents.length).toBe(0);
+    expect(timeoutEvents.length).toBe(0);
+  });
+
+  it('should emit step retry events', async () => {
+    const attempts = { count: 0 };
+    const flow: Flow = {
+      name: 'RetryFlow',
+      description: 'Retry flow',
+      steps: [
+        {
+          name: 'retryableStep',
+          request: { method: 'retry', params: [] },
+          policies: { retryPolicy: { maxAttempts: 2 } },
+        },
+      ],
+    };
+
+    const handler = jest.fn().mockImplementation(() => {
+      attempts.count += 1;
+      if (attempts.count === 1) {
+        throw new FlowError('net', ErrorCode.NETWORK_ERROR, {});
+      }
+      return { jsonrpc: '2.0', id: attempts.count, result: 'ok' };
+    });
+
+    const logger = new TestLogger();
+    const executor = new FlowExecutor(flow, handler, { logger });
+    const retryEvents: any[] = [];
+    executor.events.on(FlowEventType.STEP_RETRY, (e) => retryEvents.push(e));
+
+    await executor.execute();
+
+    expect(retryEvents.length).toBe(1);
+    expect(retryEvents[0].stepName).toBe('retryableStep');
+    expect(retryEvents[0].attempt).toBe(2);
+  });
+
+  it('should emit step timeout events', async () => {
+    const flow: Flow = {
+      name: 'TimeoutFlow',
+      description: 'Timeout flow',
+      steps: [
+        {
+          name: 'slow',
+          policies: { timeout: { timeout: 1 } },
+          transform: {
+            input: Array.from({ length: 1000 }, (_, i) => i),
+            operations: [{ type: 'map', using: '${item}' }],
+          },
+        },
+      ],
+    };
+
+    const handler = async () => ({ jsonrpc: '2.0', id: 1, result: 'ok' });
+
+    const logger = new TestLogger();
+    const executor = new FlowExecutor(flow, handler, { logger });
+    const timeoutEvents: any[] = [];
+    executor.events.on(FlowEventType.STEP_TIMEOUT, (e) => timeoutEvents.push(e));
+
+    await expect(executor.execute()).rejects.toThrow(TimeoutError);
+
+    expect(timeoutEvents.length).toBe(1);
+    expect(timeoutEvents[0].stepName).toBe('slow');
+  });
+
+  it('should emit flow timeout events', async () => {
+    const flow: Flow = {
+      name: 'FlowTimeout',
+      description: 'Flow timeout',
+      steps: [{ name: 'a', request: { method: 'a', params: [] } }],
+    };
+
+    const handler = jest.fn().mockResolvedValue({ jsonrpc: '2.0', id: 1, result: 'ok' });
+    const logger = new TestLogger();
+    const executor = new FlowExecutor(flow, handler, { logger });
+    const timeoutEvents: any[] = [];
+    executor.events.on(FlowEventType.FLOW_TIMEOUT, (e) => timeoutEvents.push(e));
+
+    (executor as any).globalAbortController.abort('timeout');
+
+    await expect(executor.execute()).rejects.toThrow(TimeoutError);
+
+    expect(timeoutEvents.length).toBe(1);
+    expect(timeoutEvents[0].flowName).toBe('FlowTimeout');
   });
 });

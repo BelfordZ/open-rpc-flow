@@ -44,6 +44,7 @@ export {
   FlowStartEvent,
   FlowCompleteEvent,
   FlowErrorEvent,
+  FlowTimeoutEvent,
   StepStartEvent,
   StepCompleteEvent,
   StepErrorEvent,
@@ -51,6 +52,8 @@ export {
   StepProgressEvent,
   StepAbortedEvent,
   FlowAbortedEvent,
+  StepRetryEvent,
+  StepTimeoutEvent,
   DependencyResolvedEvent,
   FlowEventOptions,
 } from './util/flow-executor-events';

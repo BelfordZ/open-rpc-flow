@@ -120,51 +120,31 @@ export class DependencyResolver {
       // Add dependencies from the loop's "over" expression
       this.extractReferences(step.loop.over).forEach((dep) => deps.add(dep));
 
+      const collectLoopStepDependencies = () => {
+        if (step.loop.step) {
+          this.findStepDependencies(step.loop.step, logger).forEach((dep) => deps.add(dep));
+        }
+      };
+
       // Add dependencies from the loop's condition if present
       if (step.loop.condition) {
-        // Add the loop variable to loopVars temporarily
-        const loopVar = step.loop.as;
-        this.loopVars.add(loopVar);
-
-        // Extract references from the condition
-        this.extractReferences(step.loop.condition).forEach((dep) => deps.add(dep));
-
-        // Process the loop's step
-        if (step.loop.step) {
-          this.findStepDependencies(step.loop.step, logger).forEach((dep) => deps.add(dep));
-        }
-
-        // Remove the loop variable from loopVars
-        this.loopVars.delete(loopVar);
+        this.withLoopVars(step.loop.as, () => {
+          this.extractReferences(step.loop.condition!).forEach((dep) => deps.add(dep));
+          collectLoopStepDependencies();
+        });
       } else {
         // If no condition, just process the loop's step
-        if (step.loop.step) {
-          // Add the loop variable to loopVars temporarily
-          const loopVar = step.loop.as;
-          this.loopVars.add(loopVar);
-
-          // Find dependencies in the loop step
-          this.findStepDependencies(step.loop.step, logger).forEach((dep) => deps.add(dep));
-
-          // Remove the loop variable from loopVars
-          this.loopVars.delete(loopVar);
-        }
+        this.withLoopVars(step.loop.as, collectLoopStepDependencies);
       }
 
       // Process the loop's steps if present
       if (step.loop.steps) {
         logger.debug('handling loop steps');
-        // Add the loop variable to loopVars temporarily
-        const loopVar = step.loop.as;
-        this.loopVars.add(loopVar);
-
-        // Find dependencies in each step
-        for (const subStep of step.loop.steps) {
-          this.findStepDependencies(subStep, logger).forEach((dep) => deps.add(dep));
-        }
-
-        // Remove the loop variable from loopVars
-        this.loopVars.delete(loopVar);
+        this.withLoopVars(step.loop.as, () => {
+          for (const subStep of step.loop.steps!) {
+            this.findStepDependencies(subStep, logger).forEach((dep) => deps.add(dep));
+          }
+        });
       }
     }
 
@@ -204,29 +184,21 @@ export class DependencyResolver {
         this.extractReferences(step.transform.input).forEach((dep) => deps.add(dep));
       }
       if (step.transform.operations) {
-        // Add 'item' to loopVars temporarily for map/filter operations
-        this.loopVars.add('item');
-        // Add 'acc' to loopVars temporarily for reduce operations
+        const transformLoopVars = ['item'];
         if (step.transform.operations.some((op) => op.type === 'reduce')) {
-          this.loopVars.add('acc');
+          transformLoopVars.push('acc');
         }
-        // Add 'a' and 'b' to loopVars temporarily for sort operations
         if (step.transform.operations.some((op) => op.type === 'sort')) {
-          this.loopVars.add('a');
-          this.loopVars.add('b');
+          transformLoopVars.push('a', 'b');
         }
 
-        for (const op of step.transform.operations) {
-          if (op.using && typeof op.using === 'string') {
-            this.extractReferences(op.using).forEach((dep) => deps.add(dep));
+        this.withLoopVars(transformLoopVars, () => {
+          for (const op of step.transform.operations!) {
+            if (op.using && typeof op.using === 'string') {
+              this.extractReferences(op.using).forEach((dep) => deps.add(dep));
+            }
           }
-        }
-
-        // Remove temporary loop variables
-        this.loopVars.delete('item');
-        this.loopVars.delete('acc');
-        this.loopVars.delete('a');
-        this.loopVars.delete('b');
+        });
       }
     }
 
@@ -241,6 +213,16 @@ export class DependencyResolver {
     const refs = this.expressionEvaluator.extractReferences(expr);
     // Filter out internal variables and loop variables
     return refs.filter((ref) => !this.internalVars.has(ref) && !this.loopVars.has(ref));
+  }
+
+  private withLoopVars(loopVars: string | string[], callback: () => void): void {
+    const vars = Array.isArray(loopVars) ? loopVars : [loopVars];
+    vars.forEach((loopVar) => this.loopVars.add(loopVar));
+    try {
+      callback();
+    } finally {
+      vars.forEach((loopVar) => this.loopVars.delete(loopVar));
+    }
   }
 
   /**

@@ -35,7 +35,7 @@ export class LoopStepExecutor implements StepExecutor {
       throw new Error('Invalid step type for LoopStepExecutor');
     }
 
-    const loopStep = step as LoopStep;
+    const loopStep: LoopStep = step;
 
     if (!loopStep.loop.step && !loopStep.loop.steps) {
       throw new ValidationError('Loop must have either step or steps defined', {

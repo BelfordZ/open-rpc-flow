@@ -10,6 +10,7 @@ import {
   conditionalBranchingFlow,
   complexDataPipelineFlow,
   stopFlowExample,
+  flowExecutorResumeFlow,
   errorHandlingFlow,
 } from '../../examples';
 
@@ -83,6 +84,12 @@ const setupMockResponses = (handler: jest.Mock) => {
         });
       case 'results.store':
         return Promise.resolve({ success: true, storedAt: new Date().toISOString() });
+      case 'account.load':
+        return Promise.resolve({ accountId: 'acct-123', status: 'active' });
+      case 'profile.sync':
+        return Promise.resolve({ accountId: 'acct-123', synced: true });
+      case 'summary.publish':
+        return Promise.resolve({ published: true, payload: request.params });
       default:
         return Promise.resolve({ result: 'default' });
     }
@@ -207,6 +214,18 @@ describe('Example Flows Integration', () => {
           expect(checkPermissions.role).toBe('admin');
           break;
         }
+        case 'flow-executor-resume': {
+          const loadAccount = results.get('loadAccount').result;
+          expect(loadAccount.accountId).toBe('acct-123');
+
+          const syncProfile = results.get('syncProfile').result;
+          expect(syncProfile.synced).toBe(true);
+
+          const publishSummary = results.get('publishSummary').result;
+          expect(publishSummary.published).toBe(true);
+          expect(publishSummary.payload).toEqual({ accountId: 'acct-123', synced: true });
+          break;
+        }
       }
     });
   });
@@ -235,7 +254,7 @@ describe('Example Flow Files', () => {
   };
 
   test('examples array contains all flows', () => {
-    expect(examples).toHaveLength(7);
+    expect(examples).toHaveLength(8);
     examples.forEach((flow) => {
       validateFlow(flow);
     });
@@ -263,6 +282,10 @@ describe('Example Flow Files', () => {
 
   test('stop flow is properly typed', () => {
     validateFlow(stopFlowExample);
+  });
+
+  test('flow executor resume flow is properly typed', () => {
+    validateFlow(flowExecutorResumeFlow);
   });
 
   test('error handling flow is properly typed', () => {

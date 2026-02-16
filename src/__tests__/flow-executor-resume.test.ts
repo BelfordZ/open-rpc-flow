@@ -2,6 +2,7 @@ import { FlowExecutor } from '../flow-executor';
 import { Flow } from '../types';
 import { TestLogger } from '../util/logger';
 import { PauseError } from '../errors/base';
+import flowExecutorResume from '../examples/08-flow-executor-resume.json';
 
 describe('FlowExecutor resume/retry/pause', () => {
   it('resumes after the last completed step', async () => {
@@ -122,6 +123,68 @@ describe('FlowExecutor resume/retry/pause', () => {
     const calledMethods = handler.mock.calls.map((call) => call[0].method);
     expect(calledMethods.filter((method) => method === 'one')).toHaveLength(1);
     expect(calledMethods.filter((method) => method === 'two')).toHaveLength(2);
+  });
+
+  it('runs the flow-executor-resume example flow through pause and resume', async () => {
+    let allowSyncProfileToComplete = false;
+    let syncProfileStartedResolve: (() => void) | null = null;
+    const syncProfileStarted = new Promise<void>((resolve) => {
+      syncProfileStartedResolve = resolve;
+    });
+
+    const handler = jest.fn((request, options) => {
+      if (request.method === 'account.load') {
+        return Promise.resolve({ accountId: 'acct-123', status: 'active' });
+      }
+
+      if (request.method === 'profile.sync') {
+        syncProfileStartedResolve?.();
+
+        if (allowSyncProfileToComplete) {
+          return Promise.resolve({ accountId: 'acct-123', synced: true });
+        }
+
+        return new Promise((_, reject) => {
+          options?.signal?.addEventListener('abort', () => {
+            const error = new Error('aborted');
+            (error as any).name = 'AbortError';
+            reject(error);
+          });
+        });
+      }
+
+      if (request.method === 'summary.publish') {
+        return Promise.resolve({ published: true, payload: request.params });
+      }
+
+      return Promise.resolve(null);
+    });
+
+    const executor = new FlowExecutor(flowExecutorResume as Flow, handler, {
+      logger: new TestLogger('resume-example-flow'),
+    });
+
+    const executePromise = executor.execute();
+    await syncProfileStarted;
+
+    executor.pause();
+    await expect(executePromise).rejects.toBeInstanceOf(PauseError);
+
+    allowSyncProfileToComplete = true;
+    const results = await executor.resume();
+
+    const calledMethods = handler.mock.calls.map((call) => call[0].method);
+    expect(calledMethods).toEqual([
+      'account.load',
+      'profile.sync',
+      'profile.sync',
+      'summary.publish',
+    ]);
+
+    expect(results.get('publishSummary')?.result).toEqual({
+      published: true,
+      payload: { accountId: 'acct-123', synced: true },
+    });
   });
 
   it('updates context for subsequent executions', async () => {

@@ -75,7 +75,7 @@ export class RequestStepExecutor implements StepExecutor {
       throw new ValidationError('Invalid step type for RequestStepExecutor', { step });
     }
 
-    const requestStep = step as RequestStep;
+    const requestStep: RequestStep = step;
     const requestId = this.getNextRequestId();
     const stepRetryPolicy = this.getStepRetryPolicy(requestStep, _context);
     const timeout = this.getStepTimeout(requestStep, _context);

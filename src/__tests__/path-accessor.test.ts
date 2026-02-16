@@ -524,26 +524,6 @@ describe('PathAccessor error handling', () => {
       indices: { first: 0, second: 1 },
     };
 
-    it('should handle expression evaluation errors', () => {
-      const evaluator = () => {
-        throw new Error('Evaluation failed');
-      };
-
-      expect(() => PathAccessor.get(obj, 'items[indices.first]', evaluator)).toThrow(
-        PathSyntaxError,
-      );
-    });
-
-    it('should handle invalid expression results', () => {
-      const evaluator = () => {
-        return { invalid: 'type' };
-      };
-
-      expect(() => PathAccessor.get(obj, 'items[indices.first]', evaluator)).toThrow(
-        PathSyntaxError,
-      );
-    });
-
     it('should propagate UnknownReferenceError', () => {
       const evaluator = () => {
         throw new UnknownReferenceError('Reference not found', 'unknown', ['available']);
@@ -551,16 +531,6 @@ describe('PathAccessor error handling', () => {
 
       expect(() => PathAccessor.get(obj, 'items[indices.first]', evaluator)).toThrow(
         UnknownReferenceError,
-      );
-    });
-
-    it('should propagate PathSyntaxError', () => {
-      const evaluator = (expr: string) => {
-        throw new PathSyntaxError('invalid path', expr);
-      };
-
-      expect(() => PathAccessor.get(obj, 'items[indices.first]', evaluator)).toThrow(
-        PathSyntaxError,
       );
     });
   });

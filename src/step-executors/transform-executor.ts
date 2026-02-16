@@ -417,7 +417,7 @@ export class TransformStepExecutor implements StepExecutor {
       throw new Error('Invalid step type for TransformStepExecutor');
     }
 
-    const transformStep = step as TransformStep;
+    const transformStep: TransformStep = step;
 
     this.logger.debug('Executing transform step', {
       stepName: step.name,
@@ -432,7 +432,7 @@ export class TransformStepExecutor implements StepExecutor {
         stepName: step.name,
         timeout,
         hasStepTimeout: step.timeout !== undefined,
-        hasContextTimeout: (context as any).timeout !== undefined,
+        hasContextTimeout: 'timeout' in context && context.timeout !== undefined,
       });
 
       // Create a step context for expression evaluation

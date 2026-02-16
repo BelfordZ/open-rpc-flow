@@ -45,7 +45,7 @@ export class ConditionStepExecutor implements StepExecutor {
       throw new ValidationError('Invalid step type for ConditionStepExecutor', { step });
     }
 
-    const conditionStep = step as ConditionStep;
+    const conditionStep: ConditionStep = step;
 
     this.logger.debug('Evaluating condition', {
       stepName: step.name,

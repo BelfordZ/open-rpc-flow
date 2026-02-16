@@ -88,14 +88,6 @@ describe('TestLogger', () => {
     ]);
   });
 
-  test('captures logs with prefix', () => {
-    const logger = new TestLogger('TestPrefix');
-    logger.info('test message', { data: 123 });
-    expect(logger.getLogs()).toEqual([
-      { level: 'info', message: 'test message', data: { data: 123 } },
-    ]);
-  });
-
   test('captures error logs', () => {
     const logger = new TestLogger('TestPrefix');
     const error = new Error('test error');
@@ -176,10 +168,20 @@ describe('TestLogger', () => {
     ]);
   });
 
-  test('captures info logs', () => {
-    const logger = new TestLogger('InfoTest');
-    logger.info('hello', { a: 1 });
-    expect(logger.getLogs()).toEqual([{ level: 'info', message: 'hello', data: { a: 1 } }]);
+  test('creates nested logger from nameless parent and prints falsy data', () => {
+    const originalConsole = { ...console };
+    const mockLog = jest.fn();
+    console.log = mockLog;
+
+    const parent = new TestLogger('');
+    const child = parent.createNested('Child');
+
+    child.info('zero value', 0);
+    child.print();
+
+    expect(mockLog).toHaveBeenCalledWith('[INFO] [Child] zero value');
+
+    Object.assign(console, originalConsole);
   });
 });
 

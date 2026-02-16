@@ -18,46 +18,30 @@ export class ConsoleLogger implements Logger {
   ) {}
 
   info(message: string, data?: unknown) {
-    if (this.prefix) {
-      message = `[${this.prefix}] ${message}`;
-    }
-    if (data !== undefined) {
-      this._console.info(message, data);
-    } else {
-      this._console.info(message);
-    }
+    this.log('info', message, data);
   }
 
   error(message: string, data?: unknown) {
-    if (this.prefix) {
-      message = `[${this.prefix}] ${message}`;
-    }
-    if (data !== undefined) {
-      this._console.error(message, data);
-    } else {
-      this._console.error(message);
-    }
+    this.log('error', message, data);
   }
+
   warn(message: string, data?: unknown) {
-    if (this.prefix) {
-      message = `[${this.prefix}] ${message}`;
-    }
-    if (data !== undefined) {
-      this._console.warn(message, data);
-    } else {
-      this._console.warn(message);
-    }
+    this.log('warn', message, data);
   }
+
   debug(message: string, data?: unknown) {
-    if (this.prefix) {
-      message = `[${this.prefix}] ${message}`;
-    }
-    if (data !== undefined) {
-      this._console.debug(message, data);
-    } else {
-      this._console.debug(message);
-    }
+    this.log('debug', message, data);
   }
+
+  private log(level: 'info' | 'error' | 'warn' | 'debug', message: string, data?: unknown) {
+    const formattedMessage = this.prefix ? `[${this.prefix}] ${message}` : message;
+    if (data !== undefined) {
+      this._console[level](formattedMessage, data);
+      return;
+    }
+    this._console[level](formattedMessage);
+  }
+
   createNested(prefix: string): ConsoleLogger {
     const combinedPrefix = this.prefix ? `${this.prefix}:${prefix}` : prefix;
     return new ConsoleLogger(combinedPrefix, this._console);
@@ -69,18 +53,25 @@ export class TestLogger implements Logger {
   constructor(private name: string = 'TestLogger') {}
 
   info(message: string, data?: unknown) {
-    this.logs.push({ level: 'info', message, data });
+    this.addLog('info', message, data);
   }
 
   warn(message: string, data?: unknown) {
-    this.logs.push({ level: 'warn', message, data });
+    this.addLog('warn', message, data);
   }
+
   debug(message: string, data?: unknown) {
-    this.logs.push({ level: 'debug', message, data });
+    this.addLog('debug', message, data);
   }
+
   error(message: string, data?: unknown) {
-    this.logs.push({ level: 'error', message, data });
+    this.addLog('error', message, data);
   }
+
+  private addLog(level: string, message: string, data?: unknown) {
+    this.logs.push({ level, message, data });
+  }
+
   getLogs() {
     return this.logs;
   }

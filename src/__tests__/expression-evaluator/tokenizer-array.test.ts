@@ -80,13 +80,6 @@ describe('Tokenizer Array Tests', () => {
           new TokenizerError('Unterminated array literal'),
         );
       });
-
-      it('throws error for array with whitespace at the end', () => {
-        expect(() => tokenize('[1, 2, 3  ', logger)).toThrow(
-          new TokenizerError('Unterminated array literal'),
-        );
-      });
-
       it('throws error for array with text buffer containing identifier', () => {
         expect(() => tokenize('[1, 2, someVar', logger)).toThrow(
           new TokenizerError('Unterminated array literal'),

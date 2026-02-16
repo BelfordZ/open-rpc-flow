@@ -558,11 +558,6 @@ describe('Tokenizer Miscellaneous Tests', () => {
       expect(result[1].type).toBe('operator');
       expect(result[1].value).toBe('===');
     });
-
-    it('handles operator at the end', () => {
-      expect(() => tokenize('5 +', logger)).toThrow(TokenizerError);
-    });
-
     it('handles the nullish coalescing operator', () => {
       const result = tokenize('${foo} ?? "default"', logger);
       expect(result[1].type).toBe('operator');

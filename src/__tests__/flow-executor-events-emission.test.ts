@@ -2,6 +2,7 @@ import { FlowExecutor } from '../flow-executor';
 import { Flow } from '../types';
 import { FlowEventType } from '../util/flow-executor-events';
 import { TimeoutError } from '../errors/timeout-error';
+import { PauseError } from '../errors/base';
 import { TestLogger } from '../util/logger';
 
 describe('FlowExecutor event emission', () => {
@@ -252,6 +253,35 @@ describe('FlowExecutor event emission', () => {
     jest.useRealTimers();
   });
 
+  it('emits flow paused when execution is paused', async () => {
+    const flow: Flow = {
+      name: 'PauseEventFlow',
+      description: 'flow',
+      steps: [{ name: 's', request: { method: 'foo', params: {} } }],
+    };
+    const handler = (_request: any, options?: any) =>
+      new Promise((_, reject) => {
+        options?.signal?.addEventListener('abort', () => {
+          const error = new Error('paused');
+          (error as any).name = 'AbortError';
+          reject(error);
+        });
+      });
+
+    const executor = new FlowExecutor(flow, handler, { logger: testLogger });
+    const pausedEvents: any[] = [];
+    const abortedEvents: any[] = [];
+    executor.events.on(FlowEventType.FLOW_PAUSED, (p) => pausedEvents.push(p));
+    executor.events.on(FlowEventType.FLOW_ABORTED, (p) => abortedEvents.push(p));
+
+    const executePromise = executor.execute();
+    executor.pause();
+
+    await expect(executePromise).rejects.toBeInstanceOf(PauseError);
+    expect(pausedEvents.length).toBe(1);
+    expect(pausedEvents[0].reason).toBe('paused');
+    expect(abortedEvents.length).toBe(0);
+  });
   it('emits step progress events for loop steps', async () => {
     const flow: Flow = {
       name: 'ProgressFlow',

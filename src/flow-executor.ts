@@ -18,7 +18,7 @@ import { randomUUID } from 'crypto';
 import { RetryPolicy } from './errors/recovery';
 import { ErrorCode } from './errors/codes';
 import { TimeoutError } from './errors/timeout-error';
-import { ExecutionError } from './errors/base';
+import { ExecutionError, ValidationError } from './errors/base';
 import { PolicyResolver } from './util/policy-resolver';
 
 /**
@@ -51,15 +51,15 @@ export interface FlowExecutorOptions {
  * Main executor for JSON-RPC flows
  */
 export class FlowExecutor {
-  public dependencyResolver: DependencyResolver;
-  public referenceResolver: ReferenceResolver;
-  public expressionEvaluator: SafeExpressionEvaluator;
+  public dependencyResolver!: DependencyResolver;
+  public referenceResolver!: ReferenceResolver;
+  public expressionEvaluator!: SafeExpressionEvaluator;
   public events: FlowExecutorEvents;
 
   private context: Record<string, any>;
   private stepResults: Map<string, any>;
-  private executionContext: StepExecutionContext;
-  private stepExecutors: StepExecutor[];
+  private executionContext!: StepExecutionContext;
+  private stepExecutors!: StepExecutor[];
   private logger: Logger;
   private retryPolicy: RetryPolicy | null;
   private policyResolver: PolicyResolver;
@@ -85,7 +85,7 @@ export class FlowExecutor {
       options = { logger: this.logger };
     }
 
-    this.context = flow.context || {};
+    this.context = Object.freeze({ ...(flow.context || {}) });
     this.stepResults = new Map();
 
     // Initialize the event emitter
@@ -119,7 +119,25 @@ export class FlowExecutor {
       };
     }
 
-    // Initialize shared execution context
+    this.refreshExecutionContext();
+
+    // Initialize PolicyResolver for policy-based execution
+    const policyOverrides: Record<string, any> = {};
+    if (options?.retryPolicy) {
+      policyOverrides.retryPolicy = options.retryPolicy;
+    }
+    this.policyResolver = new PolicyResolver(this.flow, this.logger, policyOverrides);
+
+    // Initialize global abort controller
+    const globalAbortController = new AbortController();
+
+    this.refreshStepExecutors(globalAbortController);
+    this.globalAbortController = globalAbortController;
+    this.stepCorrelationIds = new Map();
+    this.correlationPrefix = randomUUID();
+  }
+
+  private refreshExecutionContext(): void {
     this.referenceResolver = new ReferenceResolver(this.stepResults, this.context, this.logger);
     this.expressionEvaluator = new SafeExpressionEvaluator(this.logger, this.referenceResolver);
     this.dependencyResolver = new DependencyResolver(
@@ -136,18 +154,9 @@ export class FlowExecutor {
       logger: this.logger,
       flow: this.flow,
     };
+  }
 
-    // Initialize PolicyResolver for policy-based execution
-    const policyOverrides: Record<string, any> = {};
-    if (options?.retryPolicy) {
-      policyOverrides.retryPolicy = options.retryPolicy;
-    }
-    this.policyResolver = new PolicyResolver(this.flow, this.logger, policyOverrides);
-
-    // Initialize global abort controller
-    const globalAbortController = new AbortController();
-
-    // Initialize step executors in order of specificity
+  private refreshStepExecutors(globalAbortController: AbortController): void {
     this.stepExecutors = [
       this.createRequestStepExecutor(),
       new LoopStepExecutor(
@@ -165,9 +174,21 @@ export class FlowExecutor {
       ),
       new StopStepExecutor(this.logger, globalAbortController),
     ];
-    this.globalAbortController = globalAbortController;
-    this.stepCorrelationIds = new Map();
-    this.correlationPrefix = randomUUID();
+  }
+
+  /**
+   * Replace flow context for subsequent executions
+   */
+  setContext(context: Record<string, any>): void {
+    if (!context || typeof context !== 'object' || Array.isArray(context)) {
+      throw new ValidationError('Context must be a non-null object', {
+        contextType: typeof context,
+      });
+    }
+
+    this.context = Object.freeze({ ...context });
+    this.refreshExecutionContext();
+    this.refreshStepExecutors(this.globalAbortController);
   }
 
   /**

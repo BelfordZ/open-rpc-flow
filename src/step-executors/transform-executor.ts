@@ -33,6 +33,7 @@ export class TransformExecutor {
     input: string | any[],
     step?: Step,
     signal?: AbortSignal,
+    outputCollector?: (key: string, value: unknown) => void,
   ): Promise<any> {
     this.logger.debug('Starting transform execution', {
       operationCount: operations.length,
@@ -68,12 +69,12 @@ export class TransformExecutor {
       data = await this.executeOperation(op, data, step, signal);
 
       if (op.as) {
-        this.logger.debug('Storing operation result in context', {
+        this.logger.debug('Storing operation result in metadata outputs', {
           key: op.as,
           resultType: typeof data,
           isArray: Array.isArray(data),
         });
-        this.context[op.as] = data;
+        outputCollector?.(op.as, data);
       }
     }
 
@@ -456,11 +457,15 @@ export class TransformStepExecutor implements StepExecutor {
         isArray: Array.isArray(resolvedInput),
       });
 
+      const outputs: Record<string, unknown> = {};
       const result = await this.transformExecutor.execute(
         transformStep.transform.operations,
         resolvedInput,
         stepContext,
         signal,
+        (key, value) => {
+          outputs[key] = value;
+        },
       );
 
       this.logger.debug('Transform completed successfully', {
@@ -482,6 +487,7 @@ export class TransformStepExecutor implements StepExecutor {
           resultType: Array.isArray(result) ? 'array' : typeof result,
           timestamp: new Date().toISOString(),
           timeout,
+          ...(Object.keys(outputs).length > 0 ? { outputs } : {}),
         },
       };
     } catch (error: any) {

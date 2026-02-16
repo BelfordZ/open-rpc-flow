@@ -88,6 +88,21 @@ export interface Policies {
      */
     expressionEval?: number;
   };
+  /**
+   * Execution policy configuration
+   */
+  execution?: {
+    /**
+     * Maximum number of concurrent steps (0 = unlimited)
+     * @default 0
+     */
+    maxConcurrency?: number;
+    /**
+     * Failure behavior for independent branches
+     * @default "skip-dependents"
+     */
+    onFailure?: 'skip-dependents' | 'abort-flow';
+  };
 }
 
 /**

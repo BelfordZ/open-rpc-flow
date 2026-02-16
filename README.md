@@ -446,17 +446,17 @@ for a full working example.
 
 ### Available Events
 
-| Event Type            | Description                                        |
-| --------------------- | -------------------------------------------------- |
-| `flow:start`          | Emitted when flow execution begins                 |
-| `flow:complete`       | Emitted when flow execution completes successfully |
-| `flow:error`          | Emitted when flow execution fails                  |
-| `step:start`          | Emitted when a step execution begins               |
-| `step:complete`       | Emitted when a step execution completes            |
-| `step:error`          | Emitted when a step execution fails                |
-| `step:skip`           | Emitted when a step is skipped                     |
-| `step:progress`       | Emitted to report progress of long-running steps   |
-| `dependency:resolved` | Emitted when dependencies are resolved             |
+| Event Type            | Description                                                                                        |
+| --------------------- | -------------------------------------------------------------------------------------------------- |
+| `flow:start`          | Emitted when flow execution begins                                                                 |
+| `flow:complete`       | Emitted when flow execution reaches a terminal state (`complete`, `error`, `aborted`, or `paused`) |
+| `flow:error`          | Emitted when flow execution fails                                                                  |
+| `step:start`          | Emitted when a step execution begins                                                               |
+| `step:complete`       | Emitted when a step execution completes                                                            |
+| `step:error`          | Emitted when a step execution fails                                                                |
+| `step:skip`           | Emitted when a step is skipped                                                                     |
+| `step:progress`       | Emitted to report progress of long-running steps                                                   |
+| `dependency:resolved` | Emitted when dependencies are resolved                                                             |
 
 ### Event Payloads
 
@@ -466,7 +466,7 @@ most useful fields:
 | Event           | Key fields                                                        |
 | --------------- | ----------------------------------------------------------------- |
 | `flow:start`    | `flowName`, `orderedSteps`                                        |
-| `flow:complete` | `flowName`, `results`, `duration`                                 |
+| `flow:complete` | `flowName`, `status`, `results`, `duration`, `error?`, `reason?`  |
 | `flow:error`    | `flowName`, `error`, `duration`                                   |
 | `step:start`    | `stepName`, `stepType`, `context?`                                |
 | `step:complete` | `stepName`, `stepType`, `result`, `duration`                      |

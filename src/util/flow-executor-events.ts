@@ -23,6 +23,8 @@ export enum FlowEventType {
   FLOW_TIMEOUT = 'flow:timeout',
 }
 
+export type FlowCompletionStatus = 'complete' | 'error' | 'aborted' | 'paused';
+
 /**
  * Base interface for all flow events
  */
@@ -46,8 +48,11 @@ export interface FlowStartEvent extends FlowEvent {
 export interface FlowCompleteEvent extends FlowEvent {
   type: FlowEventType.FLOW_COMPLETE;
   flowName: string;
+  status: FlowCompletionStatus;
   results: Record<string, any>;
   duration: number;
+  error?: Error;
+  reason?: string;
 }
 
 /**
@@ -241,7 +246,16 @@ export class FlowExecutorEvents extends EventEmitter {
   /**
    * Emit flow complete event
    */
-  emitFlowComplete(flowName: string, results: Map<string, any>, startTime: number): void {
+  emitFlowComplete(
+    flowName: string,
+    results: Map<string, any>,
+    startTime: number,
+    options: {
+      status?: FlowCompletionStatus;
+      error?: Error;
+      reason?: string;
+    } = {},
+  ): void {
     if (!this.options.emitFlowEvents) return;
 
     const resultsObj = this.options.includeResults
@@ -252,8 +266,11 @@ export class FlowExecutorEvents extends EventEmitter {
       timestamp: Date.now(),
       type: FlowEventType.FLOW_COMPLETE,
       flowName,
+      status: options.status ?? 'complete',
       results: resultsObj,
       duration: Date.now() - startTime,
+      ...(options.error ? { error: options.error } : {}),
+      ...(options.reason ? { reason: options.reason } : {}),
     } as FlowCompleteEvent);
   }
 

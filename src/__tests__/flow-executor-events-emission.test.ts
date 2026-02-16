@@ -69,6 +69,9 @@ describe('FlowExecutor event emission', () => {
     // Check for flow start and complete
     expect(events.some((e) => e.type === FlowEventType.FLOW_START)).toBe(true);
     expect(events.some((e) => e.type === FlowEventType.FLOW_COMPLETE)).toBe(true);
+    expect(events.find((e) => e.type === FlowEventType.FLOW_COMPLETE)?.payload.status).toBe(
+      'complete',
+    );
     // Check for step start and complete for each step
     const stepStartEvents = events.filter((e) => e.type === FlowEventType.STEP_START);
     const stepCompleteEvents = events.filter((e) => e.type === FlowEventType.STEP_COMPLETE);
@@ -101,9 +104,15 @@ describe('FlowExecutor event emission', () => {
     fevents.on(FlowEventType.FLOW_ERROR, (payload) =>
       events.push({ type: FlowEventType.FLOW_ERROR, payload }),
     );
+    fevents.on(FlowEventType.FLOW_COMPLETE, (payload) =>
+      events.push({ type: FlowEventType.FLOW_COMPLETE, payload }),
+    );
     await expect(executor.execute()).rejects.toThrow('fail!');
     expect(events.some((e) => e.type === FlowEventType.STEP_ERROR)).toBe(true);
     expect(events.some((e) => e.type === FlowEventType.FLOW_ERROR)).toBe(true);
+    expect(events.find((e) => e.type === FlowEventType.FLOW_COMPLETE)?.payload.status).toBe(
+      'error',
+    );
   });
 
   it('emits step skip and flow complete if a stop step is encountered', async () => {
@@ -205,11 +214,33 @@ describe('FlowExecutor event emission', () => {
     const executor = new FlowExecutor(flow, jsonRpcHandler, { logger: testLogger });
     const controller = new AbortController();
     controller.abort('external');
-    const events: any[] = [];
-    executor.events.on(FlowEventType.FLOW_ABORTED, (p) => events.push(p));
+    const abortedEvents: any[] = [];
+    const completeEvents: any[] = [];
+    executor.events.on(FlowEventType.FLOW_ABORTED, (p) => abortedEvents.push(p));
+    executor.events.on(FlowEventType.FLOW_COMPLETE, (p) => completeEvents.push(p));
     await expect(executor.execute({ signal: controller.signal })).rejects.toThrow();
-    expect(events.length).toBe(1);
-    expect(events[0].reason).toBe('external');
+    expect(abortedEvents.length).toBe(1);
+    expect(abortedEvents[0].reason).toBe('external');
+    expect(completeEvents.length).toBe(1);
+    expect(completeEvents[0].status).toBe('aborted');
+  });
+
+  it('emits paused status for flow finish when paused', async () => {
+    const flow: Flow = {
+      name: 'PauseFinishFlow',
+      description: 'flow',
+      steps: [{ name: 's', request: { method: 'foo', params: {} } }],
+    };
+
+    const executor = new FlowExecutor(flow, jsonRpcHandler, { logger: testLogger });
+    const completeEvents: any[] = [];
+    executor.events.on(FlowEventType.FLOW_COMPLETE, (p) => completeEvents.push(p));
+    executor.pause();
+
+    await expect(executor.execute()).rejects.toThrow();
+
+    expect(completeEvents.length).toBe(1);
+    expect(completeEvents[0].status).toBe('paused');
   });
 
   it('aborts when the execute signal is aborted after start', async () => {

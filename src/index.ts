@@ -12,7 +12,12 @@ export {
   DelayStepExecutor,
   StopStepExecutor,
 } from './step-executors';
-export { FlowExecutor, FlowExecutorOptions, DEFAULT_RETRY_POLICY } from './flow-executor';
+export {
+  FlowExecutor,
+  FlowExecutorOptions,
+  FlowExecutorStateSnapshot,
+  DEFAULT_RETRY_POLICY,
+} from './flow-executor';
 export { SafeExpressionEvaluator } from './expression-evaluator/safe-evaluator';
 export {
   ReferenceResolver,

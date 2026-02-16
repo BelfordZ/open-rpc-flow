@@ -55,6 +55,20 @@ export interface FlowExecutorOptions {
 }
 
 /**
+ * Snapshot of FlowExecutor runtime state for debugging and resume tooling
+ */
+export interface FlowExecutorStateSnapshot {
+  /** Current shared context */
+  context: ExecutionContextData;
+  /** Names of steps that currently have stored results */
+  stepResultKeys: string[];
+  /** Last failed step tracked by the executor */
+  lastFailedStepName: string | null;
+  /** Current status tracked for each step */
+  statusMap: Record<string, 'success' | 'failed'>;
+}
+
+/**
  * Main executor for JSON-RPC flows
  */
 export class FlowExecutor {
@@ -269,6 +283,22 @@ export class FlowExecutor {
     this.lastFailedStepName = null;
     this.rebuildExecutionContext();
     this.rebuildStepExecutors();
+  }
+
+  /**
+   * Return a snapshot of current runtime state for debugging and resume tooling
+   */
+  getState(): FlowExecutorStateSnapshot {
+    const statusMap = Object.fromEntries(
+      Array.from(this.stepStatus.entries()).map(([stepName, status]) => [stepName, status.status]),
+    );
+
+    return {
+      context: { ...this.context },
+      stepResultKeys: Array.from(this.stepResults.keys()),
+      lastFailedStepName: this.lastFailedStepName,
+      statusMap,
+    };
   }
 
   /**

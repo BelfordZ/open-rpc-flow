@@ -322,9 +322,13 @@ describe('FlowExecutor resume/retry/pause', () => {
       steps: [{ name: 'step1', request: { method: 'one', params: {} } }],
     };
 
-    const executor = new FlowExecutor(flow, jest.fn(async () => ({ result: 'ok' })), {
-      logger: new TestLogger('clear-failed'),
-    });
+    const executor = new FlowExecutor(
+      flow,
+      jest.fn(async () => ({ result: 'ok' })),
+      {
+        logger: new TestLogger('clear-failed'),
+      },
+    );
 
     (executor as any).lastFailedStepName = 'step1';
 

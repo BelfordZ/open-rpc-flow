@@ -195,7 +195,11 @@ export class FlowExecutor {
   private rebuildExecutionContext(): void {
     this.referenceResolver = new ReferenceResolver(this.stepResults, this.context, this.logger);
     this.expressionEvaluator = new SafeExpressionEvaluator(this.logger, this.referenceResolver);
-    this.dependencyResolver = new DependencyResolver(this.flow, this.expressionEvaluator, this.logger);
+    this.dependencyResolver = new DependencyResolver(
+      this.flow,
+      this.expressionEvaluator,
+      this.logger,
+    );
     this.executionContext = {
       referenceResolver: this.referenceResolver,
       expressionEvaluator: this.expressionEvaluator,
@@ -330,10 +334,7 @@ export class FlowExecutor {
     }
   }
 
-  private findLastStatusIndex(
-    orderedSteps: Step[],
-    status: 'success' | 'failed',
-  ): number {
+  private findLastStatusIndex(orderedSteps: Step[], status: 'success' | 'failed'): number {
     let lastIndex = -1;
     for (let i = 0; i < orderedSteps.length; i++) {
       const stepStatus = this.stepStatus.get(orderedSteps[i].name);

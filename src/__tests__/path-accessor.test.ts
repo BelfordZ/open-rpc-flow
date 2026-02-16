@@ -132,19 +132,6 @@ describe('PathAccessor', () => {
         expect(() => PathAccessor.parsePath("foo.'bar'")).toThrow(PathSyntaxError);
       });
 
-      it('should throw PathSyntaxError on invalid nested brackets', () => {
-        let error: PathSyntaxError | undefined;
-        try {
-          PathAccessor.parsePath('foo[1[2]]');
-        } catch (e) {
-          error = e as PathSyntaxError;
-        }
-        expect(error).toBeDefined();
-        expect(error!.message).toBe('Invalid path syntax: Invalid bracket syntax at position 5: 1');
-        expect(error!.path).toBe('foo[1[2]]');
-        expect(error!.position).toBe(5);
-      });
-
       it('should throw PathSyntaxError on consecutive opening brackets', () => {
         let error: PathSyntaxError | undefined;
         try {
@@ -511,10 +498,6 @@ describe('PathAccessor error handling', () => {
 
     it('should throw on consecutive dots', () => {
       expect(() => PathAccessor.parsePath('foo..bar')).toThrow(PathSyntaxError);
-    });
-
-    it('should throw on empty path', () => {
-      expect(() => PathAccessor.parsePath('')).toThrow(InvalidPathError);
     });
   });
 

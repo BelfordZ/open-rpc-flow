@@ -162,14 +162,11 @@ export class RetryableOperation<T> {
     // Duck-typed check: if error has a code property, compare it
     if (error && typeof error === 'object' && 'code' in error) {
       const code = (error as any).code;
-      const errorCodeStr = String(code);
-      const isRetryable = this.policy.retryableErrors.some(
-        (retryableError) => String(retryableError) === errorCodeStr,
-      );
+      const isRetryable = this.matchesRetryableCode(code);
       this.logger.debug('Duck-typed retryable check result', {
         ...errorDetails,
         code,
-        errorCodeAsString: errorCodeStr,
+        errorCodeAsString: String(code),
         retryableErrorsAsStrings: this.policy.retryableErrors.map((e) => String(e)),
         isRetryable,
       });
@@ -196,19 +193,12 @@ export class RetryableOperation<T> {
         errorCode,
         errorCodeType: typeof errorCode,
       });
-
-      // Convert both sides to strings before comparing
-      const errorCodeStr = String(errorCode);
-
-      // Compare each retryable error with the error code using string comparison
-      const isRetryable = this.policy.retryableErrors.some(
-        (retryableError) => String(retryableError) === errorCodeStr,
-      );
+      const isRetryable = this.matchesRetryableCode(errorCode);
 
       /* istanbul ignore next -- debug logging */
       this.logger.debug('Retryable check result', {
         errorCode,
-        errorCodeAsString: errorCodeStr,
+        errorCodeAsString: String(errorCode),
         retryableErrorsAsStrings: this.policy.retryableErrors.map((e) => String(e)),
         isRetryable,
         errorType: error.constructor.name,
@@ -219,6 +209,13 @@ export class RetryableOperation<T> {
 
     this.logger.debug('Error is not retryable', errorDetails);
     return false;
+  }
+
+  private matchesRetryableCode(code: unknown): boolean {
+    const errorCode = String(code);
+    return this.policy.retryableErrors.some(
+      (retryableError) => String(retryableError) === errorCode,
+    );
   }
 
   /**

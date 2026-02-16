@@ -6,6 +6,7 @@ import {
   isRequestStep,
   isConditionStep,
   isTransformStep,
+  isDelayStep,
 } from '../step-executors/types';
 import { SafeExpressionEvaluator } from '../expression-evaluator/safe-evaluator';
 import { StepNotFoundError, UnknownDependencyError, CircularDependencyError } from './errors';
@@ -159,6 +160,12 @@ export class DependencyResolver {
       }
     }
 
+    // Extract references from delay steps
+    if (isDelayStep(step)) {
+      logger.debug('handling delay step');
+      this.findStepDependencies(step.delay.step, logger).forEach((dep) => deps.add(dep));
+    }
+
     // Extract references from request steps
     if (isRequestStep(step)) {
       logger.debug('handling request step');
@@ -282,6 +289,7 @@ export class DependencyResolver {
       if (isLoopStep(step)) type = StepType.Loop;
       if (isConditionStep(step)) type = StepType.Condition;
       if (isTransformStep(step)) type = StepType.Transform;
+      if (isDelayStep(step)) type = StepType.Delay;
 
       nodes.push({
         name: step.name,

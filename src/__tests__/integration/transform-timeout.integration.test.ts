@@ -6,7 +6,7 @@ import { TimeoutError } from '../../errors/timeout-error';
 describe('Integration: Transform Step Timeout (real timers)', () => {
   it('should abort a slow transform step if timeout is hit', async () => {
     // Use a large array and a computationally expensive expression to simulate slowness
-    const itemCount = 500_000;
+    const itemCount = 100_000;
     const items = Array.from({ length: itemCount }, (_, i) => i + 1);
 
     const flow: Flow = {

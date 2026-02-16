@@ -295,6 +295,29 @@ export class FlowExecutor {
   }
 
   /**
+   * Resume execution from a specific step and clear results for that step and any downstream steps
+   */
+  async resumeFrom(
+    stepName: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<Map<string, any>> {
+    this.initializeRunState({ clearResults: false, clearStatus: false });
+    const orderedSteps = this.dependencyResolver.getExecutionOrder();
+    this.ensureStatusFromResults(orderedSteps);
+
+    const startIndex = orderedSteps.findIndex((step) => step.name === stepName);
+    if (startIndex === -1) {
+      throw new StateError('Step not found in flow', {
+        stepName,
+        flowName: this.flow.name,
+      });
+    }
+
+    this.clearResultsFromIndex(orderedSteps, startIndex);
+    return this.runFromIndex(startIndex, options);
+  }
+
+  /**
    * Retry execution starting from the last failed step
    */
   async retry(options?: { signal?: AbortSignal }): Promise<Map<string, any>> {

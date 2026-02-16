@@ -359,4 +359,49 @@ describe('FlowExecutor resume/retry/pause', () => {
     const calledMethods = handler.mock.calls.map((call) => call[0].method);
     expect(calledMethods).toEqual(['two']);
   });
+
+  it('resumes from a specific step while clearing downstream results', async () => {
+    const flow: Flow = {
+      name: 'resume-from-flow',
+      description: 'resume from step validation',
+      steps: [
+        { name: 'step1', request: { method: 'one', params: {} } },
+        { name: 'step2', request: { method: 'two', params: { value: '${step1.result}' } } },
+        { name: 'step3', request: { method: 'three', params: { value: '${step2.result}' } } },
+      ],
+    };
+
+    const handler = jest.fn(async (request) => ({ result: request.method }));
+    const executor = new FlowExecutor(flow, handler, {
+      logger: new TestLogger('resume-from'),
+    });
+
+    executor.setStepResults({
+      step1: { result: 'one' },
+      step2: { result: 'two-stale' },
+      step3: { result: 'three-stale' },
+    });
+
+    const results = await executor.resumeFrom('step2');
+
+    const calledMethods = handler.mock.calls.map((call) => call[0].method);
+    expect(calledMethods).toEqual(['two', 'three']);
+    expect(results.get('step1')).toEqual({ result: 'one' });
+    expect((results.get('step2') as any)?.result).toEqual({ result: 'two' });
+    expect((results.get('step3') as any)?.result).toEqual({ result: 'three' });
+  });
+
+  it('throws when resumeFrom step is not part of the flow', async () => {
+    const flow: Flow = {
+      name: 'resume-from-unknown-flow',
+      description: 'resume from unknown step validation',
+      steps: [{ name: 'step1', request: { method: 'one', params: {} } }],
+    };
+
+    const executor = new FlowExecutor(flow, jest.fn(), {
+      logger: new TestLogger('resume-from-unknown'),
+    });
+
+    await expect(executor.resumeFrom('missing')).rejects.toThrow('Step not found in flow');
+  });
 });

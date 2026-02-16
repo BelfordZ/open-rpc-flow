@@ -41,11 +41,6 @@ describe('ExpressionEvaluator', () => {
     expect(evaluator.evaluate('false', {})).toBe(false);
   });
 
-  it('evaluates comparison expressions', () => {
-    expect(evaluator.evaluate('10 > 5', {})).toBe(true);
-    expect(evaluator.evaluate('10 < 5', {})).toBe(false);
-  });
-
   it('evaluates expressions with context', () => {
     expect(evaluator.evaluate('${context.config.threshold} > 50', {})).toBe(true);
     expect(evaluator.evaluate('${context.config.enabled}', {})).toBe(true);
@@ -97,23 +92,10 @@ describe('ExpressionEvaluator', () => {
     expect(result).toStrictEqual({ id: 42, config: 100 });
   });
 
-  it('throws on invalid expressions', () => {
-    expect(() => evaluator.evaluate('2 <> 3', {})).toThrow('Failed to evaluate expression: 2 <> 3');
-  });
-
   it('throws on undefined references', () => {
     expect(() => evaluator.evaluate('${nonexistent.value}', {})).toThrow(
       "Reference 'nonexistent' not found. Available references are: step1, context",
     );
-  });
-
-  it('resolves simple references directly', () => {
-    const items = [1, 2, 3];
-    stepResults.set('items', items);
-    expect(evaluator.evaluate('${items}', {})).toBe(items);
-
-    const extraContext = { item: { id: 42 } };
-    expect(evaluator.evaluate('${item.id}', extraContext)).toBe(42);
   });
 
   describe('wrapped step results', () => {

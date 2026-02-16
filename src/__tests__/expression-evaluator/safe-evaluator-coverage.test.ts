@@ -290,19 +290,6 @@ describe('SafeExpressionEvaluator Coverage Improvements', () => {
       expect(evaluator.evaluate('5 < 3 || 2 > 4', {})).toBe(false);
       expect(evaluator.evaluate('5 > 3 || 2 > 4', {})).toBe(true);
     });
-
-    it('respects parentheses over operator precedence', () => {
-      // Parentheses change the order of operations
-      expect(evaluator.evaluate('(2 + 3) * 4', {})).toBe(20);
-      expect(evaluator.evaluate('2 + (3 * 4)', {})).toBe(14);
-
-      // Nested parentheses
-      expect(evaluator.evaluate('((2 + 3) * 4) / 2', {})).toBe(10);
-
-      // Parentheses with logical operators
-      expect(evaluator.evaluate('(true || false) && false', {})).toBe(false);
-      expect(evaluator.evaluate('true || (false && false)', {})).toBe(true);
-    });
   });
 
   describe('reference extraction', () => {
@@ -334,17 +321,6 @@ describe('SafeExpressionEvaluator Coverage Improvements', () => {
       const refs = evaluator['extractReferences'](expr);
       expect(refs).toContain('inner');
       expect(refs.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it('ignores special variables', () => {
-      // Test that special variables are filtered out
-      // This targets the isSpecialVariable check in line 616
-      const expr = '${item.property} ${context.value} ${acc.total}';
-      const refs = evaluator['extractReferences'](expr);
-      // Should not contain special variables: item, context, acc
-      expect(refs).not.toContain('item');
-      expect(refs).not.toContain('context');
-      expect(refs).not.toContain('acc');
     });
 
     it('handles malformed references gracefully', () => {

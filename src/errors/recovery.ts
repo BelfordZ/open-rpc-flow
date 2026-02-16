@@ -27,13 +27,16 @@ export interface RetryPolicy {
 export class RetryableOperation<T> {
   private logger: Logger;
   private allErrors: unknown[] = [];
+  private onRetry?: (error: unknown, attempt: number, delay: number) => void;
 
   constructor(
     private operation: () => Promise<T>,
     private policy: RetryPolicy,
     logger: Logger,
+    onRetry?: (error: unknown, attempt: number, delay: number) => void,
   ) {
     this.logger = logger.createNested('RetryableOperation');
+    this.onRetry = onRetry;
   }
 
   /**
@@ -133,6 +136,14 @@ export class RetryableOperation<T> {
           error: error instanceof Error ? error.message : String(error),
           backoffStrategy: strategy,
         });
+
+        if (this.onRetry) {
+          try {
+            this.onRetry(error, attempt, delay);
+          } catch {
+            // ignore errors in onRetry callback
+          }
+        }
 
         await new Promise((resolve) => setTimeout(resolve, delay));
       }

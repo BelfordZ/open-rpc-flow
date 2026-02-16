@@ -14,6 +14,7 @@ import { ExecutionError, ValidationError } from '../errors/base';
 import { TimeoutError } from '../errors/timeout-error';
 import { ErrorCode } from '../errors/codes';
 import { PolicyResolver } from '../util/policy-resolver';
+import { FlowExecutorEvents } from '../util/flow-executor-events';
 
 export class RequestStepExecutor implements StepExecutor {
   private requestId: number = 0;
@@ -24,6 +25,7 @@ export class RequestStepExecutor implements StepExecutor {
     private jsonRpcHandler: JsonRpcHandler,
     logger: Logger,
     policyResolver: PolicyResolver,
+    private events?: FlowExecutorEvents,
   ) {
     this.logger = logger.createNested('RequestStepExecutor');
     this.policyResolver = policyResolver;
@@ -289,7 +291,14 @@ export class RequestStepExecutor implements StepExecutor {
         });
 
         // Execute with retry
-        const operation = new RetryableOperation(executeRequest, stepRetryPolicy, this.logger);
+        const operation = new RetryableOperation(
+          executeRequest,
+          stepRetryPolicy,
+          this.logger,
+          (err, attempt, delay) => {
+            this.events?.emitStepRetry(step, attempt, err as Error, delay);
+          },
+        );
         result = await operation.execute();
       } else {
         // No retry policy, execute directly

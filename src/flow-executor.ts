@@ -181,7 +181,12 @@ export class FlowExecutor {
    * Create a RequestStepExecutor with the current error handling configuration
    */
   private createRequestStepExecutor(): RequestStepExecutor {
-    return new RequestStepExecutor(this.jsonRpcHandler, this.logger, this.policyResolver);
+    return new RequestStepExecutor(
+      this.jsonRpcHandler,
+      this.logger,
+      this.policyResolver,
+      this.events,
+    );
   }
 
   /**
@@ -277,6 +282,9 @@ export class FlowExecutor {
             break;
           }
         } catch (error: any) {
+          if (error instanceof TimeoutError) {
+            this.events.emitStepTimeout(step, error.timeout, error.executionTime);
+          }
           this.events.emitStepError(step, error, stepStartTime, correlationId);
           throw error; // Re-throw to be caught by the outer try/catch
         }
@@ -295,12 +303,15 @@ export class FlowExecutor {
         (this.globalAbortController.signal.aborted && error.message?.includes('timeout')) ||
         error.name === 'AbortError'
       ) {
-        const timeout = this.flow.policies?.global?.timeout?.timeout || 0;
+        const duration = Date.now() - startTime;
+        const flowTimeout = this.flow.policies?.global?.timeout?.timeout || 0;
         const timeoutError = new TimeoutError(
-          `Flow execution timed out after ${Date.now() - startTime}ms. Configured timeout: ${timeout}ms.`,
-          timeout,
-          Date.now() - startTime,
+          `Flow execution timed out after ${duration}ms. Configured timeout: ${flowTimeout}ms.`,
+          flowTimeout,
+          duration,
         );
+
+        this.events.emitFlowTimeout(this.flow.name, flowTimeout, duration);
         this.events.emitFlowError(this.flow.name, timeoutError, startTime);
         throw timeoutError;
       }
@@ -380,6 +391,9 @@ export class FlowExecutor {
 
       // Only emit step error for nested steps
       if (isNested) {
+        if (error instanceof TimeoutError) {
+          this.events.emitStepTimeout(step, error.timeout, error.executionTime);
+        }
         this.events.emitStepError(step, error, stepStartTime, correlationId);
       }
 

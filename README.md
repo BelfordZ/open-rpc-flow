@@ -11,7 +11,7 @@ A flexible and type-safe execution engine for JSON-RPC based workflows. This eng
 - 🔗 **Dependency Resolution**: Automatic handling of data dependencies between steps
 - 🎯 **Type Safety**: Written in TypeScript with comprehensive type definitions
 - 🔍 **Error Handling**: Detailed error reporting, validation, and graceful error recovery
-- 🌍 **Context Management**: Global context available to all steps with proper scoping
+- 🌍 **Context Management**: Read-only global context available to all steps with proper scoping
 - 📦 **Batch Processing**: Support for processing data in configurable batch sizes
 
 ## Examples
@@ -168,9 +168,17 @@ const flow: Flow = {
   ],
 };
 
+// Context is treated as immutable input; use step results to pass derived data.
+
 // Execute the flow
 const executor = new FlowExecutor(flow, jsonRpcHandler);
 const results = await executor.execute();
+```
+
+You can reset context between runs:
+
+```typescript
+executor.setContext({ minValue: 20 });
 ```
 
 ## Flow Definition

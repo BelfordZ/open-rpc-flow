@@ -359,4 +359,63 @@ describe('FlowExecutor resume/retry/pause', () => {
     const calledMethods = handler.mock.calls.map((call) => call[0].method);
     expect(calledMethods).toEqual(['two']);
   });
+
+  it('reset clears context, results, and status for subsequent runs', async () => {
+    const flow: Flow = {
+      name: 'reset-state-flow',
+      description: 'reset state validation',
+      context: { foo: 'initial' },
+      steps: [{ name: 'step1', request: { method: 'one', params: { value: '${context.foo}' } } }],
+    };
+
+    const handler = jest.fn(async (request) => ({ result: request.params }));
+    const executor = new FlowExecutor(flow, handler, {
+      logger: new TestLogger('reset-state'),
+    });
+
+    executor.setContext({ foo: 'updated' });
+    await executor.execute();
+
+    executor.reset();
+
+    expect((executor as any).context).toEqual({});
+    expect((executor as any).stepResults.size).toBe(0);
+    expect((executor as any).stepStatus.size).toBe(0);
+  });
+
+  it('reset cancels in-flight execution and allows fresh runs', async () => {
+    const flow: Flow = {
+      name: 'reset-abort-flow',
+      description: 'reset abort validation',
+      steps: [{ name: 'step1', request: { method: 'one', params: {} } }],
+    };
+
+    let currentSignal: AbortSignal | undefined;
+    let startedResolve: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => {
+      startedResolve = resolve;
+    });
+    const handler = jest.fn((_request, options) => {
+      currentSignal = options?.signal;
+      return new Promise((_, reject) => {
+        options?.signal?.addEventListener('abort', () => reject(new Error('aborted by reset')));
+        startedResolve?.();
+      });
+    });
+
+    const executor = new FlowExecutor(flow, handler, {
+      logger: new TestLogger('reset-abort'),
+    });
+
+    const inFlight = executor.execute();
+    await started;
+    executor.reset();
+
+    await expect(inFlight).rejects.toThrow('timed out');
+    expect(currentSignal?.aborted).toBe(true);
+
+    handler.mockResolvedValueOnce({ result: 'ok' });
+    await expect(executor.execute()).resolves.toBeInstanceOf(Map);
+    expect(handler).toHaveBeenCalledTimes(2);
+  });
 });

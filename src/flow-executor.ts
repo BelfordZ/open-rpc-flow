@@ -272,6 +272,18 @@ export class FlowExecutor {
   }
 
   /**
+   * Reset executor state by cancelling any in-flight run and clearing context/results/status
+   */
+  reset(): void {
+    if (!this.globalAbortController.signal.aborted) {
+      this.globalAbortController.abort('reset');
+    }
+
+    this.context = {};
+    this.initializeRunState({ clearResults: true, clearStatus: true });
+  }
+
+  /**
    * Pause the currently running flow
    */
   pause(): void {

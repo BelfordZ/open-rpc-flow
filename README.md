@@ -184,6 +184,27 @@ Execute JSON-RPC requests with error handling:
 }
 ```
 
+### OpenRPC Method Definitions
+
+Steps can optionally include an `openrpc` field describing the inputs and output of the step using the OpenRPC method object. This makes the expected parameters and result explicit:
+
+```typescript
+{
+  name: 'getUser',
+  openrpc: {
+    name: 'getUser',
+    params: [
+      { name: 'id', required: true, schema: { type: 'number' } }
+    ],
+    result: { name: 'user', schema: { type: 'object' } }
+  },
+  request: {
+    method: 'user.get',
+    params: { id: 1 }
+  }
+}
+```
+
 ### Transform Steps
 
 Transform data using operations like map, filter, reduce:

@@ -56,6 +56,24 @@ describe('RequestStepExecutor', () => {
     });
   });
 
+  it('executes a request step with an OpenRPC method definition', async () => {
+    const step: RequestStep = {
+      name: 'getUser',
+      openrpc: {
+        name: 'getUser',
+        params: [{ name: 'id', required: true, schema: { type: 'number' } }],
+        result: { name: 'user', schema: { type: 'object' } },
+      },
+      request: { method: 'user.get', params: { id: 2 } },
+    };
+
+    jsonRpcHandler.mockResolvedValue({ id: 2, name: 'User Two' });
+    const result = await executor.execute(step, context);
+
+    expect(result.type).toBe('request');
+    expect(result.result).toEqual({ id: 2, name: 'User Two' });
+  });
+
   it('resolves references in request parameters', async () => {
     const step: RequestStep = {
       name: 'getPermissions',

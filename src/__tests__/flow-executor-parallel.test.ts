@@ -176,7 +176,6 @@ describe('FlowExecutor parallel execution', () => {
       ],
     };
 
-    let executor: FlowExecutor;
     const jsonRpcHandler = jest.fn((request) => {
       if (request.method === 'a') {
         executor['globalAbortController'].abort('manual abort');
@@ -184,8 +183,11 @@ describe('FlowExecutor parallel execution', () => {
       }
       return Promise.resolve({ result: 'b' });
     });
-
-    executor = new FlowExecutor(flow, jsonRpcHandler, new TestLogger('manual-abort'));
+    const executor: FlowExecutor = new FlowExecutor(
+      flow,
+      jsonRpcHandler,
+      new TestLogger('manual-abort'),
+    );
 
     await expect(executor.execute()).rejects.toThrow('manual abort');
 

@@ -513,7 +513,6 @@ most useful fields:
 | `flow:start`    | `flowName`, `orderedSteps`                                        |
 | `flow:complete` | `flowName`, `results`, `duration`                                 |
 | `flow:error`    | `flowName`, `error`, `duration`                                   |
-| `flow:finish`   | `flowName`, `status`, `results?`, `error?`, `duration`            |
 | `step:start`    | `stepName`, `stepType`, `context?`                                |
 | `step:complete` | `stepName`, `stepType`, `result`, `duration`                      |
 | `step:error`    | `stepName`, `stepType`, `error`, `duration`                       |

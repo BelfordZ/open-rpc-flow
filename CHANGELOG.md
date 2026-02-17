@@ -5,6 +5,13 @@
 
 * update readme ([#59](https://github.com/BelfordZ/open-rpc-flow/issues/59)) ([7f5d691](https://github.com/BelfordZ/open-rpc-flow/commit/7f5d6915880bb02c6bbe6e93f6f98abc95cc5c39))
 
+## [1.5.1](https://github.com/BelfordZ/open-rpc-flow/compare/v1.5.0...v1.5.1) (2026-02-17)
+
+
+### Bug Fixes
+
+* **ci:** use PAT for release-please action ([#138](https://github.com/BelfordZ/open-rpc-flow/issues/138)) ([61bbea8](https://github.com/BelfordZ/open-rpc-flow/commit/61bbea8e068e216a074ef850494da479ed7f6d83))
+
 ## [1.5.0](https://github.com/BelfordZ/open-rpc-flow/compare/v1.4.4...v1.5.0) (2026-02-16)
 
 

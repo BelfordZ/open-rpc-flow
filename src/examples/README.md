@@ -38,6 +38,9 @@ This directory contains example flows demonstrating various patterns and use cas
 7. **Retry with Timeout (07-retry-timeout.json)**
    - Custom retry policy with backoff
    - Step-level timeout control
+8. **Flow Executor Resume (08-flow-executor-resume.json)**
+   - Minimal pause/resume scenario for long-running flows
+   - Shows how dependent steps continue after resume
 
 ## TypeScript Examples
 

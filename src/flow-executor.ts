@@ -18,6 +18,7 @@ import {
   TransformStepExecutor,
   StopStepExecutor,
   StepType,
+  DelayStepExecutor,
 } from './step-executors';
 import { Logger, defaultLogger } from './util/logger';
 import { FlowExecutorEvents, FlowEventOptions } from './util/flow-executor-events';
@@ -229,6 +230,7 @@ export class FlowExecutor {
         this.policyResolver,
       ),
       new StopStepExecutor(this.logger, this.globalAbortController),
+      new DelayStepExecutor(this.executeStep.bind(this), this.logger),
     ];
   }
 

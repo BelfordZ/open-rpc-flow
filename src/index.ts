@@ -52,6 +52,7 @@ export {
   StepProgressEvent,
   StepAbortedEvent,
   FlowAbortedEvent,
+  FlowPausedEvent,
   StepRetryEvent,
   StepTimeoutEvent,
   DependencyResolvedEvent,

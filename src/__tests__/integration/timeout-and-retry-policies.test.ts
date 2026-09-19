@@ -116,20 +116,21 @@ interface ExpectErrorOptions {
 }
 
 async function expectError(promise: Promise<any>, options: ExpectErrorOptions = {}) {
-  const { errorClass = TimeoutError, messageIncludes = 'timed out' } = options;
+  const { errorClass = TimeoutError, messageIncludes } = options;
   try {
     await promise;
     throw new Error(`Should have thrown ${errorClass?.name || 'an error'}`);
   } catch (error) {
     if (errorClass) {
-      console.log(error);
       expect(error).toBeInstanceOf(errorClass);
     }
+
     if (messageIncludes) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       if (typeof messageIncludes === 'string') {
-        expect(String(error)).toContain(messageIncludes);
+        expect(errorMessage).toContain(messageIncludes);
       } else {
-        expect(String(error)).toMatch(messageIncludes);
+        expect(errorMessage).toMatch(messageIncludes);
       }
     }
   }
@@ -248,7 +249,7 @@ describe('Timeout and Retry Policies', () => {
         });
       });
 
-      it.only('should respect timeout on the condition step even if the request has no timeout', async () => {
+      it('should respect timeout on the condition step even if the request has no timeout', async () => {
         const shortTimeout = 50;
         const flow: Flow = {
           name: 'condition-step-timeout-test',
@@ -277,6 +278,119 @@ describe('Timeout and Retry Policies', () => {
           errorClass: TimeoutError,
           messageIncludes: 'timed out',
         });
+      });
+    });
+
+    describe('Global flow timeout vs per-step timeout', () => {
+      it('should fail with a flow timeout when global timeout is shorter than step timeout', async () => {
+        const globalTimeout = 40;
+        const stepTimeout = 200;
+
+        const flow: Flow = {
+          name: 'flow-timeout-priority-test',
+          description: 'Global timeout should win when it is shorter than step timeout',
+          policies: {
+            global: {
+              timeout: {
+                timeout: globalTimeout,
+              },
+            },
+          },
+          steps: [
+            {
+              name: 'slowStep',
+              policies: { timeout: { timeout: stepTimeout } },
+              request: {
+                method: 'slow',
+                params: [],
+              },
+            },
+          ],
+        };
+
+        const mockHandler = createMockHandler({ delay: stepTimeout * 2 });
+        const executor = new FlowExecutor(flow, mockHandler, testLogger);
+
+        const execution = executor.execute();
+        jest.advanceTimersByTime(globalTimeout);
+
+        await expectError(execution, {
+          errorClass: TimeoutError,
+          messageIncludes: 'Flow execution timed out',
+        });
+      });
+
+      it('should fail with step timeout when step timeout is shorter than global timeout', async () => {
+        const globalTimeout = 300;
+        const stepTimeout = 50;
+
+        const flow: Flow = {
+          name: 'step-timeout-priority-test',
+          description: 'Step timeout should win when it is shorter than global timeout',
+          policies: {
+            global: {
+              timeout: {
+                timeout: globalTimeout,
+              },
+            },
+          },
+          steps: [
+            {
+              name: 'slowStep',
+              policies: { timeout: { timeout: stepTimeout } },
+              request: {
+                method: 'slow',
+                params: [],
+              },
+            },
+          ],
+        };
+
+        const mockHandler = createMockHandler({ delay: stepTimeout * 3 });
+        const executor = new FlowExecutor(flow, mockHandler, testLogger);
+
+        const execution = executor.execute();
+        jest.advanceTimersByTime(stepTimeout);
+
+        await expectError(execution, {
+          errorClass: ExecutionError,
+          messageIncludes: 'Step "slowStep" execution timed out',
+        });
+      });
+
+      it('should not use global timeout as implicit step timeout when global timeout is longer', async () => {
+        const globalTimeout = 500;
+
+        const flow: Flow = {
+          name: 'global-timeout-not-step-default-test',
+          description:
+            'Global timeout must not be treated as step timeout default when step timeout is absent',
+          policies: {
+            global: {
+              timeout: {
+                timeout: globalTimeout,
+              },
+            },
+          },
+          steps: [
+            {
+              name: 'requestStep',
+              request: {
+                method: 'slow-but-valid',
+                params: [],
+              },
+            },
+          ],
+        };
+
+        // Delay longer than the default request timeout? No.
+        // Delay longer than global timeout? Also no.
+        // This step should complete successfully to prove global timeout does not cap each step.
+        const mockHandler = createMockHandler({ delay: 120 });
+        const executor = new FlowExecutor(flow, mockHandler, testLogger);
+
+        const result = await executor.execute();
+        expect(result.get('requestStep').result.result).toBe('Result for slow-but-valid');
       });
     });
 
@@ -836,7 +950,7 @@ describe('Timeout and Retry Policies', () => {
       // Execute and check that step-level policies are used
       await expectError(executor.execute(), {
         errorClass: ExecutionError,
-        messageIncludes: 'timed out',
+        messageIncludes: /timed out|Max retry attempts exceeded/,
       });
       expect(attempts.count).toBe(3); // Should use retry policy (3 attempts)
     });

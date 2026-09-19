@@ -71,6 +71,36 @@ describe('FlowExecutor', () => {
     expect(jsonRpcHandler).toHaveBeenCalledTimes(1);
   });
 
+  it('updates flow context for subsequent executions', async () => {
+    const flow: Flow = {
+      name: 'Test Flow',
+      description: 'Test flow for unit tests',
+      steps: [
+        {
+          name: 'get_data',
+          request: {
+            method: 'getData',
+            params: { value: '${context.value}' },
+          },
+        },
+      ],
+    };
+
+    jsonRpcHandler.mockResolvedValue({ success: true });
+    executor = new FlowExecutor(flow, jsonRpcHandler, testLogger);
+    executor.setContext({ value: 42 });
+
+    await executor.execute();
+
+    expect(jsonRpcHandler).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'getData',
+        params: { value: 42 },
+      }),
+      expect.anything(),
+    );
+  });
+
   it('skips execution when the flow is already aborted', async () => {
     const flow: Flow = {
       name: 'Test Flow',

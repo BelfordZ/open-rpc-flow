@@ -303,8 +303,8 @@ describe('Transform Executors', () => {
       });
     });
 
-    describe('context assignment', () => {
-      test('assigns result to context using "as"', async () => {
+    describe('outputs capture', () => {
+      test('captures result for "as" without mutating context', async () => {
         const data = [1, 2, 3];
         const operations: TransformOperation[] = [
           {
@@ -314,8 +314,12 @@ describe('Transform Executors', () => {
           },
         ];
 
-        await executor.execute(operations, data);
-        expect(context.doubled).toEqual([2, 4, 6]);
+        const outputs: Record<string, unknown> = {};
+        await executor.execute(operations, data, undefined, undefined, (key, value) => {
+          outputs[key] = value;
+        });
+        expect(outputs).toEqual({ doubled: [2, 4, 6] });
+        expect(context.doubled).toBeUndefined();
       });
     });
 
@@ -361,10 +365,11 @@ describe('Transform Executors', () => {
   describe('TransformStepExecutor', () => {
     let stepExecutor: TransformStepExecutor;
     let context: StepExecutionContext;
+    let contextObj: Record<string, any>;
     const logger = new TestLogger('TransformStepExecutorTest');
     beforeEach(() => {
       const stepResults = new Map();
-      const contextObj = {};
+      contextObj = {};
 
       const referenceResolver = new ReferenceResolver(stepResults, contextObj, logger);
       const expressionEvaluator = new SafeExpressionEvaluator(logger, referenceResolver);
@@ -425,6 +430,28 @@ describe('Transform Executors', () => {
         timeout: 10000,
         timestamp: expect.any(String),
       });
+    });
+
+    it('stores outputs in metadata without mutating context', async () => {
+      const step: TransformStep = {
+        name: 'storeOutput',
+        transform: {
+          input: [1, 2, 3],
+          operations: [
+            {
+              type: 'map',
+              using: '${item} * 2',
+              as: 'doubled',
+            },
+          ],
+        },
+      };
+
+      const result = await stepExecutor.execute(step, context);
+
+      expect(result.type).toBe('transform');
+      expect(result.metadata?.outputs).toEqual({ doubled: [2, 4, 6] });
+      expect(contextObj.doubled).toBeUndefined();
     });
 
     it('performs filter transformation', async () => {

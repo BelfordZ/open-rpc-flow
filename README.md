@@ -11,7 +11,7 @@ A flexible and type-safe execution engine for JSON-RPC based workflows. This eng
 - 🔗 **Dependency Resolution**: Automatic handling of data dependencies between steps
 - 🎯 **Type Safety**: Written in TypeScript with comprehensive type definitions
 - 🔍 **Error Handling**: Detailed error reporting, validation, and graceful error recovery
-- 🌍 **Context Management**: Global context available to all steps with proper scoping
+- 🌍 **Context Management**: Read-only global context available to all steps with proper scoping
 - 📦 **Batch Processing**: Support for processing data in configurable batch sizes
 
 ## Examples
@@ -95,6 +95,13 @@ Integrate `AbortSignal` to cancel long running requests.
 
 [**src/examples/abort-signal-example.ts**](src/examples/abort-signal-example.ts)
 
+### 7. Resume and Retry with Seeded State
+
+Resume a partially completed flow or retry from a failure without re-running completed
+work. This is useful when restoring execution state from a job queue or database.
+
+[**src/examples/resume-retry-example.ts**](src/examples/resume-retry-example.ts)
+
 ## Installation
 
 ```bash
@@ -161,9 +168,17 @@ const flow: Flow = {
   ],
 };
 
+// Context is treated as immutable input; use step results to pass derived data.
+
 // Execute the flow
 const executor = new FlowExecutor(flow, jsonRpcHandler);
 const results = await executor.execute();
+```
+
+You can reset context between runs:
+
+```typescript
+executor.setContext({ minValue: 20 });
 ```
 
 ## Flow Definition
@@ -306,6 +321,36 @@ const executor = new FlowExecutor(flow, jsonRpcHandler, {
   },
 });
 ```
+
+### Resume, Retry, and State Seeding
+
+You can safely seed context and prior step results before calling `resume()` or `retry()`.
+
+- `setContext(context)` replaces the execution context used by references like
+  `${context.foo}`.
+- `setStepResults(results)` seeds completed step outputs and marks those steps as successful.
+- `resume()` starts from the step after the last successful step.
+- `retry()` starts from the last failed step and clears results for that step and all following
+  steps.
+
+```typescript
+const executor = new FlowExecutor(flow, jsonRpcHandler);
+
+// Typically loaded from durable storage
+executor.setContext({ requestId: 'req-123', actorId: 'user-42' });
+executor.setStepResults({
+  fetchProfile: { result: { id: 'user-42', status: 'active' } },
+});
+
+// Continue from the next unfinished step
+const resumedResults = await executor.resume();
+
+// If a later run fails, retry from the last failed step
+const retriedResults = await executor.retry();
+```
+
+See [**src/examples/resume-retry-example.ts**](src/examples/resume-retry-example.ts) for a
+complete, runnable example that shows how to snapshot and restore state.
 
 ##### Error Events
 
@@ -451,6 +496,9 @@ for a full working example.
 | `flow:start`          | Emitted when flow execution begins                 |
 | `flow:complete`       | Emitted when flow execution completes successfully |
 | `flow:error`          | Emitted when flow execution fails                  |
+| `flow:aborted`        | Emitted when flow execution is externally aborted  |
+| `flow:paused`         | Emitted when `executor.pause()` interrupts a flow  |
+| `flow:timeout`        | Emitted when global flow timeout is reached        |
 | `step:start`          | Emitted when a step execution begins               |
 | `step:complete`       | Emitted when a step execution completes            |
 | `step:error`          | Emitted when a step execution fails                |
@@ -468,6 +516,9 @@ most useful fields:
 | `flow:start`    | `flowName`, `orderedSteps`                                        |
 | `flow:complete` | `flowName`, `results`, `duration`                                 |
 | `flow:error`    | `flowName`, `error`, `duration`                                   |
+| `flow:aborted`  | `flowName`, `reason`                                              |
+| `flow:paused`   | `flowName`, `reason`                                              |
+| `flow:timeout`  | `flowName`, `timeout`, `duration`                                 |
 | `step:start`    | `stepName`, `stepType`, `context?`                                |
 | `step:complete` | `stepName`, `stepType`, `result`, `duration`                      |
 | `step:error`    | `stepName`, `stepType`, `error`, `duration`                       |

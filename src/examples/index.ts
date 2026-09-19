@@ -8,6 +8,7 @@ import flowExecutorResume from './08-flow-executor-resume.json';
 import { Flow } from '../types';
 import * as eventEmitterExample from './event-emitter-example';
 import * as errorHandlingExample from './error-handling-example';
+import * as resumeRetryExample from './resume-retry-example';
 
 // Assert the type of each imported JSON
 const simpleFlow = simple as Flow;
@@ -44,4 +45,4 @@ export const examples: Flow[] = [
 ];
 
 // Export example modules
-export { eventEmitterExample, errorHandlingExample };
+export { eventEmitterExample, errorHandlingExample, resumeRetryExample };

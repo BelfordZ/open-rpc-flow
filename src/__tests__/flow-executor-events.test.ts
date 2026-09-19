@@ -1151,6 +1151,24 @@ describe('FlowExecutor Events', () => {
     expect(received.length).toBe(0);
   });
 
+  it('should emit flow paused events', () => {
+    const events = new FlowExecutorEvents({ emitFlowEvents: true });
+    const received: any[] = [];
+    events.on(FlowEventType.FLOW_PAUSED, (d) => received.push(d));
+    events.emitFlowPaused('FlowA', 'paused');
+    expect(received.length).toBe(1);
+    expect(received[0].flowName).toBe('FlowA');
+    expect(received[0].reason).toBe('paused');
+  });
+
+  it('should not emit flow paused events when emitFlowEvents is disabled', () => {
+    const events = new FlowExecutorEvents({ emitFlowEvents: false });
+    const received: any[] = [];
+    events.on(FlowEventType.FLOW_PAUSED, (d) => received.push(d));
+    events.emitFlowPaused('FlowA', 'paused');
+    expect(received.length).toBe(0);
+  });
+
   it('should emit flow timeout events from FlowExecutorEvents', () => {
     const events = new FlowExecutorEvents({ emitFlowEvents: true });
     const received: any[] = [];

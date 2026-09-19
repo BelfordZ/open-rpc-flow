@@ -589,7 +589,20 @@ export class FlowExecutor {
                 this.events.emitFlowAborted(this.flow.name, stopReason);
                 flowAbortEmitted = true;
               }
-              this.events.emitStepSkip(step, 'Workflow stopped by previous step', correlationId);
+              // The stop step itself completed successfully (step:complete was
+              // emitted above), so it must not also be reported as skipped.
+              // Only steps that will never run get a step:skip. (Issue #150.)
+              for (const stepName of orderedStepNames) {
+                if (
+                  completed.has(stepName) ||
+                  failed.has(stepName) ||
+                  skipped.has(stepName) ||
+                  inFlight.has(stepName)
+                ) {
+                  continue;
+                }
+                markSkipped(stepName, stopReason);
+              }
               return;
             }
 

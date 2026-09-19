@@ -118,7 +118,7 @@ describe('FlowExecutor event emission', () => {
         },
         {
           name: 'shouldNotRun',
-          request: { method: 'foo', params: {} },
+          request: { method: 'foo', params: { prev: '${stopStep}' } },
         },
       ],
     };
@@ -135,8 +135,10 @@ describe('FlowExecutor event emission', () => {
       events.push({ type: FlowEventType.FLOW_ABORTED, payload }),
     );
     await executor.execute();
-    // Should emit a skip for the second step
-    expect(events.some((e) => e.type === FlowEventType.STEP_SKIP)).toBe(true);
+    // The stop step completed; only the downstream step that never ran is skipped.
+    const skipEvents = events.filter((e) => e.type === FlowEventType.STEP_SKIP);
+    expect(skipEvents.length).toBe(1);
+    expect(skipEvents[0].payload.stepName).toBe('shouldNotRun');
     expect(events.some((e) => e.type === FlowEventType.FLOW_COMPLETE)).toBe(true);
     expect(events.some((e) => e.type === FlowEventType.FLOW_ABORTED)).toBe(true);
   });

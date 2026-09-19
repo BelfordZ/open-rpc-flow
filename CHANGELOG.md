@@ -5,6 +5,25 @@
 
 * update readme ([#59](https://github.com/BelfordZ/open-rpc-flow/issues/59)) ([7f5d691](https://github.com/BelfordZ/open-rpc-flow/commit/7f5d6915880bb02c6bbe6e93f6f98abc95cc5c39))
 
+## [1.6.0](https://github.com/BelfordZ/open-rpc-flow/compare/v1.5.1...v1.6.0) (2026-09-19)
+
+
+### Features
+
+* add flow-executor-resume example and tests ([#127](https://github.com/BelfordZ/open-rpc-flow/issues/127)) ([c62a279](https://github.com/BelfordZ/open-rpc-flow/commit/c62a2794718df87b493f9475ac15ab08b68f5001))
+
+
+### Bug Fixes
+
+* add comprehensive prefix unary operator support ([#155](https://github.com/BelfordZ/open-rpc-flow/issues/155)) ([09d6a90](https://github.com/BelfordZ/open-rpc-flow/commit/09d6a90db9b978a45b5470e11ce5960383e65302))
+* guard SafeExpressionEvaluator against stack overflow from deep nesting ([#141](https://github.com/BelfordZ/open-rpc-flow/issues/141)) ([2fb5774](https://github.com/BelfordZ/open-rpc-flow/commit/2fb577484a6455d488b6928fe6b4d0839fd743fb))
+* make dangerous-pattern filter token-aware instead of substring match ([#160](https://github.com/BelfordZ/open-rpc-flow/issues/160)) ([440c5ea](https://github.com/BelfordZ/open-rpc-flow/commit/440c5ea7923efb8c8e8691b4b2d809f26ef13e5f))
+* make FlowExecutor.reset() race-safe with distinct ResetError ([#159](https://github.com/BelfordZ/open-rpc-flow/issues/159)) ([adec7d4](https://github.com/BelfordZ/open-rpc-flow/commit/adec7d4a62609c1e69db1dbfd6db87c23daf5d45))
+* normalize whitespace inside ${...} across reference resolution ([#157](https://github.com/BelfordZ/open-rpc-flow/issues/157)) ([64f9f0d](https://github.com/BelfordZ/open-rpc-flow/commit/64f9f0d628f19e0a8b0054de1edc6afe5e413353))
+* preserve error details when wrapping step failures ([#140](https://github.com/BelfordZ/open-rpc-flow/issues/140)) ([04198ea](https://github.com/BelfordZ/open-rpc-flow/commit/04198eacf8898772fd87ebe1fcdc8c5609221586))
+* register DelayStepExecutor in rebuildStepExecutors ([#154](https://github.com/BelfordZ/open-rpc-flow/issues/154)) ([336dc04](https://github.com/BelfordZ/open-rpc-flow/commit/336dc04fd4d4df5fd7df938a2b7d8dafcedc0581))
+* use replacer function to stop $-pattern corruption in interpolation ([#156](https://github.com/BelfordZ/open-rpc-flow/issues/156)) ([b0ed9e8](https://github.com/BelfordZ/open-rpc-flow/commit/b0ed9e87d3328c3958ebd550a2be716d45fc7b5a))
+
 ## [1.5.1](https://github.com/BelfordZ/open-rpc-flow/compare/v1.5.0...v1.5.1) (2026-02-17)
 
 

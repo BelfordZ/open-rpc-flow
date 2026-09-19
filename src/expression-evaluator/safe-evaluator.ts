@@ -7,6 +7,7 @@ import { TokenizerError } from './tokenizer';
 import type { Token, AstNode, OperatorSymbol, LiteralValue } from './types';
 import { hasKeyValue } from './types';
 import { TimeoutError } from '../errors/timeout-error';
+import { ValidationError } from '../errors/base';
 import { PolicyResolver } from '../util/policy-resolver';
 import { Step, getStepType } from '../types';
 import { StepType } from '../step-executors/types';
@@ -24,9 +25,17 @@ export class _UnknownReferenceError extends Error {
 
 export class SafeExpressionEvaluator {
   private static readonly MAX_EXPRESSION_LENGTH = 1000;
+  /**
+   * Default maximum nesting depth for recursive expression processing
+   * (parsing, AST evaluation, and reference extraction). Guards against
+   * stack overflow from deeply nested or malicious input (see issue #47).
+   * Can be overridden per instance via the constructor.
+   */
+  public static readonly MAX_RECURSION_DEPTH = 100;
   private logger: Logger;
   private policyResolver?: PolicyResolver;
   private defaultExpressionTimeout: number = DEFAULT_TIMEOUTS.expression!;
+  private readonly maxRecursionDepth: number;
 
   // Helper functions for operators
   private static ensureNumbers(a: unknown, b: unknown, operation: string): void {
@@ -115,9 +124,11 @@ export class SafeExpressionEvaluator {
     logger: Logger,
     private referenceResolver: ReferenceResolver,
     policyResolver?: PolicyResolver,
+    maxRecursionDepth: number = SafeExpressionEvaluator.MAX_RECURSION_DEPTH,
   ) {
     this.logger = logger.createNested('SafeExpressionEvaluator');
     this.policyResolver = policyResolver;
+    this.maxRecursionDepth = maxRecursionDepth;
   }
 
   /**
@@ -309,6 +320,30 @@ export class SafeExpressionEvaluator {
   }
 
   /**
+   * Enforces the maximum recursion depth for nested expression processing.
+   * Throws a structured ValidationError instead of allowing a raw stack
+   * overflow when input is nested too deeply (see issue #47).
+   *
+   * @param depth Current recursion depth (0-based)
+   * @param operation Human-readable name of the recursive operation
+   */
+  private checkRecursionDepth(depth: number, operation: string): void {
+    if (depth > this.maxRecursionDepth) {
+      this.logger.error(
+        `Maximum expression nesting depth of ${this.maxRecursionDepth} exceeded during ${operation}`,
+      );
+      throw new ValidationError(
+        `Maximum expression nesting depth of ${this.maxRecursionDepth} exceeded during ${operation}`,
+        {
+          maxDepth: this.maxRecursionDepth,
+          depth,
+          operation,
+        },
+      );
+    }
+  }
+
+  /**
    * Helper method to convert token values to JavaScript literal values
    */
   private tokenToLiteral(value: string): LiteralValue {
@@ -320,7 +355,8 @@ export class SafeExpressionEvaluator {
     return value;
   }
 
-  private parse(tokens: Token[]): AstNode {
+  private parse(tokens: Token[], depth: number = 0): AstNode {
+    this.checkRecursionDepth(depth, 'expression parsing');
     if (tokens.length === 0) {
       throw new ExpressionError('Empty expression');
     }
@@ -342,32 +378,32 @@ export class SafeExpressionEvaluator {
       }
       // New: handle object and array literal tokens
       if (token.type === 'object_literal') {
-        const properties = this.parseObjectProperties(token.value);
+        const properties = this.parseObjectProperties(token.value, depth);
         return { type: 'object', properties };
       }
       if (token.type === 'array_literal') {
-        const elements = this.parseArrayElements(token.value);
+        const elements = this.parseArrayElements(token.value, depth);
         return { type: 'array', elements };
       }
     }
 
     // Handle array literals
     if (tokens[0]?.value === '[' && tokens[tokens.length - 1]?.value === ']') {
-      const elements = this.parseArrayElements(tokens.slice(1, -1));
+      const elements = this.parseArrayElements(tokens.slice(1, -1), depth);
       return { type: 'array', elements };
     }
 
     // Handle object literals
     if (tokens[0]?.value === '{' && tokens[tokens.length - 1]?.value === '}') {
-      const properties = this.parseObjectProperties(tokens.slice(1, -1));
+      const properties = this.parseObjectProperties(tokens.slice(1, -1), depth);
       return { type: 'object', properties };
     }
 
     // Handle operators with precedence
-    return this.parseExpression(tokens);
+    return this.parseExpression(tokens, depth);
   }
 
-  private parseExpression(tokens: Token[]): AstNode {
+  private parseExpression(tokens: Token[], depth: number): AstNode {
     const operatorStack: StackOperator[] = [];
     const outputQueue: AstNode[] = [];
     let expectOperator = false;
@@ -378,16 +414,16 @@ export class SafeExpressionEvaluator {
       // Function call: identifier followed by '('
       if (token.type === 'identifier' && tokens[i + 1] && tokens[i + 1].value === '(') {
         // Find matching closing parenthesis
-        let depth = 1;
+        let parenDepth = 1;
         let j = i + 2;
         const argTokens: Token[] = [];
-        while (j < tokens.length && depth > 0) {
-          if (tokens[j].value === '(') depth++;
-          else if (tokens[j].value === ')') depth--;
-          if (depth > 0) argTokens.push(tokens[j]);
+        while (j < tokens.length && parenDepth > 0) {
+          if (tokens[j].value === '(') parenDepth++;
+          else if (tokens[j].value === ')') parenDepth--;
+          if (parenDepth > 0) argTokens.push(tokens[j]);
           j++;
         }
-        if (depth !== 0) throw new ExpressionError('Mismatched parentheses in function call');
+        if (parenDepth !== 0) throw new ExpressionError('Mismatched parentheses in function call');
         // Split args by commas at top level
         const args: AstNode[] = [];
         let current: Token[] = [];
@@ -396,13 +432,13 @@ export class SafeExpressionEvaluator {
           if (t.value === '(') argDepth++;
           if (t.value === ')') argDepth--;
           if (t.value === ',' && argDepth === 0) {
-            if (current.length > 0) args.push(this.parse(current));
+            if (current.length > 0) args.push(this.parse(current, depth + 1));
             current = [];
           } else {
             current.push(t);
           }
         }
-        if (current.length > 0) args.push(this.parse(current));
+        if (current.length > 0) args.push(this.parse(current, depth + 1));
         outputQueue.push({ type: 'function_call', name: token.value, args });
         i = j - 1;
         expectOperator = true;
@@ -631,15 +667,19 @@ export class SafeExpressionEvaluator {
     return result;
   }
 
-  private parseArrayElements(tokens: Token[]): { value: AstNode; spread?: boolean }[] {
+  private parseArrayElements(
+    tokens: Token[],
+    depth: number,
+  ): { value: AstNode; spread?: boolean }[] {
     return this.parseGroupedElements(tokens, ',', (currentTokens, isSpread) => ({
-      value: this.parse(currentTokens),
+      value: this.parse(currentTokens, depth + 1),
       spread: isSpread,
     }));
   }
 
   private parseObjectProperties(
     tokens: Token[],
+    depth: number,
   ): { key: string; value: AstNode; spread?: boolean }[] {
     return this.parseGroupedElements(tokens, ',', (currentTokens, isSpread, key) => {
       if (key === undefined && !isSpread) {
@@ -647,7 +687,7 @@ export class SafeExpressionEvaluator {
       }
       return {
         key: key || '',
-        value: this.parse(currentTokens),
+        value: this.parse(currentTokens, depth + 1),
         spread: isSpread,
       };
     });
@@ -676,7 +716,9 @@ export class SafeExpressionEvaluator {
     expression: string,
     step?: Step,
     stepType?: StepType,
+    depth: number = 0,
   ): unknown {
+    this.checkRecursionDepth(depth, 'expression evaluation');
     this.checkTimeout(startTime, expression, step, stepType);
 
     switch (ast.type) {
@@ -704,8 +746,24 @@ export class SafeExpressionEvaluator {
             `Failed to evaluate expression: unknown operator '${ast.operator}'`,
           );
         }
-        const left = this.evaluateAst(ast.left, context, startTime, expression, step, stepType);
-        const right = this.evaluateAst(ast.right, context, startTime, expression, step, stepType);
+        const left = this.evaluateAst(
+          ast.left,
+          context,
+          startTime,
+          expression,
+          step,
+          stepType,
+          depth + 1,
+        );
+        const right = this.evaluateAst(
+          ast.right,
+          context,
+          startTime,
+          expression,
+          step,
+          stepType,
+          depth + 1,
+        );
         try {
           return operator(left, right);
         } catch (error: unknown) {
@@ -733,6 +791,7 @@ export class SafeExpressionEvaluator {
               expression,
               step,
               stepType,
+              depth + 1,
             );
             if (typeof spreadValue === 'object' && spreadValue !== null) {
               Object.assign(obj, spreadValue);
@@ -747,6 +806,7 @@ export class SafeExpressionEvaluator {
               expression,
               step,
               stepType,
+              depth + 1,
             );
           }
         }
@@ -768,6 +828,7 @@ export class SafeExpressionEvaluator {
               expression,
               step,
               stepType,
+              depth + 1,
             );
             if (Array.isArray(spreadValue)) {
               result.push(...spreadValue);
@@ -780,7 +841,15 @@ export class SafeExpressionEvaluator {
             }
           } else {
             result.push(
-              this.evaluateAst(elem.value, context, startTime, expression, step, stepType),
+              this.evaluateAst(
+                elem.value,
+                context,
+                startTime,
+                expression,
+                step,
+                stepType,
+                depth + 1,
+              ),
             );
           }
         }
@@ -804,7 +873,7 @@ export class SafeExpressionEvaluator {
             ast.name as keyof typeof SafeExpressionEvaluator.ALLOWED_FUNCTIONS
           ];
         const argVals = ast.args.map((arg: AstNode) =>
-          this.evaluateAst(arg, context, startTime, expression, step, stepType),
+          this.evaluateAst(arg, context, startTime, expression, step, stepType, depth + 1),
         );
         return fn(...argVals);
       }
@@ -827,7 +896,8 @@ export class SafeExpressionEvaluator {
   public extractReferences(expression: string): string[] {
     const refs = new Set<string>();
 
-    const extractRefs = (expr: string): void => {
+    const extractRefs = (expr: string, depth: number): void => {
+      this.checkRecursionDepth(depth, 'reference extraction');
       let pos = 0;
       while (pos < expr.length) {
         const startIdx = expr.indexOf('${', pos);
@@ -851,7 +921,7 @@ export class SafeExpressionEvaluator {
           if (baseRef && !SafeExpressionEvaluator.isSpecialVariable(baseRef)) {
             refs.add(baseRef);
           }
-          extractRefs(inner);
+          extractRefs(inner, depth + 1);
           pos = i;
         } else {
           break;
@@ -859,7 +929,7 @@ export class SafeExpressionEvaluator {
       }
     };
 
-    extractRefs(expression);
+    extractRefs(expression, 0);
     return Array.from(refs).sort();
   }
 }

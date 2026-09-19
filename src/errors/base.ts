@@ -49,8 +49,8 @@ export class FlowError<C extends Record<string, unknown> = Record<string, any>> 
 export class ValidationError<
   C extends Record<string, unknown> = Record<string, any>,
 > extends FlowError<C> {
-  constructor(message: string, context: C) {
-    super(message, ErrorCode.VALIDATION_ERROR, context);
+  constructor(message: string, context: C, code: ErrorCode = ErrorCode.VALIDATION_ERROR) {
+    super(message, code, context);
     this.name = 'ValidationError';
     Object.setPrototypeOf(this, ValidationError.prototype);
   }

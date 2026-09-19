@@ -825,12 +825,22 @@ export class FlowExecutor {
 
       if (failed.size > 0 && !workflowStopped) {
         const errors = Array.from(failed.values());
+        // Snapshot the successful steps' results so consumers can inspect
+        // how far the flow got without re-executing (issue #162). This is a
+        // shallow copy of the map: reset()/setStepResults()/re-execution may
+        // clear or replace the live map, but the error keeps its own
+        // snapshot. Result values are shared references, which is safe
+        // because the framework never mutates stored results.
+        const stepResults = Object.fromEntries(this.stepResults);
         if (errors.length === 1) {
+          const error = errors[0] as Error & { context?: Record<string, unknown> };
+          error.context = { ...error.context, stepResults };
           throw errors[0];
         }
         throw new ExecutionError('Flow execution failed with multiple errors', {
           failedSteps: Array.from(failed.keys()),
           skippedSteps: Array.from(skipped.keys()),
+          stepResults,
         });
       }
 

@@ -127,7 +127,11 @@ export class ReferenceResolver {
             if (typeof resolvedValue === 'object') {
               resolvedValue = JSON.stringify(resolvedValue);
             }
-            obj = obj.replace(ref, resolvedValue);
+            // Use a replacer function (not a replacement string): `$&`, `$'`, `$``,
+            // `$n`, and `$$` sequences in a plain replacement string are
+            // interpreted as match/insert patterns by String.replace, which
+            // silently corrupts interpolated values containing them (#146).
+            obj = obj.replace(ref, () => resolvedValue);
             this.logger.debug(`replaced ${ref} with ${resolvedValue} in ${obj}`);
           });
           return obj;

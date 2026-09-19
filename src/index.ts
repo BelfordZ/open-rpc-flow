@@ -67,6 +67,7 @@ export {
   TimeoutError,
   StateError,
   PauseError,
+  ResetError,
 } from './errors';
 export { ErrorCode, ErrorCategory } from './errors/codes';
 export { RetryPolicy, RetryableOperation } from './errors/recovery';

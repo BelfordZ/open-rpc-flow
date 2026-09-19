@@ -26,7 +26,14 @@ import { randomUUID } from 'crypto';
 import { RetryPolicy } from './errors/recovery';
 import { ErrorCode } from './errors/codes';
 import { TimeoutError } from './errors/timeout-error';
-import { ExecutionError, FlowError, PauseError, StateError, ValidationError } from './errors/base';
+import {
+  ExecutionError,
+  FlowError,
+  PauseError,
+  ResetError,
+  StateError,
+  ValidationError,
+} from './errors/base';
 import { JsonRpcRequestError } from './step-executors/types';
 import { PolicyResolver } from './util/policy-resolver';
 
@@ -75,6 +82,12 @@ export class FlowExecutor {
   private retryPolicy: RetryPolicy | null;
   private policyResolver: PolicyResolver;
   private globalAbortController!: AbortController;
+  /**
+   * Epoch bumped every time run state is reinitialized. Steps capture the
+   * epoch of the run that started them; a step from an older epoch must never
+   * write results/status into newer state (see reset()).
+   */
+  private runEpoch = 0;
   private stepCorrelationIds!: Map<string, string>;
   private correlationPrefix!: string;
   private isPaused: boolean;
@@ -179,6 +192,9 @@ export class FlowExecutor {
   private initializeRunState(options: { clearResults: boolean; clearStatus: boolean }): void {
     this.isPaused = false;
     this.globalAbortController = new AbortController();
+    // Bump the epoch so in-flight steps from a superseded run can detect that
+    // their state was cleared and must not write into the fresh state.
+    this.runEpoch++;
     this.stepCorrelationIds = new Map();
     this.correlationPrefix = randomUUID();
 
@@ -272,6 +288,25 @@ export class FlowExecutor {
     this.lastFailedStepName = null;
     this.rebuildExecutionContext();
     this.rebuildStepExecutors();
+  }
+
+  /**
+   * Reset executor state: cancel any in-flight run and reinitialize context,
+   * results, and status so the executor is ready for a fresh execution.
+   *
+   * The in-flight run (if any) fails distinctly with ResetError. Reinitializing
+   * the run state bumps the run epoch, so steps from the superseded run detect
+   * the reset and never write into the fresh state.
+   */
+  reset(): void {
+    if (!this.globalAbortController.signal.aborted) {
+      this.globalAbortController.abort('reset');
+    }
+
+    // Restore the flow's declared initial context (frozen, per immutable
+    // context); initializeRunState rebuilds the resolvers against it below.
+    this.context = Object.freeze({ ...(this.flow.context || {}) });
+    this.initializeRunState({ clearResults: true, clearStatus: true });
   }
 
   /**
@@ -389,6 +424,9 @@ export class FlowExecutor {
     const safeStartIndex = Math.max(0, startIndex);
     this.logger.info('Executing flow with options:', options);
     const startTime = Date.now();
+    // Epoch of this run. If reset() reinitializes run state while this run is
+    // in flight, the epoch changes and this run must not touch the fresh state.
+    const runEpoch = this.runEpoch;
     let globalTimeoutId: NodeJS.Timeout | undefined;
     let flowAbortEmitted = false;
     const executionPolicy = this.flow.policies?.global?.execution;
@@ -525,6 +563,13 @@ export class FlowExecutor {
               this.globalAbortController.signal,
             );
 
+            if (runEpoch !== this.runEpoch) {
+              // This run was superseded by reset() while the step was in
+              // flight (the handler ignored the abort and resolved). Drop the
+              // result instead of recording it into the fresh state.
+              return;
+            }
+
             this.stepResults.set(step.name, result);
             this.stepStatus.set(step.name, { status: 'success' });
             completed.add(step.name);
@@ -565,6 +610,13 @@ export class FlowExecutor {
               }
             }
           } catch (error: any) {
+            if (runEpoch !== this.runEpoch) {
+              // This step belonged to a run superseded by reset(). Its state
+              // was already cleared: report the abort truthfully but write
+              // nothing, and emit no timeout/error events for it.
+              this.events.emitStepAborted(step, 'reset');
+              return;
+            }
             const reason = this.globalAbortController.signal.reason;
             const isPause = this.isPaused || reason === 'paused';
             if (this.globalAbortController.signal.aborted && isPause) {
@@ -633,7 +685,12 @@ export class FlowExecutor {
         }
       };
 
-      while ((readyQueue.length > 0 || running.size > 0) && !pauseError) {
+      while (
+        (readyQueue.length > 0 || running.size > 0) &&
+        !pauseError &&
+        // Stop scheduling the moment reset() supersedes this run.
+        runEpoch === this.runEpoch
+      ) {
         if (this.globalAbortController.signal.aborted && !stopScheduling) {
           const reason = this.globalAbortController.signal.reason || 'Flow execution aborted';
           stopScheduling = true;
@@ -673,12 +730,23 @@ export class FlowExecutor {
         await Promise.race(Array.from(running));
       }
 
-      if (stopScheduling && stopReason && !workflowStopped) {
+      if (stopScheduling && stopReason && !workflowStopped && runEpoch === this.runEpoch) {
         skipRemaining(stopReason);
       }
 
       if (running.size > 0) {
         await Promise.allSettled(Array.from(running));
+      }
+
+      if (runEpoch !== this.runEpoch) {
+        // This run was superseded by reset(): its state was already cleared.
+        // Fail distinctly rather than reporting stale failures or a
+        // misleading success.
+        if (!flowAbortEmitted) {
+          this.events.emitFlowAborted(this.flow.name, 'reset');
+          flowAbortEmitted = true;
+        }
+        throw new ResetError('Flow execution was reset', { flowName: this.flow.name });
       }
 
       if (pauseError) {
@@ -732,6 +800,11 @@ export class FlowExecutor {
       return this.stepResults;
     } catch (error: any) {
       if (error instanceof PauseError) {
+        throw error;
+      }
+      if (error instanceof ResetError) {
+        // Already reported via flow:aborted above; pass through like PauseError
+        // instead of converting to a flow:error.
         throw error;
       }
       if (this.globalAbortController.signal.aborted && !flowAbortEmitted) {

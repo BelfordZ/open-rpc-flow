@@ -1,7 +1,8 @@
 import { FlowExecutor } from '../flow-executor';
 import { Flow } from '../types';
 import { TestLogger } from '../util/logger';
-import { PauseError } from '../errors/base';
+import { PauseError, ResetError } from '../errors/base';
+import { FlowEventType } from '../util/flow-executor-events';
 import flowExecutorResume from '../examples/08-flow-executor-resume.json';
 
 describe('FlowExecutor resume/retry/pause', () => {
@@ -466,5 +467,129 @@ describe('FlowExecutor resume/retry/pause', () => {
     });
 
     await expect(executor.resumeFrom('missing')).rejects.toThrow('Step not found in flow');
+  });
+
+  it('reset restores initial context and clears results and status', async () => {
+    const flow: Flow = {
+      name: 'reset-state-flow',
+      description: 'reset state validation',
+      context: { foo: 'initial' },
+      steps: [{ name: 'step1', request: { method: 'one', params: { value: '${context.foo}' } } }],
+    };
+
+    const handler = jest.fn(async (request) => ({ result: request.params }));
+    const executor = new FlowExecutor(flow, handler, {
+      logger: new TestLogger('reset-state'),
+    });
+
+    executor.setContext({ foo: 'updated' });
+    await executor.execute();
+
+    executor.reset();
+
+    // Initial context restored (not wiped), still immutable
+    expect((executor as any).context).toEqual({ foo: 'initial' });
+    expect(Object.isFrozen((executor as any).context)).toBe(true);
+    expect((executor as any).stepResults.size).toBe(0);
+    expect((executor as any).stepStatus.size).toBe(0);
+    expect((executor as any).lastFailedStepName).toBeNull();
+
+    // A fresh run uses the restored initial context
+    const results = await executor.execute();
+    expect((results.get('step1') as any)?.result).toEqual({ result: { value: 'initial' } });
+  });
+
+  it('reset rejects in-flight execution with ResetError and leaves clean state', async () => {
+    const flow: Flow = {
+      name: 'reset-abort-flow',
+      description: 'reset abort validation',
+      steps: [{ name: 'step1', request: { method: 'one', params: {} } }],
+    };
+
+    let currentSignal: AbortSignal | undefined;
+    let startedResolve: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => {
+      startedResolve = resolve;
+    });
+    const handler = jest.fn((_request, options) => {
+      currentSignal = options?.signal;
+      return new Promise((_, reject) => {
+        options?.signal?.addEventListener('abort', () => reject(new Error('aborted by reset')));
+        startedResolve?.();
+      });
+    });
+
+    const executor = new FlowExecutor(flow, handler, {
+      logger: new TestLogger('reset-abort'),
+    });
+
+    const flowAborted: unknown[] = [];
+    const stepAborted: unknown[] = [];
+    const stepTimeouts: unknown[] = [];
+    const stepErrors: unknown[] = [];
+    const flowErrors: unknown[] = [];
+    executor.events.on(FlowEventType.FLOW_ABORTED, (e) => flowAborted.push(e));
+    executor.events.on(FlowEventType.STEP_ABORTED, (e) => stepAborted.push(e));
+    executor.events.on(FlowEventType.STEP_TIMEOUT, (e) => stepTimeouts.push(e));
+    executor.events.on(FlowEventType.STEP_ERROR, (e) => stepErrors.push(e));
+    executor.events.on(FlowEventType.FLOW_ERROR, (e) => flowErrors.push(e));
+
+    const inFlight = executor.execute();
+    await started;
+    executor.reset();
+
+    // Distinct error, not a timeout masquerading as one
+    await expect(inFlight).rejects.toBeInstanceOf(ResetError);
+    await expect(inFlight).rejects.toThrow('Flow execution was reset');
+    expect(currentSignal?.aborted).toBe(true);
+    expect(currentSignal?.reason).toBe('reset');
+
+    // The superseded run wrote nothing into the fresh state (race regression)
+    expect((executor as any).stepResults.size).toBe(0);
+    expect((executor as any).stepStatus.size).toBe(0);
+
+    // Truthful events only: aborted, never timeout/error
+    expect(flowAborted).toHaveLength(1);
+    expect(stepAborted).toHaveLength(1);
+    expect(stepTimeouts).toHaveLength(0);
+    expect(stepErrors).toHaveLength(0);
+    expect(flowErrors).toHaveLength(0);
+
+    // Fresh execution works afterwards
+    handler.mockResolvedValueOnce({ result: 'ok' });
+    await expect(executor.execute()).resolves.toBeInstanceOf(Map);
+    expect(handler).toHaveBeenCalledTimes(2);
+  });
+
+  it('reset drops results from in-flight steps that ignore the abort signal', async () => {
+    const flow: Flow = {
+      name: 'reset-ignore-abort-flow',
+      description: 'reset abort-ignored validation',
+      steps: [{ name: 'step1', request: { method: 'one', params: {} } }],
+    };
+
+    let startedResolve: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => {
+      startedResolve = resolve;
+    });
+    // Handler ignores the abort signal entirely and resolves anyway.
+    const handler = jest.fn(async () => {
+      startedResolve?.();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      return { result: 'late' };
+    });
+
+    const executor = new FlowExecutor(flow, handler, {
+      logger: new TestLogger('reset-ignore-abort'),
+    });
+
+    const inFlight = executor.execute();
+    await started;
+    executor.reset();
+
+    await expect(inFlight).rejects.toBeInstanceOf(ResetError);
+    // The late result was dropped, not recorded into the fresh state
+    expect((executor as any).stepResults.size).toBe(0);
+    expect((executor as any).stepStatus.size).toBe(0);
   });
 });

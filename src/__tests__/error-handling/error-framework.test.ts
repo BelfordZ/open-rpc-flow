@@ -205,7 +205,7 @@ describe('Error Framework', () => {
       expect(error).toBe(validationError);
       expect(error).toBeInstanceOf(ValidationError);
       expect(error.code).toBe(ErrorCode.VALIDATION_ERROR);
-      expect(error.context).toEqual({ field: 'value' });
+      expect(error.context).toEqual({ field: 'value', stepResults: {} });
     });
 
     it('passes JsonRpcRequestError through so the error response stays intact', async () => {
@@ -276,6 +276,121 @@ describe('Error Framework', () => {
       expect(error.context.completedSteps).toEqual(['first_step']);
       expect(error.cause).toBeInstanceOf(Error);
       expect((error.cause as Error).message).toBe('second step blew up');
+    });
+  });
+
+  describe('Issue #162: successful step results in flow failure errors', () => {
+    let jsonRpcHandler: jest.Mock;
+
+    const requestStep = (name: string, method: string, params: unknown = {}): any => ({
+      name,
+      request: { method, params },
+    });
+
+    const makeFlow = (steps: any[]): Flow => ({
+      name: 'Step Results Flow',
+      description: 'flow for issue #162 step-results-in-failure tests',
+      steps,
+    });
+
+    beforeEach(() => {
+      jsonRpcHandler = jest.fn();
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it('attaches successful step results to a single-step failure', async () => {
+      jsonRpcHandler.mockImplementation(async (req: any) => {
+        if (req.method === 'fail') throw new Error('boom');
+        return { echo: req.method };
+      });
+      // Each step references the previous one so they run strictly in order.
+      const step2 = requestStep('step2', 'b', { prev: '${step1.result.echo}' });
+      const step3 = requestStep('step3', 'fail', { prev: '${step2.result.echo}' });
+
+      const executor = new FlowExecutor(
+        makeFlow([requestStep('step1', 'a'), step2, step3]),
+        jsonRpcHandler,
+        { logger: testLogger },
+      );
+
+      const error = (await executor.execute().catch((e) => e)) as ExecutionError;
+
+      expect(error).toBeInstanceOf(ExecutionError);
+      expect(error.context.stepName).toBe('step3');
+      expect(Object.keys(error.context.stepResults)).toEqual(['step1', 'step2']);
+      expect(error.context.stepResults.step1.result).toEqual({ echo: 'a' });
+      expect(error.context.stepResults.step2.result).toEqual({ echo: 'b' });
+      expect(error.context.stepResults).not.toHaveProperty('step3');
+    });
+
+    it('keeps the error identity and message when attaching step results', async () => {
+      jsonRpcHandler.mockRejectedValue(new Error('boom'));
+
+      const executor = new FlowExecutor(
+        makeFlow([requestStep('only_step', 'fail')]),
+        jsonRpcHandler,
+        { logger: testLogger },
+      );
+
+      const error = (await executor.execute().catch((e) => e)) as ExecutionError;
+
+      expect(error).toBeInstanceOf(ExecutionError);
+      expect(error.message).toBe('Failed to execute request step "only_step": boom');
+      expect(error.context.stepResults).toEqual({});
+    });
+
+    it('attaches step results to the multi-error aggregation', async () => {
+      jsonRpcHandler.mockImplementation(async (req: any) => {
+        if (req.method === 'fail') throw new Error('boom');
+        return { echo: req.method };
+      });
+      // Independent steps: the two failures accumulate instead of aborting.
+      const executor = new FlowExecutor(
+        makeFlow([
+          requestStep('ok_step', 'a'),
+          requestStep('bad_step_1', 'fail'),
+          requestStep('bad_step_2', 'fail'),
+        ]),
+        jsonRpcHandler,
+        { logger: testLogger },
+      );
+
+      const error = (await executor.execute().catch((e) => e)) as ExecutionError;
+
+      expect(error).toBeInstanceOf(ExecutionError);
+      expect(error.message).toBe('Flow execution failed with multiple errors');
+      expect(error.context.failedSteps).toHaveLength(2);
+      expect(error.context.failedSteps).toEqual(
+        expect.arrayContaining(['bad_step_1', 'bad_step_2']),
+      );
+      expect(error.context.stepResults.ok_step.result).toEqual({ echo: 'a' });
+      expect(Object.keys(error.context.stepResults)).toEqual(['ok_step']);
+    });
+
+    it('snapshots step results so later resets cannot corrupt the error', async () => {
+      jsonRpcHandler.mockImplementation(async (req: any) => {
+        if (req.method === 'fail') throw new Error('boom');
+        return { echo: req.method };
+      });
+      const step2 = requestStep('step2', 'fail', { prev: '${step1.result.echo}' });
+
+      const executor = new FlowExecutor(
+        makeFlow([requestStep('step1', 'a'), step2]),
+        jsonRpcHandler,
+        { logger: testLogger },
+      );
+
+      const error = (await executor.execute().catch((e) => e)) as ExecutionError;
+      expect(error.context.stepResults.step1.result).toEqual({ echo: 'a' });
+
+      // reset() clears the executor's live results map; the error must keep
+      // its own snapshot.
+      await executor.reset();
+      expect(error.context.stepResults.step1.result).toEqual({ echo: 'a' });
+      expect(Object.keys(error.context.stepResults)).toEqual(['step1']);
     });
   });
 });

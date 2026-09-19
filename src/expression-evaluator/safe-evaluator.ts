@@ -830,6 +830,7 @@ export class SafeExpressionEvaluator {
           expression,
           step,
           stepType,
+          depth + 1,
         );
         if (ast.operator === '!') {
           // Logical negation follows JavaScript truthiness rules.

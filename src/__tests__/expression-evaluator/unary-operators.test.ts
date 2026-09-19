@@ -1,5 +1,6 @@
 import { SafeExpressionEvaluator } from '../../expression-evaluator/safe-evaluator';
 import { ExpressionError } from '../../expression-evaluator/errors';
+import { ValidationError } from '../../errors/base';
 import { ReferenceResolver } from '../../reference-resolver';
 import { TestLogger } from '../../util/logger';
 import { tokenize, TokenizerError } from '../../expression-evaluator/tokenizer';
@@ -178,6 +179,19 @@ describe('Unary operators', () => {
       // (e.g. inside a function call) must still fail cleanly.
       expect(() => evaluator.evaluate('Number(-)', {})).toThrow(ExpressionError);
       expect(() => evaluator.evaluate('Number(-)', {})).toThrow(/Invalid unary operation node/);
+    });
+
+    it('enforces the recursion depth limit on deep unary chains', () => {
+      // A chain longer than MAX_RECURSION_DEPTH must trip the depth guard
+      // (ValidationError), not recurse without bound. Must stay under
+      // MAX_EXPRESSION_LENGTH (1000) to reach evaluation.
+      const deep = '!'.repeat(SafeExpressionEvaluator.MAX_RECURSION_DEPTH + 50) + 'true';
+      expect(deep.length).toBeLessThan(1000);
+      expect(() => evaluator.evaluate(deep, {})).toThrow(ValidationError);
+      expect(() => evaluator.evaluate(deep, {})).toThrow(/Maximum expression nesting depth/);
+
+      // Shallow chains still evaluate normally (even count -> true)
+      expect(evaluator.evaluate('!'.repeat(10) + 'true', {})).toBe(true);
     });
   });
 });

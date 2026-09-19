@@ -96,6 +96,12 @@ export interface OperationNode {
   right: AstNode;
 }
 
+export interface UnaryNode {
+  type: 'unary';
+  operator: '!' | '-' | '+';
+  operand: AstNode;
+}
+
 export interface ObjectNode {
   type: 'object';
   properties: { key: string; value: AstNode; spread?: boolean }[];
@@ -116,6 +122,7 @@ export type AstNode =
   | LiteralNode
   | ReferenceNode
   | OperationNode
+  | UnaryNode
   | ObjectNode
   | ArrayNode
   | FunctionCallNode;

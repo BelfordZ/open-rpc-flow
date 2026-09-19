@@ -94,7 +94,12 @@ function isQuote(char: string): boolean {
 }
 
 function validateOperatorSequence(state: TokenizerState, operator: string): void {
-  const nextChar = state.expression[state.currentIndex + 1];
+  // NOTE: handleOperator advances state.currentIndex past the operator token
+  // before calling this function, so state.currentIndex is already the index
+  // of the character immediately following the operator. (Issue #142: using
+  // currentIndex + 1 here skipped a character and misidentified valid
+  // unspaced chains like `1+1+1` as invalid `++` sequences.)
+  const nextChar = state.expression[state.currentIndex];
 
   // Check for invalid operator sequences
   if (nextChar && isOperator(nextChar)) {
@@ -104,11 +109,18 @@ function validateOperatorSequence(state: TokenizerState, operator: string): void
     }
   }
 
+  // A prefix unary operator (`+`, `-`, `!`) may start the operand of a unary
+  // or binary operator -- e.g. the `-` in `5 + -3`, or the second `!` in
+  // `!!flag`. (Issues #144, #149.)
+  const nextNonWhitespace = findNextNonWhitespace(state.expression, state.currentIndex);
+  const nextStartsOperand =
+    nextNonWhitespace !== null &&
+    (!isOperator(nextNonWhitespace) || UNARY_OPERATORS.includes(nextNonWhitespace));
+
   // Determine if the operator should be treated as unary or binary
   if (UNARY_OPERATORS.includes(operator) && isUnaryContext(state)) {
     // Unary operator check starting at state.currentIndex
-    const nextNonWhitespace = findNextNonWhitespace(state.expression, state.currentIndex);
-    if (!nextNonWhitespace || isOperator(nextNonWhitespace)) {
+    if (!nextStartsOperand) {
       throw new TokenizerError(`Unary operator ${operator} missing operand`);
     }
   } else if (BINARY_OPERATORS.includes(operator)) {
@@ -117,8 +129,7 @@ function validateOperatorSequence(state: TokenizerState, operator: string): void
       /* istanbul ignore next */
       throw new TokenizerError(`Operator ${operator} missing left operand`);
     }
-    const nextNonWhitespace = findNextNonWhitespace(state.expression, state.currentIndex);
-    if (!nextNonWhitespace || isOperator(nextNonWhitespace)) {
+    if (!nextStartsOperand) {
       throw new TokenizerError(`Operator ${operator} missing right operand`);
     }
   }

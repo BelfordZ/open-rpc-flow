@@ -324,9 +324,12 @@ describe('SafeExpressionEvaluator - Error Handling', () => {
      * These tests specifically target the condition where an operator is encountered
      * in the token stream when we're not expecting one, which should throw an "Unexpected operator" error.
      */
-    it('throws when expression starts with an operator', () => {
-      // Starting an expression with an operator (other than unary) should throw
-      expect(() => evaluator.evaluate('+ 2', {})).toThrow('Unexpected operator');
+    it('throws when expression starts with a non-unary operator', () => {
+      // Starting an expression with a prefix unary operator (+, -, !) is valid
+      // (issues #144, #149); other leading operators still throw.
+      expect(evaluator.evaluate('+ 2', {})).toBe(2);
+      expect(evaluator.evaluate('- 2', {})).toBe(-2);
+      expect(evaluator.evaluate('!true', {})).toBe(false);
       expect(() => evaluator.evaluate('* 2', {})).toThrow(
         'Failed to evaluate expression: * 2. Got error: Operator * missing left operand',
       );
@@ -346,9 +349,9 @@ describe('SafeExpressionEvaluator - Error Handling', () => {
       expect(() => evaluator.evaluate('2 + * 3', {})).toThrow(
         'Failed to evaluate expression: 2 + * 3. Got error: Operator + missing right operand',
       );
-      expect(() => evaluator.evaluate('2 * + 3', {})).toThrow(
-        'Failed to evaluate expression: 2 * + 3. Got error: Operator * missing right operand',
-      );
+      // `+` is a valid prefix unary operator (issues #144, #149), so this
+      // parses as `2 * (+3)`.
+      expect(evaluator.evaluate('2 * + 3', {})).toBe(6);
       expect(() => evaluator.evaluate('2 && || 3', {})).toThrow(
         'Failed to evaluate expression: 2 && || 3. Got error: Unexpected operator',
       );

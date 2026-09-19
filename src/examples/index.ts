@@ -4,6 +4,7 @@ import nestedLoops from './03-nested-loops.json';
 import conditionalBranching from './04-conditional-branching.json';
 import complexDataPipeline from './05-complex-data-pipeline.json';
 import stopFlow from './06-stop-flow.json';
+import flowExecutorResume from './08-flow-executor-resume.json';
 import { Flow } from '../types';
 import * as eventEmitterExample from './event-emitter-example';
 import * as errorHandlingExample from './error-handling-example';
@@ -16,6 +17,7 @@ const nestedLoopsFlow = nestedLoops as Flow;
 const conditionalBranchingFlow = conditionalBranching as Flow;
 const complexDataPipelineFlow = complexDataPipeline as Flow;
 const stopFlowExample = stopFlow as Flow;
+const flowExecutorResumeFlow = flowExecutorResume as Flow;
 const errorHandlingFlow = errorHandlingExample.flow;
 
 // Export with unique names
@@ -26,6 +28,7 @@ export {
   conditionalBranchingFlow,
   complexDataPipelineFlow,
   stopFlowExample,
+  flowExecutorResumeFlow,
   errorHandlingFlow,
 };
 
@@ -37,6 +40,7 @@ export const examples: Flow[] = [
   conditionalBranchingFlow,
   complexDataPipelineFlow,
   stopFlowExample,
+  flowExecutorResumeFlow,
   errorHandlingFlow,
 ];
 

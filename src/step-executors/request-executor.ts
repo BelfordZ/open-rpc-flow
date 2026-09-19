@@ -229,7 +229,10 @@ export class RequestStepExecutor implements StepExecutor {
           result: raceResult,
           type: StepType.Request,
           metadata: {
-            hasError: raceResult && 'error' in raceResult,
+            // Guarded: truthy primitive results (e.g. a bare number) must not
+            // reach the `in` operator. See issue #152.
+            hasError:
+              raceResult !== null && typeof raceResult === 'object' && 'error' in raceResult,
             method: requestStep.request.method,
             requestId,
             timestamp: new Date().toISOString(),

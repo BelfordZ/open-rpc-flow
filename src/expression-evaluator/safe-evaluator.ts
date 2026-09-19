@@ -5,7 +5,7 @@ import { PathSyntaxError, PropertyAccessError } from '../path-accessor';
 import { tokenize } from './tokenizer';
 import { TokenizerError } from './tokenizer';
 import type { Token, AstNode, OperatorSymbol, LiteralValue } from './types';
-import { hasKeyValue } from './types';
+import { hasKeyValue, hasTokenArrayValue } from './types';
 import { TimeoutError } from '../errors/timeout-error';
 import { ValidationError } from '../errors/base';
 import { ErrorCode } from '../errors/codes';
@@ -263,14 +263,28 @@ export class SafeExpressionEvaluator {
       );
     }
 
-    // Check for potentially dangerous patterns
-    const dangerousPatterns = ['eval', 'Function', 'constructor', '__proto__', 'prototype'];
-    this.logger.debug('Checking for dangerous patterns');
-
-    for (const pattern of dangerousPatterns) {
-      if (expression.includes(pattern)) {
-        this.logger.error(`Found forbidden pattern in expression: ${pattern}`);
-        throw new ExpressionError(`Expression contains forbidden pattern: ${pattern}`);
+    // Check for potentially dangerous patterns. This is token-aware rather
+    // than a raw substring match (issue #148): only actual `identifier` and
+    // `key` tokens are compared against the forbidden set, recursing into
+    // nested token arrays (references, template/object/array literals).
+    // String literals are deliberately skipped so innocent text like
+    // "evaluation" or "retrieval" is accepted.
+    const dangerousIdentifiers = new Set([
+      'eval',
+      'Function',
+      'constructor',
+      '__proto__',
+      'prototype',
+    ]);
+    this.logger.debug('Checking for dangerous identifier patterns');
+    try {
+      this.assertNoDangerousIdentifiers(tokenize(expression, this.logger), dangerousIdentifiers);
+    } catch (error) {
+      // If the expression doesn't tokenize, leave the error to the main
+      // tokenize() call in evaluate() so malformed input keeps its
+      // TokenizerError.
+      if (!(error instanceof TokenizerError)) {
+        throw error;
       }
     }
 
@@ -304,6 +318,28 @@ export class SafeExpressionEvaluator {
 
     if (openCount !== closeCount) {
       throw new ExpressionError('Malformed template literal: unclosed ${');
+    }
+  }
+
+  /**
+   * Reject forbidden identifiers (issue #148).
+   *
+   * Compares only `identifier` and `key` tokens against the forbidden set,
+   * recursing into nested token arrays (references, template literals,
+   * object/array literals). String literals are skipped so innocent text
+   * like "evaluation" is accepted, while real threats (`eval(...)`,
+   * `x.constructor`, `${x.__proto__}`) are still caught.
+   */
+  private assertNoDangerousIdentifiers(tokens: Token[], dangerousIdentifiers: Set<string>): void {
+    for (const token of tokens) {
+      if (token.type === 'identifier' || token.type === 'key') {
+        if (dangerousIdentifiers.has(token.value)) {
+          this.logger.error(`Found forbidden pattern in expression: ${token.value}`);
+          throw new ExpressionError(`Expression contains forbidden pattern: ${token.value}`);
+        }
+      } else if (hasTokenArrayValue(token)) {
+        this.assertNoDangerousIdentifiers(token.value, dangerousIdentifiers);
+      }
     }
   }
 

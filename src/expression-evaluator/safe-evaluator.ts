@@ -8,6 +8,7 @@ import type { Token, AstNode, OperatorSymbol, LiteralValue } from './types';
 import { hasKeyValue } from './types';
 import { TimeoutError } from '../errors/timeout-error';
 import { ValidationError } from '../errors/base';
+import { ErrorCode } from '../errors/codes';
 import { PolicyResolver } from '../util/policy-resolver';
 import { Step, getStepType } from '../types';
 import { StepType } from '../step-executors/types';
@@ -339,6 +340,7 @@ export class SafeExpressionEvaluator {
           depth,
           operation,
         },
+        ErrorCode.EXPRESSION_TOO_DEEP,
       );
     }
   }

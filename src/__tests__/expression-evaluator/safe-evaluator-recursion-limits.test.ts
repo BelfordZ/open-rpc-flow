@@ -42,7 +42,7 @@ describe('SafeExpressionEvaluator recursion limits (issue #47)', () => {
       expect(caught).toBeInstanceOf(ValidationError);
       expect(caught).toBeInstanceOf(FlowError);
       const err = caught as ValidationError;
-      expect(err.code).toBe(ErrorCode.VALIDATION_ERROR);
+      expect(err.code).toBe(ErrorCode.EXPRESSION_TOO_DEEP);
       expect(err.message).toContain('Maximum expression nesting depth');
       expect(err.context.maxDepth).toBe(SafeExpressionEvaluator.MAX_RECURSION_DEPTH);
       expect(err.context.operation).toBe('reference extraction');
@@ -76,7 +76,7 @@ describe('SafeExpressionEvaluator recursion limits (issue #47)', () => {
       expect(caught).toBeInstanceOf(ValidationError);
       expect(caught).toBeInstanceOf(FlowError);
       const err = caught as ValidationError;
-      expect(err.code).toBe(ErrorCode.VALIDATION_ERROR);
+      expect(err.code).toBe(ErrorCode.EXPRESSION_TOO_DEEP);
       expect(err.message).toContain('Maximum expression nesting depth');
       expect(err.context.operation).toBe('expression parsing');
     });
@@ -88,7 +88,7 @@ describe('SafeExpressionEvaluator recursion limits (issue #47)', () => {
       try {
         evaluator.evaluate(deep, {});
       } catch (error) {
-        expect((error as ValidationError).code).toBe(ErrorCode.VALIDATION_ERROR);
+        expect((error as ValidationError).code).toBe(ErrorCode.EXPRESSION_TOO_DEEP);
       }
     });
 
@@ -116,7 +116,7 @@ describe('SafeExpressionEvaluator recursion limits (issue #47)', () => {
 
       expect(caught).toBeInstanceOf(ValidationError);
       const err = caught as ValidationError;
-      expect(err.code).toBe(ErrorCode.VALIDATION_ERROR);
+      expect(err.code).toBe(ErrorCode.EXPRESSION_TOO_DEEP);
       expect(err.context.operation).toBe('expression evaluation');
     });
 
@@ -154,6 +154,24 @@ describe('SafeExpressionEvaluator recursion limits (issue #47)', () => {
 
     it('exposes the default limit as a named constant', () => {
       expect(SafeExpressionEvaluator.MAX_RECURSION_DEPTH).toBe(100);
+    });
+
+    it('uses a distinct error code so depth-limit failures are distinguishable from other validation errors', () => {
+      const deep = nest('[', ']', SafeExpressionEvaluator.MAX_RECURSION_DEPTH + 1);
+
+      let depthError: unknown;
+      try {
+        evaluator.evaluate(deep, {});
+      } catch (error) {
+        depthError = error;
+      }
+      expect(depthError).toBeInstanceOf(ValidationError);
+      expect((depthError as ValidationError).code).toBe(ErrorCode.EXPRESSION_TOO_DEEP);
+
+      // A plain ValidationError keeps the generic code (optional code param defaults)
+      const generic = new ValidationError('some other problem', {});
+      expect(generic.code).toBe(ErrorCode.VALIDATION_ERROR);
+      expect(generic.code).not.toBe((depthError as ValidationError).code);
     });
   });
 });

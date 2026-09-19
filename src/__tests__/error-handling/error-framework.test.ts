@@ -7,6 +7,10 @@ import {
   RetryPolicy,
 } from '../../errors';
 import { noLogger, TestLogger } from '../../util/logger';
+import { FlowExecutor } from '../../flow-executor';
+import { Flow } from '../../types';
+import { TransformStepExecutor } from '../../step-executors/transform-executor';
+import { JsonRpcRequestError, StepType } from '../../step-executors/types';
 
 describe('Error Framework', () => {
   let testLogger: TestLogger;
@@ -142,6 +146,136 @@ describe('Error Framework', () => {
       expect(error.context.code).toBe(ErrorCode.MAX_RETRIES_EXCEEDED);
       expect(operation).toHaveBeenCalledTimes(3);
       expect(attempts).toBe(3);
+    });
+  });
+
+  describe('Issue #51: step error detail preservation', () => {
+    let jsonRpcHandler: jest.Mock;
+
+    const transformStep = (name: string): any => ({
+      name,
+      transform: {
+        input: '${context.value}',
+        operations: [{ type: 'map', using: '${item}' }],
+      },
+    });
+
+    const makeFlow = (steps: any[]): Flow => ({
+      name: 'Error Detail Flow',
+      description: 'flow for issue #51 error detail tests',
+      steps,
+    });
+
+    beforeEach(() => {
+      jsonRpcHandler = jest.fn();
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it('wraps plain errors in ExecutionError preserving cause, code, and step context', async () => {
+      const originalError = new Error('connection reset');
+      (originalError as any).code = 'ECONNRESET';
+      jest.spyOn(TransformStepExecutor.prototype, 'execute').mockRejectedValue(originalError);
+
+      const executor = new FlowExecutor(makeFlow([transformStep('failing_step')]), jsonRpcHandler, {
+        logger: testLogger,
+      });
+
+      const error = (await executor.execute().catch((e) => e)) as ExecutionError;
+
+      expect(error).toBeInstanceOf(ExecutionError);
+      expect(error.message).toBe('Failed to execute step failing_step: connection reset');
+      expect(error.cause).toBe(originalError);
+      expect(error.code).toBe('ECONNRESET');
+      expect(error.context.stepName).toBe('failing_step');
+    });
+
+    it('passes FlowError subclasses through without wrapping', async () => {
+      const validationError = new ValidationError('Invalid input value', { field: 'value' });
+      jest.spyOn(TransformStepExecutor.prototype, 'execute').mockRejectedValue(validationError);
+
+      const executor = new FlowExecutor(makeFlow([transformStep('bad_step')]), jsonRpcHandler, {
+        logger: testLogger,
+      });
+
+      const error = await executor.execute().catch((e) => e);
+
+      expect(error).toBe(validationError);
+      expect(error).toBeInstanceOf(ValidationError);
+      expect(error.code).toBe(ErrorCode.VALIDATION_ERROR);
+      expect(error.context).toEqual({ field: 'value' });
+    });
+
+    it('passes JsonRpcRequestError through so the error response stays intact', async () => {
+      const rpcError = new JsonRpcRequestError('JSON-RPC error occurred', {
+        code: -32602,
+        message: 'Invalid params',
+        data: { detail: 'missing required field' },
+      });
+      jsonRpcHandler.mockRejectedValue(rpcError);
+
+      const executor = new FlowExecutor(
+        makeFlow([{ name: 'rpc_step', request: { method: 'doThing', params: {} } }]),
+        jsonRpcHandler,
+        { logger: testLogger },
+      );
+
+      const error = await executor.execute().catch((e) => e);
+
+      expect(error).toBe(rpcError);
+      expect(error).toBeInstanceOf(JsonRpcRequestError);
+      expect(error.error).toEqual({
+        code: -32602,
+        message: 'Invalid params',
+        data: { detail: 'missing required field' },
+      });
+    });
+
+    it('keeps the legacy message for non-Error throwables', async () => {
+      const customError = { toString: () => 'Custom error without message' };
+      jest.spyOn(TransformStepExecutor.prototype, 'execute').mockRejectedValue(customError);
+
+      const executor = new FlowExecutor(makeFlow([transformStep('error_step')]), jsonRpcHandler, {
+        logger: testLogger,
+      });
+
+      const error = (await executor.execute().catch((e) => e)) as ExecutionError;
+
+      expect(error).toBeInstanceOf(ExecutionError);
+      expect(error.message).toBe('Failed to execute step error_step: Custom error without message');
+      expect(error.cause).toBeUndefined();
+      expect(error.code).toBe(ErrorCode.EXECUTION_ERROR);
+    });
+
+    it('includes completed steps in the error context (issue #19)', async () => {
+      jest
+        .spyOn(TransformStepExecutor.prototype, 'execute')
+        .mockImplementation(async (step: any) => {
+          if (step.name === 'second_step') {
+            throw new Error('second step blew up');
+          }
+          return { type: StepType.Transform, result: 'ok' };
+        });
+
+      // second_step references first_step so it runs strictly after it
+      const secondStep = transformStep('second_step');
+      secondStep.transform.input = '${first_step.result}';
+
+      const executor = new FlowExecutor(
+        makeFlow([transformStep('first_step'), secondStep]),
+        jsonRpcHandler,
+        { logger: testLogger },
+      );
+
+      const error = (await executor.execute().catch((e) => e)) as ExecutionError;
+
+      expect(error).toBeInstanceOf(ExecutionError);
+      expect(error.context.stepName).toBe('second_step');
+      expect(error.context.completedSteps).toEqual(['first_step']);
+      expect(error.cause).toBeInstanceOf(Error);
+      expect((error.cause as Error).message).toBe('second step blew up');
     });
   });
 });

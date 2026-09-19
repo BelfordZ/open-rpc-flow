@@ -5,6 +5,13 @@
 
 * update readme ([#59](https://github.com/BelfordZ/open-rpc-flow/issues/59)) ([7f5d691](https://github.com/BelfordZ/open-rpc-flow/commit/7f5d6915880bb02c6bbe6e93f6f98abc95cc5c39))
 
+## [1.6.1](https://github.com/BelfordZ/open-rpc-flow/compare/v1.6.0...v1.6.1) (2026-09-19)
+
+
+### Bug Fixes
+
+* stop step emits step:complete for itself, step:skip only for downstream steps ([#161](https://github.com/BelfordZ/open-rpc-flow/issues/161)) ([050d7f2](https://github.com/BelfordZ/open-rpc-flow/commit/050d7f2fb11c7d4629d37b0efc7bba9c0171e302))
+
 ## [1.6.0](https://github.com/BelfordZ/open-rpc-flow/compare/v1.5.1...v1.6.0) (2026-09-19)
 
 

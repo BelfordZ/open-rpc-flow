@@ -4,6 +4,7 @@ import { ReferenceResolver } from '../reference-resolver';
 import { PathSyntaxError, PropertyAccessError } from '../path-accessor';
 import { tokenize } from './tokenizer';
 import { TokenizerError } from './tokenizer';
+import type { TokenizeOptions } from './tokenizer';
 import type { Token, AstNode, OperatorSymbol, LiteralValue } from './types';
 import { hasKeyValue, hasTokenArrayValue } from './types';
 import { TimeoutError } from '../errors/timeout-error';
@@ -171,12 +172,16 @@ export class SafeExpressionEvaluator {
   evaluate(expression: string, context: Record<string, any>, step?: Step): any {
     this.logger.debug('Evaluating expression:', expression);
     this.logger.debug('Context:', JSON.stringify(context, null, 2));
-    this.validateExpression(expression);
     const startTime = Date.now();
+    const stepType = step ? getStepType(step) : undefined;
+    const timeout = this.getExpressionTimeout(step, stepType);
+    // Threaded into tokenize() so a pathological tokenization pass aborts
+    // with TimeoutError instead of running past the deadline (issue #163).
+    const tokenizeOptions: TokenizeOptions = { startTime, timeoutMs: timeout, step, stepType };
+    this.validateExpression(expression, tokenizeOptions);
     this.logger.debug(`Expression validated at: ${startTime}`);
 
     try {
-      const stepType = step ? getStepType(step) : undefined;
       this.checkTimeout(startTime, expression, step, stepType);
 
       // Handle simple literals directly
@@ -188,7 +193,7 @@ export class SafeExpressionEvaluator {
       }
 
       // Tokenize the expression
-      const tokens = tokenize(expression, this.logger);
+      const tokens = tokenize(expression, this.logger, tokenizeOptions);
       this.logger.debug('Tokens:', tokens);
 
       // Handle template literals
@@ -247,7 +252,7 @@ export class SafeExpressionEvaluator {
     }
   }
 
-  private validateExpression(expression: string): void {
+  private validateExpression(expression: string, tokenizeOptions: TokenizeOptions): void {
     this.logger.debug('Validating expression:', expression);
     if (!expression || typeof expression !== 'string') {
       this.logger.error('Invalid expression: must be a non-empty string');
@@ -278,11 +283,15 @@ export class SafeExpressionEvaluator {
     ]);
     this.logger.debug('Checking for dangerous identifier patterns');
     try {
-      this.assertNoDangerousIdentifiers(tokenize(expression, this.logger), dangerousIdentifiers);
+      this.assertNoDangerousIdentifiers(
+        tokenize(expression, this.logger, tokenizeOptions),
+        dangerousIdentifiers,
+      );
     } catch (error) {
       // If the expression doesn't tokenize, leave the error to the main
       // tokenize() call in evaluate() so malformed input keeps its
-      // TokenizerError.
+      // TokenizerError. TimeoutError is deliberately not swallowed: a
+      // tokenization that outruns its deadline must abort (issue #163).
       if (!(error instanceof TokenizerError)) {
         throw error;
       }

@@ -2,6 +2,28 @@ import { Logger } from '../util/logger';
 import type { Token } from './types';
 export type { Token, TokenType, TokenWithKeyValue, TokenWithTokenArrayValue } from './types';
 export { hasKeyValue, hasTokenArrayValue } from './types';
+import { TimeoutError } from '../errors/timeout-error';
+import type { Step } from '../types';
+import type { StepType } from '../step-executors/types';
+
+/**
+ * Options for {@link tokenize}.
+ *
+ * When `startTime` and `timeoutMs` are both set, tokenization aborts with a
+ * TimeoutError once the elapsed time exceeds the timeout (issue #163). The
+ * check is coarse-grained — every 1024 characters, not per character — so
+ * normal expressions see no measurable slowdown.
+ */
+export interface TokenizeOptions {
+  /** When expression evaluation started, as a Date.now() value. */
+  startTime?: number;
+  /** Configured expression timeout in milliseconds. */
+  timeoutMs?: number;
+  /** Step context for the TimeoutError, when available. */
+  step?: Step;
+  /** Step type context for the TimeoutError, when available. */
+  stepType?: StepType;
+}
 
 export class TokenizerError extends Error {
   constructor(message: string) {
@@ -48,9 +70,17 @@ interface TokenizerState {
   containerStack: string[];
   containerStart: number;
   currentContainer: string | null;
+  startTime?: number;
+  timeoutMs?: number;
+  step?: Step;
+  stepType?: StepType;
 }
 
-function createTokenizerState(expression: string, logger: Logger): TokenizerState {
+function createTokenizerState(
+  expression: string,
+  logger: Logger,
+  options: TokenizeOptions,
+): TokenizerState {
   return {
     expression,
     currentIndex: 0,
@@ -60,7 +90,42 @@ function createTokenizerState(expression: string, logger: Logger): TokenizerStat
     containerStack: [],
     containerStart: 0,
     currentContainer: null,
+    startTime: options.startTime,
+    timeoutMs: options.timeoutMs,
+    step: options.step,
+    stepType: options.stepType,
   };
+}
+
+/**
+ * Characters processed between timeout checks. Coarse-grained on purpose:
+ * tokenization is a tight loop and there is no reason to sample the clock
+ * per character (issue #163).
+ */
+const TIMEOUT_CHECK_INTERVAL = 1024;
+
+/**
+ * Aborts tokenization with a TimeoutError once the configured expression
+ * timeout has elapsed. A no-op unless the caller supplied a timeout via
+ * TokenizeOptions.
+ */
+function checkTokenizeTimeout(state: TokenizerState, index: number): void {
+  if (state.startTime === undefined || state.timeoutMs === undefined) {
+    return;
+  }
+  if ((index & (TIMEOUT_CHECK_INTERVAL - 1)) !== 0) {
+    return;
+  }
+  const elapsed = Date.now() - state.startTime;
+  if (elapsed > state.timeoutMs) {
+    throw TimeoutError.forExpression(
+      state.expression,
+      state.timeoutMs,
+      elapsed,
+      state.step,
+      state.stepType,
+    );
+  }
 }
 
 function isOperator(char: string): boolean {
@@ -147,11 +212,15 @@ function findNextNonWhitespace(expression: string, startIndex: number): string |
   return null;
 }
 
-export function tokenize(expression: string, logger: Logger): Token[] {
+export function tokenize(
+  expression: string,
+  logger: Logger,
+  options: TokenizeOptions = {},
+): Token[] {
   if (!expression || expression.trim() === '') {
     throw new TokenizerError('Expression cannot be empty');
   }
-  return tokenizeExpression(expression, logger);
+  return tokenizeExpression(expression, logger, options);
 }
 
 function handleNumber(state: TokenizerState): Token {
@@ -159,6 +228,7 @@ function handleNumber(state: TokenizerState): Token {
   let numberStr = '';
 
   while (state.currentIndex < state.expression.length) {
+    checkTokenizeTimeout(state, state.currentIndex);
     const char = state.expression[state.currentIndex];
     if (!isDigit(char) && char !== '.') {
       break;
@@ -209,6 +279,7 @@ function handleReference(state: TokenizerState): Token {
   let inOperator = false;
 
   while (state.currentIndex < state.expression.length) {
+    checkTokenizeTimeout(state, state.currentIndex);
     const char = state.expression[state.currentIndex];
 
     if (char === '{') {
@@ -364,6 +435,7 @@ function handleStringLiteral(state: TokenizerState, quote: string): Token {
   state.currentIndex++; // Skip opening quote
 
   while (state.currentIndex < state.expression.length) {
+    checkTokenizeTimeout(state, state.currentIndex);
     const char = state.expression[state.currentIndex];
 
     if (char === '\\') {
@@ -405,6 +477,7 @@ function handleTemplateLiteral(state: TokenizerState): Token[] {
   let rawBuffer = '';
 
   while (state.currentIndex < state.expression.length) {
+    checkTokenizeTimeout(state, state.currentIndex);
     const char = state.expression[state.currentIndex];
 
     if (char === '`') {
@@ -455,6 +528,7 @@ function handleTemplateLiteral(state: TokenizerState): Token[] {
       let bracketCount = 1;
 
       while (state.currentIndex < state.expression.length && bracketCount > 0) {
+        checkTokenizeTimeout(state, state.currentIndex);
         const current = state.expression[state.currentIndex];
         if (current === '{') bracketCount++;
         if (current === '}') bracketCount--;
@@ -470,7 +544,12 @@ function handleTemplateLiteral(state: TokenizerState): Token[] {
         expressionStartIndex,
         state.currentIndex - 1,
       );
-      const expressionTokens = tokenizeExpression(expressionContent, state.logger);
+      const expressionTokens = tokenizeExpression(expressionContent, state.logger, {
+        startTime: state.startTime,
+        timeoutMs: state.timeoutMs,
+        step: state.step,
+        stepType: state.stepType,
+      });
 
       tokens.push({
         type: 'reference',
@@ -499,6 +578,7 @@ function handleObjectLiteral(state: TokenizerState): Token {
   let _expectingKey = true;
 
   while (state.currentIndex < state.expression.length) {
+    checkTokenizeTimeout(state, state.currentIndex);
     const char = state.expression[state.currentIndex];
 
     if (isQuote(char) && char !== '`') {
@@ -637,6 +717,7 @@ function handleArrayLiteral(state: TokenizerState): Token {
   let bracketCount = 1;
 
   while (state.currentIndex < state.expression.length) {
+    checkTokenizeTimeout(state, state.currentIndex);
     const char = state.expression[state.currentIndex];
 
     if (char === '[') {
@@ -729,13 +810,14 @@ function handleArrayLiteral(state: TokenizerState): Token {
   throw new TokenizerError('Unterminated array literal');
 }
 
-function tokenizeExpression(expression: string, logger: Logger): Token[] {
-  const state = createTokenizerState(expression, logger);
+function tokenizeExpression(expression: string, logger: Logger, options: TokenizeOptions): Token[] {
+  const state = createTokenizerState(expression, logger, options);
   const _expectingValue = true;
   let inTextSequence = false;
   let inBraces = false;
 
   while (state.currentIndex < expression.length) {
+    checkTokenizeTimeout(state, state.currentIndex);
     const char = expression[state.currentIndex];
 
     if (isQuote(char) && char !== '`') {
@@ -771,6 +853,7 @@ function tokenizeExpression(expression: string, logger: Logger): Token[] {
         let depth = 1;
 
         while (lookAhead < expression.length && depth > 0) {
+          checkTokenizeTimeout(state, lookAhead);
           if (expression[lookAhead] === '{') depth++;
           if (expression[lookAhead] === '}') depth--;
 
@@ -800,6 +883,7 @@ function tokenizeExpression(expression: string, logger: Logger): Token[] {
             let refDepth = 1;
             lookAhead += 2;
             while (lookAhead < expression.length && refDepth > 0) {
+              checkTokenizeTimeout(state, lookAhead);
               if (expression[lookAhead] === '{') refDepth++;
               if (expression[lookAhead] === '}') refDepth--;
               lookAhead++;

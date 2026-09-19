@@ -309,7 +309,7 @@ describe('FlowExecutor Events', () => {
           name: 'step2',
           request: {
             method: 'test.method',
-            params: { foo: 'bar' },
+            params: { prev: '${step1}' },
           },
         },
       ],
@@ -319,19 +319,84 @@ describe('FlowExecutor Events', () => {
 
     // Event collection
     const skipEvents: any[] = [];
+    const completeEvents: any[] = [];
 
     // Register event listeners
     executor.events.on(FlowEventType.STEP_SKIP, (data) => {
       skipEvents.push(data);
     });
+    executor.events.on(FlowEventType.STEP_COMPLETE, (data) => {
+      completeEvents.push(data);
+    });
 
     // Execute the flow
     await executor.execute();
 
-    // Verify skip events were emitted
+    // The stop step ran and completed: exactly one terminal event for itself,
+    // and it must not also be reported as skipped (issue #150).
+    expect(completeEvents.filter((e) => e.stepName === 'step1').length).toBe(1);
+    expect(skipEvents.filter((e) => e.stepName === 'step1').length).toBe(0);
+
+    // The downstream step that never ran is reported as skipped.
     expect(skipEvents.length).toBe(1);
-    expect(skipEvents[0].stepName).toBe('step1');
-    expect(skipEvents[0].reason).toContain('previous step');
+    expect(skipEvents[0].stepName).toBe('step2');
+    expect(skipEvents[0].reason).toBe('Stopped by stop step');
+  });
+
+  test('stop step produces a coherent exact event sequence (issue #150)', async () => {
+    const logger = new TestLogger();
+    const flow: Flow = {
+      name: 'StopSequenceFlow',
+      description: 'A flow that stops mid-way',
+      steps: [
+        {
+          name: 'before',
+          request: {
+            method: 'test.method',
+            params: { foo: 'bar' },
+          },
+        },
+        {
+          name: 'stopStep',
+          stop: {
+            endWorkflow: true,
+          },
+        },
+        {
+          name: 'after',
+          request: {
+            method: 'test.method',
+            params: { prev: '${stopStep}' },
+          },
+        },
+      ],
+    };
+
+    const executor = new FlowExecutor(flow, mockJsonRpcHandler, { logger });
+
+    const sequence: string[] = [];
+    executor.events.on(FlowEventType.STEP_START, (data: any) =>
+      sequence.push(`start:${data.stepName}`),
+    );
+    executor.events.on(FlowEventType.STEP_COMPLETE, (data: any) =>
+      sequence.push(`complete:${data.stepName}`),
+    );
+    executor.events.on(FlowEventType.STEP_SKIP, (data: any) =>
+      sequence.push(`skip:${data.stepName}`),
+    );
+    executor.events.on(FlowEventType.STEP_ERROR, (data: any) =>
+      sequence.push(`error:${data.stepName}`),
+    );
+
+    await executor.execute();
+
+    // The stop step completed exactly once and was never reported as skipped;
+    // the step that never ran is the only one reported as skipped.
+    const forStep = (name: string) => sequence.filter((e) => e.endsWith(`:${name}`));
+    expect(forStep('stopStep')).toEqual(['start:stopStep', 'complete:stopStep']);
+    expect(forStep('after')).toEqual(['skip:after']);
+    expect(forStep('before')).toEqual(['start:before', 'complete:before']);
+    expect(sequence.filter((e) => e.startsWith('error:'))).toEqual([]);
   });
 
   test('should emit step events for nested steps', async () => {
@@ -488,7 +553,7 @@ describe('FlowExecutor Events', () => {
           name: 'shouldNotExecute',
           request: {
             method: 'test.method',
-            params: {},
+            params: { prev: '${conditionStep}' },
           },
         },
       ],
@@ -519,10 +584,11 @@ describe('FlowExecutor Events', () => {
     // Execute the flow
     await executor.execute();
 
-    // Verify that a step was skipped due to the nested stop
+    // Verify that the step which never ran was skipped due to the nested stop.
+    // The condition step itself completed (its nested stop step fired), so it
+    // must not be reported as skipped (issue #150).
     expect(events.length).toBe(1);
-    // In this implementation, it looks like the condition step itself is marked as skipped
-    expect(events[0].data.stepName).toBe('conditionStep');
+    expect(events[0].data.stepName).toBe('shouldNotExecute');
   });
 
   it('should only emit certain event types when configured', async () => {

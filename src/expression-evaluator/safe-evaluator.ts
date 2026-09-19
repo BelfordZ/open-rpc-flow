@@ -983,7 +983,11 @@ export class SafeExpressionEvaluator {
           }
         }
         if (braceCount === 0) {
-          const inner = expr.substring(startIdx + 2, i - 1);
+          // Trim only leading/trailing whitespace of the whole inner expression,
+          // mirroring how the expression evaluator's tokenizer ignores it.
+          // Whitespace *inside* the expression (e.g. in quoted keys like
+          // `${ a['b c'] }`) is preserved. (Issue #147.)
+          const inner = expr.substring(startIdx + 2, i - 1).trim();
           const baseRef = inner.split(/[[.\s]+/)[0];
           if (baseRef && !SafeExpressionEvaluator.isSpecialVariable(baseRef)) {
             refs.add(baseRef);

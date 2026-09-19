@@ -13,6 +13,15 @@ export {
   StopStepExecutor,
 } from './step-executors';
 export { FlowExecutor, FlowExecutorOptions, DEFAULT_RETRY_POLICY } from './flow-executor';
+export {
+  validateFlow,
+  FlowDiagnostic,
+  FlowDiagnosticCode,
+  FlowDiagnosticSeverity,
+  OpenRpcDocument,
+  OpenRpcMethodDescriptor,
+  OpenRpcParamDescriptor,
+} from './flow-doctor';
 export { SafeExpressionEvaluator } from './expression-evaluator/safe-evaluator';
 export {
   ReferenceResolver,

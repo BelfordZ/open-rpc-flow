@@ -22,6 +22,7 @@ import {
 } from './step-executors';
 import { Logger, defaultLogger } from './util/logger';
 import { FlowExecutorEvents, FlowEventOptions } from './util/flow-executor-events';
+import { OpenRpcDocument, validateFlow } from './flow-doctor';
 import { randomUUID } from 'crypto';
 import { RetryPolicy } from './errors/recovery';
 import { ErrorCode } from './errors/codes';
@@ -61,6 +62,18 @@ export interface FlowExecutorOptions {
   eventOptions?: Partial<FlowEventOptions>;
   /** Retry policy for request steps */
   retryPolicy?: RetryPolicy;
+  /**
+   * OpenRPC document for opt-in upfront semantic validation (Flow Doctor).
+   * When `validateUpfront` is true, the flow is validated against this
+   * document in the constructor and a `ValidationError` is thrown if any
+   * error-severity diagnostics are found.
+   */
+  openrpcDocument?: OpenRpcDocument;
+  /**
+   * Validate the flow against `openrpcDocument` before execution.
+   * Requires `openrpcDocument` to be set.
+   */
+  validateUpfront?: boolean;
 }
 
 /**
@@ -108,6 +121,27 @@ export class FlowExecutor {
       // It's an options object (or undefined)
       options = loggerOrOptions as FlowExecutorOptions;
       this.logger = options?.logger || defaultLogger;
+    }
+
+    // Opt-in upfront semantic validation (Flow Doctor, issue #151): fail
+    // fast with every diagnostic instead of failing mid-run at step 7 of 10.
+    if (options?.validateUpfront) {
+      if (!options.openrpcDocument) {
+        throw new ValidationError('validateUpfront requires openrpcDocument to be set', {
+          flowName: flow.name,
+        });
+      }
+      const diagnostics = validateFlow(flow, options.openrpcDocument);
+      const errors = diagnostics.filter((diagnostic) => diagnostic.severity === 'error');
+      if (errors.length > 0) {
+        const summary = errors
+          .map((diagnostic) => `[${diagnostic.step}] ${diagnostic.message}`)
+          .join('; ');
+        throw new ValidationError(
+          `Flow '${flow.name}' failed upfront validation with ${errors.length} error(s): ${summary}`,
+          { flowName: flow.name, diagnostics },
+        );
+      }
     }
 
     this.context = Object.freeze({ ...(flow.context || {}) });

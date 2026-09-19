@@ -5,6 +5,13 @@
 
 * update readme ([#59](https://github.com/BelfordZ/open-rpc-flow/issues/59)) ([7f5d691](https://github.com/BelfordZ/open-rpc-flow/commit/7f5d6915880bb02c6bbe6e93f6f98abc95cc5c39))
 
+## [1.7.0](https://github.com/BelfordZ/open-rpc-flow/compare/v1.6.1...v1.7.0) (2026-09-19)
+
+
+### Features
+
+* add Flow Doctor static validation against OpenRPC document ([#167](https://github.com/BelfordZ/open-rpc-flow/issues/167)) ([d886f4c](https://github.com/BelfordZ/open-rpc-flow/commit/d886f4cfc2f9c15d36def34a88aef420cf45d0ab))
+
 ## [1.6.1](https://github.com/BelfordZ/open-rpc-flow/compare/v1.6.0...v1.6.1) (2026-09-19)
 
 

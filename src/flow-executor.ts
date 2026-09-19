@@ -18,6 +18,7 @@ import {
   TransformStepExecutor,
   StopStepExecutor,
   StepType,
+  DelayStepExecutor,
 } from './step-executors';
 import { Logger, defaultLogger } from './util/logger';
 import { FlowExecutorEvents, FlowEventOptions } from './util/flow-executor-events';
@@ -25,7 +26,8 @@ import { randomUUID } from 'crypto';
 import { RetryPolicy } from './errors/recovery';
 import { ErrorCode } from './errors/codes';
 import { TimeoutError } from './errors/timeout-error';
-import { ExecutionError, PauseError, StateError, ValidationError } from './errors/base';
+import { ExecutionError, FlowError, PauseError, StateError, ValidationError } from './errors/base';
+import { JsonRpcRequestError } from './step-executors/types';
 import { PolicyResolver } from './util/policy-resolver';
 
 /**
@@ -229,6 +231,7 @@ export class FlowExecutor {
         this.policyResolver,
       ),
       new StopStepExecutor(this.logger, this.globalAbortController),
+      new DelayStepExecutor(this.executeStep.bind(this), this.logger),
     ];
   }
 
@@ -864,12 +867,35 @@ export class FlowExecutor {
         this.events.emitStepAborted(step, error.message || 'aborted');
       }
 
-      // Do not wrap custom errors
-      if (error instanceof TimeoutError || error instanceof ExecutionError) {
+      // Do not wrap framework errors: FlowError subclasses already carry a
+      // machine-readable code, step context, and a cause chain. JSON-RPC
+      // request errors are also passed through untouched so the detailed
+      // error response (code/message/data) reaches the consumer intact.
+      if (error instanceof FlowError || error instanceof JsonRpcRequestError) {
         throw error;
       }
 
-      throw new Error(`Failed to execute step ${step.name}: ${errorMessage}`);
+      // Wrap remaining errors in an ExecutionError that preserves the
+      // original details instead of flattening them into a generic message
+      // (issue #51): the original error is kept as `cause`, any error code it
+      // carries is propagated, and step context is attached for actionable
+      // error output.
+      const cause = error instanceof Error ? error : undefined;
+      const originalCode =
+        error && typeof error === 'object' && 'code' in error
+          ? (error as { code?: unknown }).code
+          : undefined;
+      throw new ExecutionError(
+        `Failed to execute step ${step.name}: ${errorMessage}`,
+        {
+          code: originalCode ?? ErrorCode.EXECUTION_ERROR,
+          stepName: step.name,
+          // Successful steps so far, so consumers can see how far the flow
+          // got before failing (see issue #19).
+          completedSteps: Array.from(this.stepResults.keys()),
+        },
+        cause,
+      );
     }
   }
 

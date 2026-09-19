@@ -15,6 +15,13 @@ export class DependencyResolver {
   private logger: Logger;
   private internalVars = new Set(['context', 'metadata']);
   private loopVars = new Set<string>();
+  /**
+   * Cached dependency graph. Built lazily on first use and reused by every
+   * graph consumer. Null means "not built yet" (or invalidated). The resolver
+   * assumes the flow is immutable; if the flow's steps are mutated after
+   * construction, call {@link invalidateCache} to force a rebuild.
+   */
+  private dependencyGraph: Map<string, Set<string>> | null = null;
 
   constructor(
     private flow: Flow,
@@ -22,6 +29,28 @@ export class DependencyResolver {
     logger: Logger,
   ) {
     this.logger = logger.createNested('DependencyResolver');
+    this.dependencyGraph = null;
+  }
+
+  /**
+   * Discards the cached dependency graph so it is rebuilt on next use.
+   * Only needed when the flow's steps were mutated after this resolver was
+   * constructed; the resolver otherwise assumes an immutable flow.
+   */
+  public invalidateCache(): void {
+    this.dependencyGraph = null;
+  }
+
+  /**
+   * Returns the dependency graph, building it once and caching the result.
+   * A failed build is not cached: the error propagates and the next call
+   * retries the build.
+   */
+  private getOrBuildGraph(parentLogger: Logger): Map<string, Set<string>> {
+    if (this.dependencyGraph === null) {
+      this.dependencyGraph = this.buildDependencyGraph(parentLogger);
+    }
+    return this.dependencyGraph;
   }
 
   /**
@@ -30,7 +59,7 @@ export class DependencyResolver {
   getExecutionOrder(): Step[] {
     const logger = this.logger.createNested('getExecutionOrder');
     logger.debug('Getting execution order');
-    const graph = this.buildDependencyGraph(logger);
+    const graph = this.getOrBuildGraph(logger);
     return this.topologicalSort(graph);
   }
 
@@ -40,7 +69,7 @@ export class DependencyResolver {
   getDependencies(stepName: string): string[] {
     const logger = this.logger.createNested(`getDependencies: ${stepName}`);
     logger.debug(`Getting dependencies for step: ${stepName}`);
-    const graph = this.buildDependencyGraph(logger);
+    const graph = this.getOrBuildGraph(logger);
     const deps = graph.get(stepName);
     if (!deps) {
       const availableSteps = Array.from(graph.keys());
@@ -59,7 +88,7 @@ export class DependencyResolver {
   getDependents(stepName: string): string[] {
     const logger = this.logger.createNested(`getDependents: ${stepName}`);
     logger.debug(`Getting dependents for step: ${stepName}`);
-    const graph = this.buildDependencyGraph(logger);
+    const graph = this.getOrBuildGraph(logger);
     const dependents: string[] = [];
 
     for (const [step, deps] of graph.entries()) {
@@ -273,7 +302,7 @@ export class DependencyResolver {
    */
   getDependencyGraph(): DependencyGraph {
     const logger = this.logger.createNested('getDependencyGraph');
-    const graph = this.buildDependencyGraph(logger);
+    const graph = this.getOrBuildGraph(logger);
 
     const nodes: DependencyNode[] = [];
     const edges: Array<{ from: string; to: string }> = [];
@@ -282,7 +311,14 @@ export class DependencyResolver {
     for (const step of this.flow.steps) {
       const deps = graph.get(step.name) as Set<string>;
       const dependencies = Array.from(deps);
-      const dependents = this.getDependents(step.name);
+      // Same result as getDependents(step.name), read straight from the
+      // cached graph instead of re-entering the public method per step.
+      const dependents: string[] = [];
+      for (const [name, stepDeps] of graph.entries()) {
+        if (stepDeps.has(step.name)) {
+          dependents.push(name);
+        }
+      }
 
       // Determine step type
       let type: DependencyNode['type'] = StepType.Request; // default

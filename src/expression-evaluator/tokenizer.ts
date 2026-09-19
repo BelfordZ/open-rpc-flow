@@ -94,7 +94,12 @@ function isQuote(char: string): boolean {
 }
 
 function validateOperatorSequence(state: TokenizerState, operator: string): void {
-  const nextChar = state.expression[state.currentIndex + 1];
+  // NOTE: handleOperator advances state.currentIndex past the operator token
+  // before calling this function, so state.currentIndex is already the index
+  // of the character immediately following the operator. (Issue #142: using
+  // currentIndex + 1 here skipped a character and misidentified valid
+  // unspaced chains like `1+1+1` as invalid `++` sequences.)
+  const nextChar = state.expression[state.currentIndex];
 
   // Check for invalid operator sequences
   if (nextChar && isOperator(nextChar)) {

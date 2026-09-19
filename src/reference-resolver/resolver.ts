@@ -21,6 +21,38 @@ export class ReferenceResolver {
     this.logger.debug('Initialized with context keys:', Object.keys(this.context));
   }
 
+  /**
+   * Removes whitespace around `.` path separators, ignoring whitespace inside
+   * quoted strings so keys like `a['b c']` keep their inner space. This mirrors
+   * the expression evaluator's tokenizer, which skips insignificant whitespace
+   * (e.g. `${ a . b }` evaluates as `a.b`). (Issue #147.)
+   */
+  private normalizePathWhitespace(path: string): string {
+    let result = '';
+    let quote: string | null = null;
+    for (let i = 0; i < path.length; i++) {
+      const ch = path[i];
+      if (quote !== null) {
+        result += ch;
+        if (ch === quote) {
+          quote = null;
+        }
+      } else if (ch === '"' || ch === "'") {
+        quote = ch;
+        result += ch;
+      } else if (ch === '.') {
+        result = result.replace(/\s+$/, '');
+        result += '.';
+        while (i + 1 < path.length && /\s/.test(path[i + 1])) {
+          i++;
+        }
+      } else {
+        result += ch;
+      }
+    }
+    return result;
+  }
+
   private checkForCircularReference(path: string): void {
     if (this.resolvingPaths.includes(path)) {
       const referencePath = [...this.resolvingPaths, path];
@@ -70,7 +102,10 @@ export class ReferenceResolver {
     extraContext: Record<string, any>,
   ): any {
     if (typeof value === 'string' && value.startsWith('${') && value.endsWith('}')) {
-      const refPath = value.slice(2, -1);
+      // Trim leading/trailing whitespace inside the braces and normalize
+      // insignificant whitespace so that `${ producer }` behaves like
+      // `${producer}`. (Issue #147.)
+      const refPath = this.normalizePathWhitespace(value.slice(2, -1).trim());
       this.checkForCircularReference(refPath);
       value = this.resolveReference(value, extraContext);
     }
@@ -87,7 +122,12 @@ export class ReferenceResolver {
       this.logger.debug('Not a reference pattern, returning as is:', ref);
       return ref;
     }
-    const path = ref.slice(2, -1);
+    // Trim leading/trailing whitespace inside the braces and normalize
+    // insignificant whitespace (e.g. around `.` separators) so that
+    // `${ producer }` and `${ a . b }` resolve like `${producer}` and
+    // `${a.b}`. Whitespace *inside* quoted keys like `${ a['b c'] }` is
+    // preserved. (Issue #147.)
+    const path = this.normalizePathWhitespace(ref.slice(2, -1).trim());
 
     // Check for circular references using new helper method
     this.checkForCircularReference(path);

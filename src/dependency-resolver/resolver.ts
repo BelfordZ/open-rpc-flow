@@ -1,5 +1,5 @@
 import { Flow, Step, DependencyGraph, DependencyNode } from '../types';
-import { StepType } from '../step-executors/types';
+import { StepType, isSwitchCondition } from '../step-executors/types';
 import { Logger } from '../util/logger';
 import {
   isLoopStep,
@@ -180,12 +180,29 @@ export class DependencyResolver {
     // Extract references from condition steps
     if (isConditionStep(step)) {
       logger.debug('handling condition step');
-      this.extractReferences(step.condition.if).forEach((dep) => deps.add(dep));
-      if (step.condition.then) {
-        this.findStepDependencies(step.condition.then, logger).forEach((dep) => deps.add(dep));
-      }
-      if (step.condition.else) {
-        this.findStepDependencies(step.condition.else, logger).forEach((dep) => deps.add(dep));
+      const condition = step.condition;
+      if (isSwitchCondition(condition)) {
+        this.extractReferences(condition.switch).forEach((dep) => deps.add(dep));
+        const caseSteps: Step[] = [];
+        for (const caseValue of Object.values(condition.cases ?? {})) {
+          caseSteps.push(...(Array.isArray(caseValue) ? caseValue : [caseValue]));
+        }
+        if (condition.default !== undefined) {
+          caseSteps.push(
+            ...(Array.isArray(condition.default) ? condition.default : [condition.default]),
+          );
+        }
+        for (const caseStep of caseSteps) {
+          this.findStepDependencies(caseStep, logger).forEach((dep) => deps.add(dep));
+        }
+      } else {
+        this.extractReferences(condition.if).forEach((dep) => deps.add(dep));
+        if (condition.then) {
+          this.findStepDependencies(condition.then, logger).forEach((dep) => deps.add(dep));
+        }
+        if (condition.else) {
+          this.findStepDependencies(condition.else, logger).forEach((dep) => deps.add(dep));
+        }
       }
     }
 

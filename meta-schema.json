@@ -286,26 +286,60 @@
     },
     "ConditionStep": {
       "type": "object",
-      "description": "A step that conditionally executes one of two possible steps based on a condition.",
+      "description": "A step that conditionally executes nested steps, either via if/then/else or by switching on an expression value across multiple cases.",
       "required": ["name", "condition"],
       "properties": {
         "condition": {
           "type": "object",
-          "required": ["if", "then"],
-          "properties": {
-            "if": {
-              "type": "string",
-              "description": "Expression that evaluates to a boolean determining which step to execute."
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["if", "then"],
+              "not": { "required": ["switch"] },
+              "properties": {
+                "if": {
+                  "type": "string",
+                  "description": "Expression that evaluates to a boolean determining which step to execute."
+                },
+                "then": {
+                  "$ref": "#/definitions/Step",
+                  "description": "Step to execute if the condition is true."
+                },
+                "else": {
+                  "$ref": "#/definitions/Step",
+                  "description": "Optional step to execute if the condition is false."
+                }
+              }
             },
-            "then": {
-              "$ref": "#/definitions/Step",
-              "description": "Step to execute if the condition is true."
-            },
-            "else": {
-              "$ref": "#/definitions/Step",
-              "description": "Optional step to execute if the condition is false."
+            {
+              "type": "object",
+              "required": ["switch", "cases"],
+              "not": { "required": ["if"] },
+              "properties": {
+                "switch": {
+                  "type": "string",
+                  "description": "Expression whose evaluated value selects the matching case. Non-string values match the case key equal to their String() coercion."
+                },
+                "cases": {
+                  "type": "object",
+                  "description": "Map of case keys to the step or list of steps to execute when the switch value matches the key.",
+                  "additionalProperties": {
+                    "oneOf": [
+                      { "$ref": "#/definitions/Step" },
+                      { "type": "array", "items": { "$ref": "#/definitions/Step" } }
+                    ]
+                  }
+                },
+                "default": {
+                  "description": "Optional step or list of steps to execute when no case matches.",
+                  "oneOf": [
+                    { "$ref": "#/definitions/Step" },
+                    { "type": "array", "items": { "$ref": "#/definitions/Step" } }
+                  ]
+                }
+              }
             }
-          }
+          ]
         }
       }
     },

@@ -5,6 +5,14 @@
 
 * update readme ([#59](https://github.com/BelfordZ/open-rpc-flow/issues/59)) ([7f5d691](https://github.com/BelfordZ/open-rpc-flow/commit/7f5d6915880bb02c6bbe6e93f6f98abc95cc5c39))
 
+## [1.7.1](https://github.com/BelfordZ/open-rpc-flow/compare/v1.7.0...v1.7.1) (2026-09-19)
+
+
+### Bug Fixes
+
+* enforce expression timeout during tokenization ([#168](https://github.com/BelfordZ/open-rpc-flow/issues/168)) ([11363e9](https://github.com/BelfordZ/open-rpc-flow/commit/11363e9132bf178b13afdce2026cfd1dde3c04d3))
+* include successful step results in flow failure errors ([#169](https://github.com/BelfordZ/open-rpc-flow/issues/169)) ([be765c9](https://github.com/BelfordZ/open-rpc-flow/commit/be765c97e46fa847c674178d4f21878d52a13ec1))
+
 ## [1.7.0](https://github.com/BelfordZ/open-rpc-flow/compare/v1.6.1...v1.7.0) (2026-09-19)
 
 

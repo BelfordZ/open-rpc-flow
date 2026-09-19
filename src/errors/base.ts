@@ -95,6 +95,19 @@ export class PauseError<
     Object.setPrototypeOf(this, PauseError.prototype);
   }
 }
+
+/**
+ * Error class for executions terminated by reset()
+ */
+export class ResetError<
+  C extends Record<string, unknown> = Record<string, any>,
+> extends StateError<C> {
+  constructor(message: string, context: C) {
+    super(message, context);
+    this.name = 'ResetError';
+    Object.setPrototypeOf(this, ResetError.prototype);
+  }
+}
 type RetryErrorContext = {
   code: ErrorCode.MAX_RETRIES_EXCEEDED;
   attempts: number;

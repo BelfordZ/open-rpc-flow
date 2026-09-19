@@ -15,7 +15,22 @@ import { StepType } from '../step-executors/types';
 import { DEFAULT_TIMEOUTS } from '../constants/timeouts';
 
 type Operator = OperatorSymbol;
-type StackOperator = Operator | '(' | ')';
+type UnaryOperator = '!' | '-' | '+';
+/**
+ * Marker pushed onto the operator stack for a prefix unary operator.
+ * The marker records which unary operator was seen; it consumes a single
+ * operand when popped, unlike binary operators which consume two.
+ */
+type UnaryStackMarker = `unary:${UnaryOperator}`;
+type StackOperator = Operator | '(' | ')' | UnaryStackMarker;
+
+/**
+ * Whether the value is one of the prefix unary operators (`!`, `-`, `+`)
+ * supported by the expression language.
+ */
+function isUnaryOperatorSymbol(value: string): value is UnaryOperator {
+  return value === '!' || value === '-' || value === '+';
+}
 
 export class _UnknownReferenceError extends Error {
   constructor(message: string) {
@@ -461,18 +476,13 @@ export class SafeExpressionEvaluator {
         }
         let foundMatching = false;
         while (operatorStack.length > 0) {
-          const operator = operatorStack.pop()!;
-          if (operator === '(') {
+          const topOperator = operatorStack[operatorStack.length - 1];
+          if (topOperator === '(') {
+            operatorStack.pop();
             foundMatching = true;
             break;
           }
-          // Ensure operator is a valid operation operator
-          if (operator === ')') {
-            throw new ExpressionError('Invalid operator: found closing parenthesis');
-          }
-          const right = outputQueue.pop()!;
-          const left = outputQueue.pop()!;
-          outputQueue.push({ type: 'operation', operator: operator as Operator, left, right });
+          this.popOperatorToOutput(operatorStack, outputQueue);
         }
         if (!foundMatching) {
           throw new ExpressionError('Mismatched parentheses');
@@ -538,37 +548,42 @@ export class SafeExpressionEvaluator {
         });
         expectOperator = true;
       } else if (token.type === 'operator') {
+        const operatorValue = token.value;
         if (!expectOperator) {
-          throw new ExpressionError('Unexpected operator');
-        }
-        const op = token.value as Operator;
-        while (operatorStack.length > 0) {
-          const topOperator = operatorStack[operatorStack.length - 1];
-          if (topOperator === '(' || topOperator === ')') break;
-          if (this.getPrecedence(topOperator as Operator) >= this.getPrecedence(op)) {
-            const operator = operatorStack.pop() as Operator;
-            const right = outputQueue.pop()!;
-            const left = outputQueue.pop()!;
-            outputQueue.push({ type: 'operation', operator, left, right });
+          // Prefix unary operator in operand position, e.g. the `-` in
+          // `5 + -3` or the `!` in `!flag`. It binds tighter than any binary
+          // operator; the operand is still to come, so expectOperator stays
+          // false. (Issues #144, #149.)
+          if (isUnaryOperatorSymbol(operatorValue)) {
+            operatorStack.push(`unary:${operatorValue}`);
           } else {
-            break;
+            throw new ExpressionError('Unexpected operator');
           }
+        } else {
+          const op = operatorValue as Operator;
+          while (operatorStack.length > 0) {
+            const topOperator = operatorStack[operatorStack.length - 1];
+            if (topOperator === '(' || topOperator === ')') break;
+            if (this.getPrecedence(topOperator) >= this.getPrecedence(op)) {
+              this.popOperatorToOutput(operatorStack, outputQueue);
+            } else {
+              break;
+            }
+          }
+          operatorStack.push(op);
+          expectOperator = false;
         }
-        operatorStack.push(op);
-        expectOperator = false;
       } else {
         throw new ExpressionError(`Unexpected token: ${JSON.stringify(token)}`);
       }
     }
 
     while (operatorStack.length > 0) {
-      const operator = operatorStack.pop()!;
-      if (operator === '(' || operator === ')') {
+      const topOperator = operatorStack[operatorStack.length - 1];
+      if (topOperator === '(' || topOperator === ')') {
         throw new ExpressionError('Mismatched parentheses');
       }
-      const right = outputQueue.pop()!;
-      const left = outputQueue.pop()!;
-      outputQueue.push({ type: 'operation', operator: operator as Operator, left, right });
+      this.popOperatorToOutput(operatorStack, outputQueue);
     }
 
     if (outputQueue.length !== 1) {
@@ -578,7 +593,32 @@ export class SafeExpressionEvaluator {
     return outputQueue[0];
   }
 
-  private getPrecedence(operator: Operator): number {
+  /**
+   * Pop the top operator off the stack and push the corresponding AST node
+   * onto the output queue. A `unary:` marker consumes a single operand;
+   * a binary operator consumes two.
+   */
+  private popOperatorToOutput(operatorStack: StackOperator[], outputQueue: AstNode[]): void {
+    const operator = operatorStack.pop()!;
+    if (typeof operator === 'string' && operator.startsWith('unary:')) {
+      const operand = outputQueue.pop()!;
+      outputQueue.push({
+        type: 'unary',
+        operator: operator.slice('unary:'.length) as UnaryOperator,
+        operand,
+      });
+      return;
+    }
+    const right = outputQueue.pop()!;
+    const left = outputQueue.pop()!;
+    outputQueue.push({ type: 'operation', operator: operator as Operator, left, right });
+  }
+
+  private getPrecedence(operator: StackOperator): number {
+    // Prefix unary operators bind tighter than any binary operator.
+    if (typeof operator === 'string' && operator.startsWith('unary:')) {
+      return 8;
+    }
     switch (operator) {
       case '||':
         return 1;
@@ -777,6 +817,30 @@ export class SafeExpressionEvaluator {
           }
           throw new ExpressionError('Failed to evaluate operation: Unknown error');
         }
+      }
+
+      case 'unary': {
+        if (!ast.operand) {
+          throw new ExpressionError('Invalid unary operation node');
+        }
+        const operand = this.evaluateAst(
+          ast.operand,
+          context,
+          startTime,
+          expression,
+          step,
+          stepType,
+        );
+        if (ast.operator === '!') {
+          // Logical negation follows JavaScript truthiness rules.
+          return !operand;
+        }
+        if (typeof operand !== 'number') {
+          throw new ExpressionError(
+            `Cannot apply unary operator '${ast.operator}' to non-numeric value: ${String(operand)}`,
+          );
+        }
+        return ast.operator === '-' ? -operand : operand;
       }
 
       case 'object': {

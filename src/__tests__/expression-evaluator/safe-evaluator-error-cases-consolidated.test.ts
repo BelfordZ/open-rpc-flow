@@ -63,10 +63,9 @@ describe('SafeExpressionEvaluator - Error Cases (Consolidated)', () => {
     });
 
     it('should handle specific edge cases', () => {
-      // Missing content between operators
-      expect(() => {
-        evaluator.evaluate('5 + + 3', {});
-      }).toThrow();
+      // `+` is a valid prefix unary operator (issues #144, #149), so `5 + + 3`
+      // parses as `5 + (+3)`.
+      expect(evaluator.evaluate('5 + + 3', {})).toBe(8);
 
       // Invalid token sequences
       expect(() => {
@@ -156,10 +155,9 @@ describe('SafeExpressionEvaluator - Error Cases (Consolidated)', () => {
   // From safe-evaluator-unexpected-operator-direct.test.ts
   describe('Unexpected Operator Handling', () => {
     it('should throw error when operators appear in unexpected positions', () => {
-      // Operator at the start of expression
-      expect(() => {
-        evaluator.evaluate('+ 5', {});
-      }).toThrow();
+      // A leading prefix unary operator (+, -, !) is valid (issues #144, #149).
+      expect(evaluator.evaluate('+ 5', {})).toBe(5);
+      expect(evaluator.evaluate('- 5', {})).toBe(-5);
 
       // Two consecutive operators
       expect(() => {
@@ -171,10 +169,10 @@ describe('SafeExpressionEvaluator - Error Cases (Consolidated)', () => {
         evaluator.evaluate('5 +', {});
       }).toThrow();
 
-      // Operator after opening parenthesis
-      expect(() => {
-        evaluator.evaluate('(+ 5)', {});
-      }).toThrow();
+      // A unary operator after an opening parenthesis is valid
+      // (issues #144, #149).
+      expect(evaluator.evaluate('(+ 5)', {})).toBe(5);
+      expect(evaluator.evaluate('(- 5)', {})).toBe(-5);
     });
 
     it('should handle valid operator sequences correctly', () => {

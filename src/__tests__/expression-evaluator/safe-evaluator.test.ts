@@ -191,7 +191,9 @@ describe('SafeExpressionEvaluator', () => {
       // Test invalid operator usage
       expect(() => evaluator.evaluate('++', {})).toThrow(ExpressionError);
       expect(() => evaluator.evaluate('1 ++ 2', {})).toThrow(ExpressionError);
-      expect(() => evaluator.evaluate('1 + + 2', {})).toThrow(ExpressionError);
+      // `+` is a valid prefix unary operator (issues #144, #149), so `1 + + 2`
+      // parses as `1 + (+2)`. The unspaced `++` remains an invalid sequence.
+      expect(evaluator.evaluate('1 + + 2', {})).toBe(3);
     });
 
     it('throws on unknown operators', () => {

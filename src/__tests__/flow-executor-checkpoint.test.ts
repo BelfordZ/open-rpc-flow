@@ -213,6 +213,37 @@ describe('FlowExecutor durable checkpoints (issue #158)', () => {
     expect(new Set(log2.methods)).toEqual(new Set(['two', 'three', 'four']));
   });
 
+  it('imports a checkpoint into a flow with a step inserted before the failure point', async () => {
+    const flow = makeFlow();
+    const log: CallLog = { methods: [] };
+    const executor = newExecutor(flow, makeHandler(log, { two: 1 }));
+    await expect(executor.execute()).rejects.toThrow('boom-two');
+
+    const snapshot = JSON.parse(JSON.stringify(executor.exportState())) as FlowCheckpoint;
+
+    // Insert a new step between the completed step1 and the failed step2,
+    // wiring step2 through it (the classic "fix the flow and re-run" edit).
+    const edited = makeFlow();
+    edited.steps = [
+      edited.steps[0],
+      { name: 'step1b', request: { method: 'one-b', params: {} } },
+      {
+        ...edited.steps[1],
+        request: { method: 'two', params: { v: '${step1b.result}' } },
+      },
+      edited.steps[2],
+    ];
+    const log2: CallLog = { methods: [] };
+    const executor2 = newExecutor(edited, makeHandler(log2));
+    executor2.importState(snapshot);
+    await executor2.execute();
+
+    // step1 stays skipped (recorded success, unchanged); the inserted step1b
+    // runs; step2 re-runs (definition changed to depend on step1b); step3
+    // runs fresh. step1b must complete before step2 starts.
+    expect(log2.methods).toEqual(['one-b', 'two', 'three']);
+  });
+
   it('re-runs changed steps across a diamond graph without double-processing', async () => {
     // a -> b, a -> c, b -> d, c -> d: d is reachable twice through the graph.
     const flow: Flow = {

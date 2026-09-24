@@ -56,6 +56,29 @@ describe('RequestStepExecutor', () => {
     });
   });
 
+  it('handles truthy primitive handler results without crashing', async () => {
+    // Regression test: `hasError` used `'error' in raceResult` unguarded,
+    // which threw a TypeError for truthy primitive results (issue #152).
+    const step: RequestStep = {
+      name: 'getCount',
+      request: {
+        method: 'count.get',
+        params: {},
+      },
+    };
+
+    jsonRpcHandler.mockResolvedValue(8);
+    const result = await executor.execute(step, context);
+
+    expect(result.result).toBe(8);
+    expect(result.metadata).toEqual({
+      hasError: false,
+      method: 'count.get',
+      requestId: 1,
+      timestamp: expect.any(String),
+    });
+  });
+
   it('resolves references in request parameters', async () => {
     const step: RequestStep = {
       name: 'getPermissions',

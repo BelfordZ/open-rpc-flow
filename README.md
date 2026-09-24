@@ -482,6 +482,38 @@ await new FlowExecutor(flow, replay).execute();
   throws a `ReplayError` naming any recorded step whose definition changed
   since recording, using the same per-step digests as durable checkpoints.
 
+#### Contract-Driven Dry Runs
+
+Dry-run a flow with zero live services: `MockJsonRpcHandler` auto-generates
+mock responses from a single OpenRPC document, so you can exercise the full
+flow — references, conditions, loops, retries — against the contract before
+anything is deployed.
+
+```typescript
+import { MockJsonRpcHandler } from '@open-rpc/flow-executor';
+
+const handler = MockJsonRpcHandler.fromOpenRpc(openrpcDocument, { seed: 42 });
+await new FlowExecutor(flow, handler).execute();
+const trace = handler.getTrace(); // one { path, method, params, result } per call
+```
+
+- **Mock selection per method:** an example pairing whose params deep-equal
+  the request wins; otherwise the method's first example is used. With no
+  examples, a value is generated from the result schema (objects, arrays,
+  strings with `format`/`minLength`/`maxLength`, numbers with
+  `minimum`/`maximum`, booleans, enums, `anyOf`/`oneOf` first variant).
+  Unknown types, `$ref`s, and anything unrecognized mock as `null`.
+- **Deterministic:** the same `seed` and the same call sequence always
+  produce the same responses (mulberry32 PRNG). Omit `seed` for a random
+  one.
+- **Never crashes:** unknown methods mock as `null` rather than throwing —
+  pair with Flow Doctor (`validateFlow`) to catch unknown methods
+  statically instead.
+- **Trace:** `getTrace()` returns a JSON-serializable copy of every mocked
+  call, each tagged with the calling step's execution `path` when the
+  executor supplies it — the same shape record/replay traces use, so a
+  dry-run trace lifts directly into replay tooling.
+
 ##### Error Events
 
 Listen for error events during flow execution:

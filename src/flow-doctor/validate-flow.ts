@@ -1,6 +1,11 @@
 import Ajv from 'ajv';
 import type { Flow, Step } from '../types';
-import { isConditionStep, isLoopStep, isRequestStep } from '../step-executors/types';
+import {
+  isConditionStep,
+  isLoopStep,
+  isRequestStep,
+  isSwitchCondition,
+} from '../step-executors/types';
 import {
   FlowDiagnostic,
   FlowDiagnosticCode,
@@ -199,9 +204,25 @@ function* walkSteps(steps: Step[], scopeVars: string[]): Generator<ScopedStep> {
       const innerScope = step.loop.as ? [...scopeVars, step.loop.as] : scopeVars;
       yield* walkSteps(inner, innerScope);
     } else if (isConditionStep(step)) {
-      const branches = [step.condition.then, step.condition.else].filter(
-        (branch): branch is Step => branch !== undefined,
-      );
+      const condition = step.condition;
+      const branches: Step[] = [];
+      if (isSwitchCondition(condition)) {
+        for (const caseValue of Object.values(condition.cases ?? {})) {
+          branches.push(...(Array.isArray(caseValue) ? caseValue : [caseValue]));
+        }
+        if (condition.default !== undefined) {
+          branches.push(
+            ...(Array.isArray(condition.default) ? condition.default : [condition.default]),
+          );
+        }
+      } else {
+        if (condition.then !== undefined) {
+          branches.push(condition.then);
+        }
+        if (condition.else !== undefined) {
+          branches.push(condition.else);
+        }
+      }
       yield* walkSteps(branches, scopeVars);
     }
   }
@@ -216,8 +237,9 @@ function* walkSteps(steps: Step[], scopeVars: string[]): Generator<ScopedStep> {
  * - `method`: request method names are sent literally (never interpolated),
  *   so `${...}` there is reported as UNKNOWN_METHOD, not as a step reference.
  * - Nested step subtrees (`loop.step`, `loop.steps`, `condition.then`,
- *   `condition.else`): nested steps are validated separately with their own
- *   scope (e.g. loop variables); scanning them here would double-report.
+ *   `condition.else`, `condition.cases`, `condition.default`): nested steps are
+ *   validated separately with their own scope (e.g. loop variables); scanning
+ *   them here would double-report.
  */
 function* referenceStrings(step: Step): Generator<string> {
   const EXCLUDED_KEYS = new Set(['name', 'description', 'method']);
@@ -232,7 +254,8 @@ function* referenceStrings(step: Step): Generator<string> {
     // Don't descend into nested steps; they are validated with their own scope.
     if (
       (parentKey === 'loop' && (key === 'step' || key === 'steps')) ||
-      (parentKey === 'condition' && (key === 'then' || key === 'else'))
+      (parentKey === 'condition' &&
+        (key === 'then' || key === 'else' || key === 'cases' || key === 'default'))
     ) {
       continue;
     }

@@ -580,3 +580,88 @@ describe('FlowExecutor validateUpfront', () => {
     ).not.toThrow();
   });
 });
+
+describe('validateFlow switch conditions', () => {
+  it('validates nested steps inside switch cases', () => {
+    const flow = makeFlow([
+      requestStep('getUser', 'getUser', { id: 1 }),
+      {
+        name: 'route',
+        condition: {
+          switch: '${getUser.result.name}',
+          cases: {
+            foo: requestStep('a', 'getUser', { id: 'not-an-integer' }),
+            bar: [requestStep('b', 'nope', {})],
+          },
+          default: requestStep('c', 'ping', {}),
+        },
+      },
+    ]);
+    const diagnostics = validateFlow(flow, testDocument);
+    const codes = diagnostics.map((d) => `${d.step}:${d.code}`).sort();
+    expect(codes).toEqual(['a:PARAM_SCHEMA_MISMATCH', 'b:UNKNOWN_METHOD']);
+  });
+
+  it('flags unknown step references in the switch expression', () => {
+    const flow = makeFlow([
+      {
+        name: 'route',
+        condition: {
+          switch: '${missing.result}',
+          cases: { foo: requestStep('a', 'ping', {}) },
+        },
+      },
+    ]);
+    const diagnostics = validateFlow(flow, testDocument);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]).toMatchObject({ step: 'route', code: 'UNKNOWN_STEP_REFERENCE' });
+  });
+
+  it('does not double-report references inside switch cases', () => {
+    const flow = makeFlow([
+      requestStep('getUser', 'getUser', { id: 1 }),
+      {
+        name: 'route',
+        condition: {
+          switch: '${getUser.result.name}',
+          cases: { foo: requestStep('a', 'ping', { note: '${typo.result}' }) },
+        },
+      },
+    ]);
+    const diagnostics = validateFlow(flow, testDocument);
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]).toMatchObject({ step: 'a', code: 'UNKNOWN_STEP_REFERENCE' });
+  });
+
+  it('accepts a healthy switch flow', () => {
+    const flow = makeFlow([
+      requestStep('getUser', 'getUser', { id: 1 }),
+      {
+        name: 'route',
+        condition: {
+          switch: '${getUser.result.name}',
+          cases: {
+            foo: requestStep('a', 'ping', {}),
+            bar: [requestStep('b', 'getUser', { id: 2 })],
+          },
+          default: [requestStep('c', 'ping', {}), requestStep('d', 'ping', {})],
+        },
+      },
+    ]);
+    expect(validateFlow(flow, testDocument)).toEqual([]);
+  });
+
+  it('tolerates a switch with missing cases at runtime', () => {
+    const flow = makeFlow([
+      requestStep('getUser', 'getUser', { id: 1 }),
+      {
+        name: 'route',
+        condition: {
+          switch: '${getUser.result.name}',
+          default: requestStep('c', 'ping', {}),
+        } as unknown as import('../types').SwitchCondition,
+      },
+    ]);
+    expect(validateFlow(flow, testDocument)).toEqual([]);
+  });
+});

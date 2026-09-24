@@ -1,8 +1,8 @@
-import { Step, ErrorData } from '../types';
+import { Step, ErrorData, IfCondition, SwitchCondition } from '../types';
 import { StepExecutionContext } from '../types';
 import { RetryPolicy } from '../errors/recovery';
 
-export { Step };
+export { Step, IfCondition, SwitchCondition };
 
 /**
  * Interface for transform operations
@@ -111,12 +111,12 @@ export interface LoopStep extends Step {
 }
 
 export interface ConditionStep extends Step {
-  condition: {
-    if: string;
-    then: Step;
-    else?: Step;
-  };
+  condition: IfCondition | SwitchCondition;
 }
+
+export const isSwitchCondition = (
+  condition: IfCondition | SwitchCondition,
+): condition is SwitchCondition => 'switch' in condition;
 
 export interface DelayStep extends Step {
   delay: {

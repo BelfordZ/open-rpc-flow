@@ -412,6 +412,76 @@ await executor2.execute(); // skips completed steps, re-runs the failed step
   never completed. Steps that already succeeded are never re-run — make sure
   re-executed steps are safe to run again.
 
+#### Record & Replay (What-If Overrides)
+
+Record a run's JSON-RPC traffic, then replay the flow offline — no network —
+with optional path-keyed what-if overrides. Resume (above) and replay share
+the checkpoint/digest substrate, but they are separate operations: resume
+trusts and skips completed steps at the scheduler layer, while replay re-runs
+step logic and mocks each call from a recorded trace.
+
+```typescript
+import {
+  createRecordingHandler,
+  createReplayHandler,
+  overrideSequence,
+} from '@open-rpc/flow-executor';
+
+// 1. Record: wrap the real handler once.
+const { handler: recorder, getTrace } = createRecordingHandler(jsonRpcHandler);
+await new FlowExecutor(flow, recorder).execute();
+const trace = getTrace('MyFlow'); // JSON-serializable RecordedTrace
+
+// 2. Replay: no network is touched. Each replayed call is matched by its
+// execution path (e.g. "processUsers[2].fetchUser"), so loop iterations and
+// nested sub-steps get their own replay cursors regardless of how the
+// original calls interleaved.
+const replay = createReplayHandler(trace);
+await new FlowExecutor(flow, replay).execute();
+```
+
+- **What-if overrides** replace responses by execution path, without
+  re-running anything upstream:
+
+  ```typescript
+  // What if user #42 is flagged? Only that iteration's call changes.
+  const replay = createReplayHandler(trace, {
+    overrides: { 'processUsers[0].fetchUser': { id: 42, flagged: true } },
+  });
+
+  // What if the retry policy kicks in? Serve an ordered response script —
+  // an item shaped like a recorded error re-throws as JsonRpcRequestError.
+  const flaky = createReplayHandler(trace, {
+    overrides: {
+      fetchUser: overrideSequence(
+        { error: { message: 'timeout', code: -32000 } },
+        { error: { message: 'timeout', code: -32000 } },
+        { id: 1, recovered: true },
+      ),
+    },
+  });
+  ```
+
+  An override may also be a plain array — it is served as a single
+  array-valued response. Only `overrideSequence(...)` is a response script.
+  When any override is present, parameter matching is relaxed for downstream
+  calls, since substituted results can legitimately alter downstream
+  requests; without overrides, calls must match recorded params exactly.
+
+- **Divergence is explicit.** More replay calls than recorded, a brand-new
+  execution path (e.g. an iteration that never ran during recording), a
+  method mismatch, or an exhausted response script all throw `ReplayError` —
+  there is no live-network fallback. Fewer replay calls than recorded are
+  reported by `replay.getReplayReport()` (`consumed` / `unconsumed`), and
+  `strict: true` turns unconsumed entries into an error when the report is
+  requested.
+- **Serialization is strict.** Traces only carry JSON-safe values —
+  `undefined` records as `null`, and circular references, `BigInt`s, and
+  functions throw instead of silently degrading.
+- **Stale steps are detectable.** `validateTraceForFlow(trace, stepHashes)`
+  throws a `ReplayError` naming any recorded step whose definition changed
+  since recording, using the same per-step digests as durable checkpoints.
+
 ##### Error Events
 
 Listen for error events during flow execution:

@@ -90,6 +90,23 @@ export {
 } from './errors';
 export { ErrorCode, ErrorCategory } from './errors/codes';
 export { RetryPolicy, RetryableOperation } from './errors/recovery';
+export {
+  createRecordingHandler,
+  createReplayHandler,
+  detectContractDrift,
+  isRecordedError,
+  overrideSequence,
+  validateTraceForFlow,
+  ReplayError,
+  ReplaySequence,
+  RecordedCall,
+  RecordedError,
+  RecordedTrace,
+  ReplayOptions,
+  ReplayReport,
+  ReplayHandler,
+  DriftReport,
+} from './record-replay';
 
 import metaSchemaContent from '../meta-schema.json';
 export const metaSchema = metaSchemaContent;

@@ -168,6 +168,14 @@ export class RequestStepExecutor implements StepExecutor {
         // Create options object with AbortSignal if available
         const options: JsonRpcHandlerOptions = {};
 
+        // Tag the call with this step's execution path so recording/replay
+        // handlers can attribute it (e.g. 'fetchUsers' or
+        // 'processUsers[2].fetchUser'). Absent for non-flow handler use.
+        const stepPath = extraContext._stepPath;
+        if (typeof stepPath === 'string') {
+          options.stepPath = stepPath;
+        }
+
         // Use either our timeout's abort signal or the one from context or the passed signal
         if (abortController?.signal) {
           options.signal = abortController.signal;

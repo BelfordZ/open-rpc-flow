@@ -3,6 +3,7 @@ import { StepExecutor, StepExecutionResult, StepType, LoopStep } from './types';
 import { Logger } from '../util/logger';
 import { ValidationError, LoopStepExecutionError } from '../errors/base';
 import { getDataType } from '../util/type-utils';
+import { iterationPathSegment } from '../util/step-path';
 import { canRunLoopInParallel } from './loop-parallel-safety';
 
 export type ExecuteStep = (
@@ -149,6 +150,16 @@ export class LoopStepExecutor implements StepExecutor {
    * Precomputes one plan entry per iteration (up to maxIterations). Planning
    * up front means parallel iterations share no mutable bookkeeping.
    */
+  /**
+   * This loop step's own execution path, as tagged by FlowExecutor. Falls
+   * back to the bare step name when the path is absent (should not happen
+   * in practice, but keeps direct executor use working).
+   */
+  private ownStepPath(step: Step, extraContext: ExecutionContextData): string {
+    const tagged = extraContext._stepPath;
+    return typeof tagged === 'string' ? tagged : step.name;
+  }
+
   private planIterations(collection: unknown[], maxIterations: number): IterationPlan[] {
     const planned: IterationPlan[] = [];
     const total = Math.min(maxIterations, collection.length);
@@ -228,6 +239,9 @@ export class LoopStepExecutor implements StepExecutor {
       const iterationContext = {
         ...extraContext,
         [loopStep.loop.as]: item,
+        // Tag the iteration so handler calls made by its sub-steps are
+        // attributed to `loopStep[<0-based index>]` (used by record/replay).
+        _stepPath: iterationPathSegment(this.ownStepPath(step, extraContext), iterationCount - 1),
         metadata: {
           iteration: [...iterationHistory], // copy of iterationHistory so that it isn't changed by later iterations
           current: currentIteration,
@@ -352,6 +366,11 @@ export class LoopStepExecutor implements StepExecutor {
         const iterationContext: ExecutionContextData = {
           ...extraContext,
           [loopStep.loop.as]: entry.item,
+          // Tag the iteration so handler calls made by its sub-steps are
+          // attributed to `loopStep[<planned index>]` (used by record/replay).
+          // The planned index is stable across runs, which is what keeps
+          // replay matching deterministic under concurrency.
+          _stepPath: iterationPathSegment(this.ownStepPath(step, extraContext), entry.index),
           metadata: {
             iteration: planned
               .slice(0, entry.index + 1)

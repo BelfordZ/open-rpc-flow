@@ -21,6 +21,7 @@ import {
   DelayStepExecutor,
 } from './step-executors';
 import { Logger, defaultLogger } from './util/logger';
+import { joinStepPath } from './util/step-path';
 import { FlowExecutorEvents, FlowEventOptions } from './util/flow-executor-events';
 import { OpenRpcDocument, validateFlow } from './flow-doctor';
 import { randomUUID } from 'crypto';
@@ -1215,6 +1216,14 @@ export class FlowExecutor {
         ...(step.metadata || {}),
       },
     };
+
+    // Tag this step execution with its execution path so handler calls can be
+    // attributed to steps (used by record/replay). Nested steps derive their
+    // path from the parent path carried in the extra context; loop executors
+    // extend it with an iteration segment (see LoopStepExecutor).
+    const parentPath =
+      typeof extraContext._stepPath === 'string' ? extraContext._stepPath : undefined;
+    (contextWithMeta as ExecutionContextData)._stepPath = joinStepPath(parentPath, step.name);
     const isNested = Boolean(extraContext._nestedStep);
 
     try {

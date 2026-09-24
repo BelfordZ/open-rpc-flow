@@ -2,6 +2,7 @@ import { Step, StepExecutionContext, ExecutionContextData } from '../types';
 import { StepExecutor, StepExecutionResult, StepType, LoopStep } from './types';
 import { Logger } from '../util/logger';
 import { ValidationError, LoopStepExecutionError } from '../errors/base';
+import { StopBranch } from '../errors/stop-branch';
 import { getDataType } from '../util/type-utils';
 import { iterationPathSegment } from '../util/step-path';
 import { canRunLoopInParallel } from './loop-parallel-safety';
@@ -38,6 +39,13 @@ export class LoopStepExecutor implements StepExecutor {
     private executeStep: ExecuteStep,
     logger: Logger,
     private progressCallback?: (step: Step, iteration: number, totalIterations: number) => void,
+    /**
+     * Called for each nested step that will never run because a bare stop
+     * step terminated the iteration's branch (issue #188). The FlowExecutor
+     * wires this up to emit `step:skip`; it is optional so the executor
+     * stays usable standalone.
+     */
+    private onBranchStepSkipped?: (step: Step, reason: string) => void,
   ) {
     this.logger = logger.createNested('LoopStepExecutor');
   }
@@ -454,6 +462,10 @@ export class LoopStepExecutor implements StepExecutor {
    * Runs the body of a single iteration: either the single `loop.step`, or
    * the `loop.steps` sequence, which stays sequential within an iteration
    * because steps in one iteration may depend on each other.
+   *
+   * A bare stop step terminates the rest of the iteration's body (issue
+   * #188): the stop step itself completed, the remaining body steps are
+   * reported as skipped, and the loop continues with the next iteration.
    */
   private async executeIterationBody(
     loopStep: LoopStep,
@@ -461,15 +473,37 @@ export class LoopStepExecutor implements StepExecutor {
     signal?: AbortSignal,
   ): Promise<StepExecutionResult> {
     if (loopStep.loop.step) {
-      return this.executeStep(loopStep.loop.step, iterationContext, signal);
+      try {
+        return await this.executeStep(loopStep.loop.step, iterationContext, signal);
+      } catch (error) {
+        if (error instanceof StopBranch) {
+          // The whole body was a stop step: the iteration simply ends here.
+          return error.result;
+        }
+        throw error;
+      }
     }
 
     // execute() validates that either `step` or `steps` is defined.
     const innerSteps = loopStep.loop.steps as Step[];
     const stepResults: StepExecutionResult[] = [];
     for (const stepToExecute of innerSteps) {
-      const result = await this.executeStep(stepToExecute, iterationContext, signal);
-      stepResults.push(result);
+      try {
+        stepResults.push(await this.executeStep(stepToExecute, iterationContext, signal));
+      } catch (error) {
+        if (!(error instanceof StopBranch)) {
+          throw error;
+        }
+        // A bare stop step terminated this iteration's body: the stop step
+        // itself completed (its result travels on the signal); the rest of
+        // the body's steps are skipped and the loop continues.
+        stepResults.push(error.result);
+        const reason = `Branch terminated by stop step "${error.stepName}"`;
+        for (const skippedStep of innerSteps.slice(stepResults.length)) {
+          this.onBranchStepSkipped?.(skippedStep, reason);
+        }
+        break;
+      }
     }
     return {
       type: StepType.Loop,

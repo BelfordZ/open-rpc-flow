@@ -77,6 +77,23 @@ const apiAggregationFlow: Flow = {
 
 ### 4. Stop Flow Execution
 
+A `stop` step halts execution. There are two forms:
+
+- `stop: { endWorkflow: true }` — aborts the entire workflow immediately.
+  `flow:aborted` is emitted and the steps that never run are reported as
+  skipped.
+- `stop: {}` (or `endWorkflow: false`) — terminates only the current branch
+  and lets the flow continue gracefully:
+  - inside a `switch` case: the rest of that case is skipped; execution
+    continues after the switch step;
+  - inside a `loop.steps` body: the rest of the current iteration is
+    skipped; the loop continues with the next iteration;
+  - at the top level: the remaining steps are skipped and the flow completes
+    normally — it is _not_ aborted.
+
+The stop step itself is reported as complete (`step:complete`); every step
+that never runs because of the stop is reported as skipped (`step:skip`).
+
 Demonstrates halting a flow when a condition is met. See the full example here:
 
 [**src/examples/06-stop-flow.json**](src/examples/06-stop-flow.json)

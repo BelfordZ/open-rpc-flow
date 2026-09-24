@@ -3,6 +3,7 @@ import { StepExecutor, StepExecutionResult, StepType } from './types';
 import { Logger } from '../util/logger';
 import { getDataType } from '../util/type-utils';
 import { ValidationError } from '../errors/base';
+import { StopBranch } from '../errors/stop-branch';
 
 export interface StopStep extends Step {
   stop: {
@@ -49,17 +50,7 @@ export class StopStepExecutor implements StepExecutor {
     });
 
     // Perform cleanup and termination logic here
-    if (endWorkflow) {
-      this.logger.info('Terminating entire workflow', { stepName: step.name });
-      if (this.globalAbortController && !this.globalAbortController.signal.aborted) {
-        this.globalAbortController.abort('Stopped by stop step');
-      }
-    } else {
-      this.logger.info('Terminating current branch', { stepName: step.name });
-      // Add logic to terminate the current branch of the workflow
-    }
-
-    return {
+    const stopResult: StepExecutionResult = {
       type: StepType.Stop,
       result: { endWorkflow },
       metadata: {
@@ -68,5 +59,20 @@ export class StopStepExecutor implements StepExecutor {
         timestamp: new Date().toISOString(),
       },
     };
+
+    if (endWorkflow) {
+      this.logger.info('Terminating entire workflow', { stepName: step.name });
+      if (this.globalAbortController && !this.globalAbortController.signal.aborted) {
+        this.globalAbortController.abort('Stopped by stop step');
+      }
+      return stopResult;
+    }
+
+    this.logger.info('Terminating current branch', { stepName: step.name });
+    // A bare stop terminates the enclosing branch without aborting the
+    // workflow. Throw the control-flow signal so the nearest branch
+    // boundary (switch case, loop iteration, or the top-level step loop)
+    // can skip the rest of the branch and continue normally.
+    throw new StopBranch(step.name, stopResult);
   }
 }

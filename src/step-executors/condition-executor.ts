@@ -10,6 +10,7 @@ import {
 import { Logger } from '../util/logger';
 import { getDataType } from '../util/type-utils';
 import { ValidationError, ExecutionError } from '../errors/base';
+import { StopBranch } from '../errors/stop-branch';
 import { TimeoutError } from '../errors/timeout-error';
 import { PolicyResolver } from '../util/policy-resolver';
 
@@ -33,6 +34,13 @@ export class ConditionStepExecutor implements StepExecutor {
     ) => Promise<StepExecutionResult>,
     logger: Logger,
     policyResolver: PolicyResolver,
+    /**
+     * Called for each nested step that will never run because a bare stop
+     * step terminated the branch (issue #188). The FlowExecutor wires this
+     * up to emit `step:skip`; it is optional so the executor stays usable
+     * standalone.
+     */
+    private onBranchStepSkipped?: (step: Step, reason: string) => void,
   ) {
     this.logger = logger.createNested('ConditionStepExecutor');
     this.policyResolver = policyResolver;
@@ -138,6 +146,12 @@ export class ConditionStepExecutor implements StepExecutor {
           },
         };
       } catch (error: any) {
+        if (error instanceof StopBranch) {
+          // A bare stop step inside a branch (e.g. the then/else step)
+          // terminated it: not a failure, let the signal propagate to the
+          // enclosing branch boundary untouched.
+          throw error;
+        }
         this.logger.error('Condition execution failed', {
           stepName: step.name,
           error: error.toString(),
@@ -211,7 +225,22 @@ export class ConditionStepExecutor implements StepExecutor {
       this.logger.debug(`Executing switch case "${branchTaken}"`, { stepName: step.name });
       const results: StepExecutionResult[] = [];
       for (const caseStep of caseSteps) {
-        results.push(await this.executeStep(caseStep, nestedContext, abortController.signal));
+        try {
+          results.push(await this.executeStep(caseStep, nestedContext, abortController.signal));
+        } catch (error) {
+          if (!(error instanceof StopBranch)) {
+            throw error;
+          }
+          // A bare stop step terminated the case: the stop step itself
+          // completed (its result travels on the signal); the rest of the
+          // case's steps are skipped and the flow continues after the switch.
+          results.push(error.result);
+          const reason = `Branch terminated by stop step "${error.stepName}"`;
+          for (const skippedStep of caseSteps.slice(results.length)) {
+            this.onBranchStepSkipped?.(skippedStep, reason);
+          }
+          break;
+        }
       }
       value = Array.isArray(matched) ? results : results[0];
     } else {

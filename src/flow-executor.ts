@@ -1152,7 +1152,8 @@ export class FlowExecutor {
    * After {@link importState}, the next `execute()` instead resumes from the
    * imported checkpoint: completed steps are skipped and the failed step (if
    * any) is re-run. The resume behavior applies to exactly one `execute()`
-   * call; subsequent calls go back to fresh-run semantics.
+   * call; subsequent calls go back to fresh-run semantics. Resuming logs an
+   * info line naming the skipped steps and the failed step being re-run.
    */
   async execute(options?: { signal?: AbortSignal }): Promise<Map<string, any>> {
     const priorAbortReason = this.globalAbortController?.signal.aborted
@@ -1161,10 +1162,36 @@ export class FlowExecutor {
     // importState() arms the flag; initializeRunState() consumes it.
     const resumeImported = this.pendingImportedState;
     this.initializeRunState({ clearResults: !resumeImported, clearStatus: !resumeImported });
+    if (resumeImported) {
+      this.logCheckpointResume();
+    }
     if (priorAbortReason !== null && priorAbortReason !== undefined) {
       this.globalAbortController.abort(priorAbortReason);
     }
     return this.runFromIndex(0, options);
+  }
+
+  /**
+   * Log what a checkpoint resume will do: which recorded-completed steps are
+   * skipped and which failed step (if any) is re-run. One line, so a resumed
+   * run is auditable without per-step noise.
+   */
+  private logCheckpointResume(): void {
+    const skippedSteps: string[] = [];
+    for (const step of this.flow.steps) {
+      const completed =
+        this.stepStatus.get(step.name)?.status === 'success' || this.stepResults.has(step.name);
+      if (completed) {
+        skippedSteps.push(step.name);
+      }
+    }
+    const skippedSummary = skippedSteps.length > 0 ? skippedSteps.join(', ') : '(none)';
+    const failedSummary = this.lastFailedStepName
+      ? `re-running failed step '${this.lastFailedStepName}'`
+      : 'no failed step recorded';
+    this.logger.info(
+      `Resuming from checkpoint: skipping completed step(s): ${skippedSummary}; ${failedSummary}.`,
+    );
   }
 
   /**

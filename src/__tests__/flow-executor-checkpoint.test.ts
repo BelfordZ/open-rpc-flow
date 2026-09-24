@@ -253,6 +253,76 @@ describe('FlowExecutor durable checkpoints (issue #158)', () => {
     expect(log2.methods).toHaveLength(4);
   });
 
+  it('logs which steps are skipped and which failed step is re-run on resume', async () => {
+    const flow = makeFlow();
+    const log: CallLog = { methods: [] };
+    const executor = newExecutor(flow, makeHandler(log, { two: 1 }));
+    await expect(executor.execute()).rejects.toThrow('boom-two');
+    const snapshot = JSON.parse(JSON.stringify(executor.exportState())) as FlowCheckpoint;
+
+    const logger = new TestLogger('resume-log');
+    const executor2 = new FlowExecutor(flow, makeHandler({ methods: [] }), { logger });
+    executor2.importState(snapshot);
+    await executor2.execute();
+
+    const resumeLines = logger
+      .getLogs()
+      .filter(
+        (entry) => entry.level === 'info' && entry.message.includes('Resuming from checkpoint'),
+      );
+    expect(resumeLines).toHaveLength(1);
+    expect(resumeLines[0].message).toBe(
+      "Resuming from checkpoint: skipping completed step(s): step1; re-running failed step 'step2'.",
+    );
+  });
+
+  it('logs a resume with no failed step and a resume with nothing completed', async () => {
+    // Fully successful run: skip recorded successes, no failed step.
+    const flow = makeFlow();
+    const okSnapshot = JSON.parse(
+      JSON.stringify(newExecutor(flow, makeHandler({ methods: [] })).exportState()),
+    ) as FlowCheckpoint;
+    // Simulate a completed run's recorded progress.
+    okSnapshot.stepResults = {
+      step1: { result: 'ok-one' },
+      step2: { result: 'ok-two' },
+      step3: { result: 'ok-three' },
+    };
+    okSnapshot.stepStatus = {
+      step1: { status: 'success' },
+      step2: { status: 'success' },
+      step3: { status: 'success' },
+    };
+    const logger = new TestLogger('resume-log-ok');
+    const executor = new FlowExecutor(flow, makeHandler({ methods: [] }), { logger });
+    executor.importState(okSnapshot);
+    await executor.execute();
+    const okLines = logger
+      .getLogs()
+      .filter((entry) => entry.message.includes('Resuming from checkpoint'));
+    expect(okLines).toHaveLength(1);
+    expect(okLines[0].message).toBe(
+      'Resuming from checkpoint: skipping completed step(s): step1, step2, step3; no failed step recorded.',
+    );
+
+    // Failed at the first step: nothing to skip.
+    const log2: CallLog = { methods: [] };
+    const failing = newExecutor(flow, makeHandler(log2, { one: 1 }));
+    await expect(failing.execute()).rejects.toThrow('boom-one');
+    const failSnapshot = JSON.parse(JSON.stringify(failing.exportState())) as FlowCheckpoint;
+    const logger2 = new TestLogger('resume-log-fail');
+    const executor2 = new FlowExecutor(flow, makeHandler({ methods: [] }), { logger: logger2 });
+    executor2.importState(failSnapshot);
+    await executor2.execute();
+    const failLines = logger2
+      .getLogs()
+      .filter((entry) => entry.message.includes('Resuming from checkpoint'));
+    expect(failLines).toHaveLength(1);
+    expect(failLines[0].message).toBe(
+      "Resuming from checkpoint: skipping completed step(s): (none); re-running failed step 'step1'.",
+    );
+  });
+
   it('re-runs a fixed step and its dependents, keeps unrelated completed steps skipped', async () => {
     const flow = makeFlow();
     const log: CallLog = { methods: [] };

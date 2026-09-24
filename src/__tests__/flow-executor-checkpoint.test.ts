@@ -1,5 +1,5 @@
 import { FlowExecutor } from '../flow-executor';
-import { CHECKPOINT_VERSION, CheckpointError, FlowCheckpoint, hashFlow } from '../checkpoint';
+import { CHECKPOINT_VERSION, CheckpointError, FlowCheckpoint, hashStep } from '../checkpoint';
 import { ValidationError } from '../errors';
 import { ErrorCode } from '../errors/codes';
 import { PauseError } from '../errors/base';
@@ -49,7 +49,11 @@ describe('FlowExecutor durable checkpoints (issue #158)', () => {
 
     expect(snapshot.version).toBe(CHECKPOINT_VERSION);
     expect(snapshot.flowName).toBe('checkpoint-flow');
-    expect(snapshot.flowHash).toBe(hashFlow(flow));
+    expect(snapshot.stepHashes).toEqual({
+      step1: hashStep(flow.steps[0]),
+      step2: hashStep(flow.steps[1]),
+      step3: hashStep(flow.steps[2]),
+    });
     expect(new Date(snapshot.exportedAt).toISOString()).toBe(snapshot.exportedAt);
     expect(snapshot.context).toEqual({});
     expect(snapshot.stepResults).toEqual({});
@@ -185,18 +189,145 @@ describe('FlowExecutor durable checkpoints (issue #158)', () => {
     expect((err as CheckpointError).code).toBe(ErrorCode.CHECKPOINT_VERSION_MISMATCH);
   });
 
-  it('rejects checkpoints exported from a different flow definition', () => {
-    const executor = newExecutor(makeFlow(), makeHandler({ methods: [] }));
-    const snapshot = executor.exportState();
+  it('imports a checkpoint into a flow with an added step: new steps run, completed steps stay skipped', async () => {
+    const flow = makeFlow();
+    const log: CallLog = { methods: [] };
+    const executor = newExecutor(flow, makeHandler(log, { two: 1 }));
+    await expect(executor.execute()).rejects.toThrow('boom-two');
+    expect(log.methods).toEqual(['one', 'two']);
 
-    const otherFlow = makeFlow();
-    otherFlow.steps.push({ name: 'step4', request: { method: 'four', params: {} } });
-    const other = newExecutor(otherFlow, makeHandler({ methods: [] }));
+    const snapshot = JSON.parse(JSON.stringify(executor.exportState())) as FlowCheckpoint;
 
-    const err = catchError(() => other.importState(snapshot));
-    expect(err).toBeInstanceOf(CheckpointError);
-    expect((err as CheckpointError).code).toBe(ErrorCode.CHECKPOINT_FLOW_MISMATCH);
-    expect((err as Error).message).toContain('different flow definition');
+    // Add a step after the failure point and fix nothing else.
+    const edited = makeFlow();
+    edited.steps.push({ name: 'step4', request: { method: 'four', params: {} } });
+    const log2: CallLog = { methods: [] };
+    const executor2 = newExecutor(edited, makeHandler(log2));
+    executor2.importState(snapshot);
+    await executor2.execute();
+
+    // step1 skipped (recorded success), step2 re-run (recorded failure),
+    // step3 and the new step4 run fresh (step4 has no dependencies, so its
+    // completion order relative to step3 is not deterministic).
+    expect(log2.methods[0]).toBe('two');
+    expect(new Set(log2.methods)).toEqual(new Set(['two', 'three', 'four']));
+  });
+
+  it('re-runs changed steps across a diamond graph without double-processing', async () => {
+    // a -> b, a -> c, b -> d, c -> d: d is reachable twice through the graph.
+    const flow: Flow = {
+      name: 'diamond-flow',
+      description: 'diamond invalidation test flow',
+      steps: [
+        { name: 'a', request: { method: 'ma', params: {} } },
+        { name: 'b', request: { method: 'mb', params: { v: '${a.result}' } } },
+        { name: 'c', request: { method: 'mc', params: { v: '${a.result}' } } },
+        { name: 'd', request: { method: 'md', params: { v: '${b.result}-${c.result}' } } },
+      ],
+    };
+    const log: CallLog = { methods: [] };
+    const executor = newExecutor(flow, makeHandler(log, { md: 1 }));
+    await expect(executor.execute()).rejects.toThrow('boom-md');
+
+    const snapshot = JSON.parse(JSON.stringify(executor.exportState())) as FlowCheckpoint;
+
+    // "Fix" both a and b: d is a dependent of each, so it is invalidated twice.
+    const fixed: Flow = {
+      name: 'diamond-flow',
+      description: 'diamond invalidation test flow',
+      steps: [
+        { name: 'a', request: { method: 'ma', params: { fixed: true } } },
+        { name: 'b', request: { method: 'mb', params: { v: '${a.result}', fixed: true } } },
+        flow.steps[2],
+        flow.steps[3],
+      ],
+    };
+    const log2: CallLog = { methods: [] };
+    const executor2 = newExecutor(fixed, makeHandler(log2));
+    executor2.importState(snapshot);
+    await executor2.execute();
+
+    // a and b changed -> re-run; c depended on a -> re-run;
+    // d depended on b and c -> re-run exactly once.
+    expect(new Set(log2.methods)).toEqual(new Set(['ma', 'mb', 'mc', 'md']));
+    expect(log2.methods).toHaveLength(4);
+  });
+
+  it('re-runs a fixed step and its dependents, keeps unrelated completed steps skipped', async () => {
+    const flow = makeFlow();
+    const log: CallLog = { methods: [] };
+    const executor = newExecutor(flow, makeHandler(log, { two: 1 }));
+    await expect(executor.execute()).rejects.toThrow('boom-two');
+
+    const snapshot = JSON.parse(JSON.stringify(executor.exportState())) as FlowCheckpoint;
+
+    // "Fix" step2 by changing its definition (e.g. corrected params).
+    const fixed = makeFlow();
+    fixed.steps[1] = {
+      name: 'step2',
+      request: { method: 'two', params: { v: '${step1.result}', fixed: true } },
+    };
+    const log2: CallLog = { methods: [] };
+    const executor2 = newExecutor(fixed, makeHandler(log2));
+    executor2.importState(snapshot);
+    await executor2.execute();
+
+    // step1 unchanged and completed -> skipped; step2 changed -> re-run;
+    // step3 depends on step2 -> re-run too.
+    expect(log2.methods).toEqual(['two', 'three']);
+  });
+
+  it('drops recorded progress for a removed step with a warning and imports the rest', async () => {
+    const flow: Flow = {
+      name: 'trim-flow',
+      description: 'removal reconciliation test flow',
+      steps: [
+        { name: 'gone', request: { method: 'gone', params: {} } },
+        { name: 'stays', request: { method: 'stays', params: {} } },
+      ],
+    };
+    const log: CallLog = { methods: [] };
+    const executor = newExecutor(flow, makeHandler(log));
+    await executor.execute();
+    expect(log.methods).toEqual(['gone', 'stays']);
+
+    const snapshot = JSON.parse(JSON.stringify(executor.exportState())) as FlowCheckpoint;
+
+    const trimmed: Flow = {
+      name: 'trim-flow',
+      description: 'removal reconciliation test flow',
+      steps: [{ name: 'stays', request: { method: 'stays', params: {} } }],
+    };
+    const log2: CallLog = { methods: [] };
+    const executor2 = newExecutor(trimmed, makeHandler(log2));
+    executor2.importState(snapshot);
+    await executor2.execute();
+
+    // 'gone' was removed: its recorded success is dropped (warned, not thrown).
+    // 'stays' keeps its recorded success and stays skipped.
+    expect(log2.methods).toEqual([]);
+  });
+
+  it('keeps recorded progress when an unrun step is edited', async () => {
+    const flow = makeFlow();
+    const log: CallLog = { methods: [] };
+    const executor = newExecutor(flow, makeHandler(log, { two: 1 }));
+    await expect(executor.execute()).rejects.toThrow('boom-two');
+
+    const snapshot = JSON.parse(JSON.stringify(executor.exportState())) as FlowCheckpoint;
+
+    // step3 never ran; editing it must not disturb step1's recorded success.
+    const edited = makeFlow();
+    edited.steps[2] = {
+      name: 'step3',
+      request: { method: 'three', params: { v: '${step2.result}', extra: 1 } },
+    };
+    const log2: CallLog = { methods: [] };
+    const executor2 = newExecutor(edited, makeHandler(log2));
+    executor2.importState(snapshot);
+    await executor2.execute();
+
+    expect(log2.methods).toEqual(['two', 'three']);
   });
 
   it('imports a renamed flow whose step definitions are identical', async () => {
@@ -352,8 +483,9 @@ describe('FlowExecutor durable checkpoints (issue #158)', () => {
 
   it('exposes the checkpoint API from the package root', async () => {
     const root = await import('../index');
-    expect(root.CHECKPOINT_VERSION).toBe(1);
-    expect(root.hashFlow).toBe(hashFlow);
+    expect(root.CHECKPOINT_VERSION).toBe(2);
+    expect(root.hashFlow).toBeDefined();
+    expect(root.hashStep).toBe(hashStep);
     expect(root.validateCheckpoint).toBeDefined();
     expect(root.CheckpointError).toBe(CheckpointError);
   });

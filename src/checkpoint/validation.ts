@@ -41,8 +41,16 @@ export function validateCheckpoint(value: unknown): FlowCheckpoint {
   if (typeof candidate.flowName !== 'string' || candidate.flowName.length === 0) {
     problems.push(`flowName must be a non-empty string, got ${describe(candidate.flowName)}`);
   }
-  if (typeof candidate.flowHash !== 'string' || candidate.flowHash.length === 0) {
-    problems.push(`flowHash must be a non-empty string, got ${describe(candidate.flowHash)}`);
+  if (!isPlainObject(candidate.stepHashes)) {
+    problems.push(`stepHashes must be an object, got ${describe(candidate.stepHashes)}`);
+  } else {
+    for (const [stepName, hash] of Object.entries(candidate.stepHashes)) {
+      if (typeof hash !== 'string' || hash.length === 0) {
+        problems.push(
+          `stepHashes[${JSON.stringify(stepName)}] must be a non-empty string, got ${describe(hash)}`,
+        );
+      }
+    }
   }
   if (typeof candidate.exportedAt !== 'string') {
     problems.push(`exportedAt must be a string, got ${describe(candidate.exportedAt)}`);

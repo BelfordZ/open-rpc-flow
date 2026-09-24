@@ -20,6 +20,7 @@ export {
   CheckpointError,
   CHECKPOINT_VERSION,
   hashFlow,
+  hashStep,
   validateCheckpoint,
 } from './checkpoint';
 export {

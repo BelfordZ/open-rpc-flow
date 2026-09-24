@@ -392,10 +392,13 @@ await executor2.execute(); // skips completed steps, re-runs the failed step
   `BigInt`s, and circular references throw a `CheckpointError`
   (`CHECKPOINT_NOT_SERIALIZABLE`) naming the offending path instead of
   silently corrupting the snapshot.
-- `importState()` validates the checkpoint and checks compatibility: an
-  unsupported `version` or a `flowHash` that doesn't match this executor's step
-  definitions throws a `CheckpointError` instead of silently misbehaving. A
-  renamed flow with identical steps still imports.
+- `importState()` validates the checkpoint and reconciles it with the current
+  flow per step: unchanged steps keep their recorded progress and stay
+  skipped, steps added after export simply run, and a recorded step whose
+  definition changed is treated as fixed — its recorded results are discarded
+  so it re-runs, along with the steps that depend on it. A recorded step that
+  no longer exists is dropped with a warning. An unsupported `version` still
+  throws a `CheckpointError` instead of silently misbehaving.
 - **Idempotency warning:** resuming re-runs the failed step and every step that
   never completed. Steps that already succeeded are never re-run — make sure
   re-executed steps are safe to run again.

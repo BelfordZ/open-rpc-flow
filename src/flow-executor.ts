@@ -40,10 +40,9 @@ import { PolicyResolver } from './util/policy-resolver';
 import {
   assertJsonSerializable,
   CHECKPOINT_VERSION,
-  CheckpointError,
   CheckpointStepStatus,
   FlowCheckpoint,
-  hashFlow,
+  hashStep,
   validateCheckpoint,
 } from './checkpoint';
 
@@ -378,7 +377,7 @@ export class FlowExecutor {
     const raw: FlowCheckpoint = {
       version: CHECKPOINT_VERSION,
       flowName: this.flow.name,
-      flowHash: hashFlow(this.flow),
+      stepHashes: Object.fromEntries(this.flow.steps.map((step) => [step.name, hashStep(step)])),
       exportedAt: new Date().toISOString(),
       context: this.context as Record<string, unknown>,
       stepResults: Object.fromEntries(this.stepResults),
@@ -400,14 +399,22 @@ export class FlowExecutor {
    * becomes a resume: steps with recorded successes are skipped, the failed
    * step (if any) is re-run, and steps that never ran execute normally.
    *
+   * Flow edits are reconciled per step instead of rejected (the "run, fix,
+   * re-run" loop): the checkpoint records a digest of each step definition,
+   * and on import each recorded step is compared against this executor's
+   * flow —
+   * - unchanged steps keep their recorded results and stay skipped;
+   * - steps added after export have no recorded progress and run normally;
+   * - a recorded step whose definition changed is treated as fixed: its
+   *   recorded results are discarded so it re-runs, and its transitive
+   *   dependents are discarded too (they consumed the old definition's
+   *   output);
+   * - a recorded step that no longer exists is dropped with a warning.
+   *
    * Compatibility checks (all failures throw instead of silently misbehaving):
    * - the checkpoint must be well-formed (`ValidationError` otherwise);
    * - its `version` must match (`CheckpointError` with
-   *   `CHECKPOINT_VERSION_MISMATCH` otherwise);
-   * - its `flowHash` must match the step definitions of this executor's flow
-   *   (`CheckpointError` with `CHECKPOINT_FLOW_MISMATCH` otherwise). Only the
-   *   step definitions are hashed: a renamed flow with identical steps still
-   *   imports (a warning is logged).
+   *   `CHECKPOINT_VERSION_MISMATCH` otherwise).
    *
    * Idempotency warning: resuming re-runs the failed step and every step
    * that never completed. Steps that already succeeded are never re-run.
@@ -429,23 +436,10 @@ export class FlowExecutor {
     }
     const checkpoint = validateCheckpoint(candidate);
 
-    const expectedHash = hashFlow(this.flow);
-    if (checkpoint.flowHash !== expectedHash) {
-      throw new CheckpointError(
-        `Checkpoint was exported from a different flow definition: its step graph does not ` +
-          `match flow '${this.flow.name}'. Recorded results would map to the wrong steps, so ` +
-          `the checkpoint cannot be imported.`,
-        {
-          flowName: this.flow.name,
-          checkpointFlowName: checkpoint.flowName,
-        },
-        ErrorCode.CHECKPOINT_FLOW_MISMATCH,
-      );
-    }
     if (checkpoint.flowName !== this.flow.name) {
       this.logger.warn(
-        `Checkpoint flow name '${checkpoint.flowName}' differs from flow '${this.flow.name}', ` +
-          `but the step definitions are identical; importing anyway.`,
+        `Checkpoint flow name '${checkpoint.flowName}' differs from flow '${this.flow.name}'. ` +
+          `Step definitions are compared per step, so importing anyway.`,
       );
     }
 
@@ -467,6 +461,9 @@ export class FlowExecutor {
         ...(status.error !== undefined ? { error: rehydrateCheckpointError(status.error) } : {}),
       });
     }
+    // Reconcile the imported progress against this executor's (possibly
+    // edited) flow before anything below treats a status entry as current.
+    this.reconcileImportedSteps(isolated.stepHashes);
     // Defensive: a result without a status entry counts as a success, mirroring
     // the completed-step detection in runFromIndex().
     for (const stepName of this.stepResults.keys()) {
@@ -489,6 +486,82 @@ export class FlowExecutor {
     this.pendingImportedState = true;
     this.rebuildExecutionContext();
     this.rebuildStepExecutors();
+  }
+
+  /**
+   * Reconcile imported step progress against this executor's flow, which may
+   * have been edited since the checkpoint was exported. Recorded results for
+   * steps whose definition changed (or that no longer exist) are discarded
+   * so those steps re-run, along with their transitive dependents — the rest
+   * of the recorded progress is kept untouched.
+   *
+   * @param checkpointHashes per-step digests recorded in the checkpoint.
+   */
+  private reconcileImportedSteps(checkpointHashes: Record<string, string>): void {
+    const currentHashes = new Map<string, string>();
+    for (const step of this.flow.steps) {
+      currentHashes.set(step.name, hashStep(step));
+    }
+
+    // Direct dependents per step, from the current flow's dependency graph.
+    const dependentsByStep = new Map<string, Set<string>>();
+    for (const node of this.dependencyResolver.getDependencyGraph().nodes) {
+      dependentsByStep.set(node.name, new Set(node.dependents));
+    }
+    const transitiveDependents = (root: string): Set<string> => {
+      const seen = new Set<string>();
+      const queue = [...(dependentsByStep.get(root) ?? [])];
+      while (queue.length > 0) {
+        const name = queue.shift() as string;
+        if (seen.has(name)) {
+          continue;
+        }
+        seen.add(name);
+        queue.push(...(dependentsByStep.get(name) ?? []));
+      }
+      return seen;
+    };
+
+    const invalidated = new Set<string>();
+    const drop = (stepName: string): void => {
+      if (invalidated.has(stepName)) {
+        return;
+      }
+      invalidated.add(stepName);
+      this.stepResults.delete(stepName);
+      this.stepStatus.delete(stepName);
+    };
+
+    const removed: string[] = [];
+    const changed: string[] = [];
+    for (const [stepName, recordedHash] of Object.entries(checkpointHashes)) {
+      const currentHash = currentHashes.get(stepName);
+      if (currentHash === undefined) {
+        removed.push(stepName);
+        drop(stepName);
+      } else if (currentHash !== recordedHash) {
+        changed.push(stepName);
+        drop(stepName);
+        for (const dependent of transitiveDependents(stepName)) {
+          drop(dependent);
+        }
+      }
+    }
+
+    if (removed.length > 0) {
+      this.logger.warn(
+        `Checkpoint reconciliation: dropped recorded progress for removed step(s) ` +
+          `${removed.join(', ')}; they will not be skipped on resume.`,
+      );
+    }
+    if (changed.length > 0) {
+      const rerun = [...invalidated].filter((name) => !removed.includes(name));
+      this.logger.info(
+        `Checkpoint reconciliation: step definition(s) changed for ${changed.join(', ')}; ` +
+          `discarded their recorded progress so they re-run, along with dependent step(s) ` +
+          `${rerun.filter((name) => !changed.includes(name)).join(', ') || '(none)'}.`,
+      );
+    }
   }
 
   /**

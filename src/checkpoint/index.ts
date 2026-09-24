@@ -5,5 +5,5 @@ export {
   CheckpointStepStatus,
 } from './types';
 export { CheckpointError } from './errors';
-export { hashFlow, stableStringify } from './hash';
+export { hashFlow, hashStep, stableStringify } from './hash';
 export { validateCheckpoint, assertJsonSerializable } from './validation';

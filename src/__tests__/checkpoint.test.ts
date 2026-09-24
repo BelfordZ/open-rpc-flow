@@ -4,6 +4,7 @@ import {
   FlowCheckpoint,
   assertJsonSerializable,
   hashFlow,
+  hashStep,
   stableStringify,
   validateCheckpoint,
 } from '../checkpoint';
@@ -13,9 +14,9 @@ import type { Flow } from '../types';
 
 function validCheckpoint(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    version: 1,
+    version: CHECKPOINT_VERSION,
     flowName: 'my-flow',
-    flowHash: 'deadbeef',
+    stepHashes: { a: 'deadbeef' },
     exportedAt: new Date().toISOString(),
     context: {},
     stepResults: {},
@@ -95,6 +96,20 @@ describe('hashFlow', () => {
   });
 });
 
+describe('hashStep', () => {
+  it('is deterministic and keyed to the step definition', () => {
+    const step = { name: 'a', request: { method: 'm_a', params: {} } };
+    expect(hashStep(step)).toBe(hashStep({ name: 'a', request: { method: 'm_a', params: {} } }));
+    expect(hashStep(step)).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('changes when the step definition changes, but not when the flow is renamed', () => {
+    const step = { name: 'a', request: { method: 'm_a', params: {} } };
+    const edited = { name: 'a', request: { method: 'm_a', params: { v: 1 } } };
+    expect(hashStep(edited)).not.toBe(hashStep(step));
+  });
+});
+
 describe('validateCheckpoint', () => {
   it('accepts a well-formed checkpoint and tolerates unknown fields', () => {
     const checkpoint = validateCheckpoint(
@@ -129,7 +144,7 @@ describe('validateCheckpoint', () => {
       validateCheckpoint({
         version: '1',
         flowName: '',
-        flowHash: '',
+        stepHashes: { a: '', b: 42 },
         exportedAt: 123,
         context: [],
         stepResults: null,
@@ -149,7 +164,7 @@ describe('validateCheckpoint', () => {
     for (const fragment of [
       'version',
       'flowName',
-      'flowHash',
+      'stepHashes',
       'exportedAt',
       'context',
       'stepResults',

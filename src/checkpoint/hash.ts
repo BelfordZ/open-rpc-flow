@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
 import { ValidationError } from '../errors';
-import type { Flow } from '../types';
+import type { Flow, Step } from '../types';
 
 /**
  * Deterministic serialization with sorted object keys, so structurally
@@ -51,6 +51,16 @@ export function stableStringify(value: unknown): string {
     }
   };
   return stringify(value);
+}
+
+/**
+ * Compatibility digest for a single step definition. Hashing per step (rather
+ * than the whole flow) lets {@link importState} reconcile a checkpoint
+ * against an edited flow: unchanged steps keep their recorded progress, new
+ * steps simply run, and changed steps (plus their dependents) are re-run.
+ */
+export function hashStep(step: Step): string {
+  return createHash('sha256').update(stableStringify(step)).digest('hex');
 }
 
 /**

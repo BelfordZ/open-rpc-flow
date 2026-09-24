@@ -8,7 +8,7 @@
  * Schema version of {@link FlowCheckpoint}. Bump this when the shape changes;
  * {@link validateCheckpoint} rejects checkpoints from other versions.
  */
-export const CHECKPOINT_VERSION = 1;
+export const CHECKPOINT_VERSION = 2;
 
 /**
  * A failed step's error, stored as plain data. Errors are never serialized
@@ -44,12 +44,15 @@ export interface FlowCheckpoint {
   /** Name of the flow the checkpoint was exported from (informational). */
   flowName: string;
   /**
-   * sha256 hex digest of the flow's step definitions. This is the
-   * compatibility anchor on import: recorded results are only meaningful if
-   * the step graph is identical. A renamed flow with identical steps keeps
-   * the same hash and still imports.
+   * Per-step sha256 hex digests of the flow's step definitions, keyed by step
+   * name. This is the compatibility anchor on import: each recorded step's
+   * results are only meaningful if that step's definition is unchanged.
+   * Steps added to the flow after export simply have no entry and run fresh;
+   * steps whose definition changed are re-run (along with their dependents)
+   * instead of trusting stale results. A renamed flow with identical steps
+   * keeps identical digests and still imports.
    */
-  flowHash: string;
+  stepHashes: Record<string, string>;
   /** ISO-8601 timestamp of when the checkpoint was exported. */
   exportedAt: string;
   /** Deep-cloned execution context. */

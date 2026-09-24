@@ -65,7 +65,12 @@ export const DEFAULT_RETRY_POLICY: RetryPolicy = {
  * Options for the FlowExecutor
  */
 export interface FlowExecutorOptions {
-  /** Logger instance to use */
+  /**
+   * Logger instance to use. Defaults to a `ConsoleLogger` at the `warn`
+   * level, so normal runs only emit warnings and errors. Pass
+   * `new ConsoleLogger('FlowExecutor', console, 'debug')` to opt back into
+   * full output, or a `Logger` of your own to redirect it entirely.
+   */
   logger?: Logger;
   /** Event emitter options */
   eventOptions?: Partial<FlowEventOptions>;

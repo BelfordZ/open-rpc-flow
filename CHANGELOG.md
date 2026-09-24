@@ -5,6 +5,15 @@
 
 * update readme ([#59](https://github.com/BelfordZ/open-rpc-flow/issues/59)) ([7f5d691](https://github.com/BelfordZ/open-rpc-flow/commit/7f5d6915880bb02c6bbe6e93f6f98abc95cc5c39))
 
+## [1.11.1](https://github.com/BelfordZ/open-rpc-flow/compare/v1.11.0...v1.11.1) (2026-09-24)
+
+
+### Bug Fixes
+
+* export NoLogger and noLogger from package index ([#196](https://github.com/BelfordZ/open-rpc-flow/issues/196)) ([4ec71a5](https://github.com/BelfordZ/open-rpc-flow/commit/4ec71a5617913e715b9bd167516c520a6e462a1c))
+* honor top-level step.timeout for request steps ([#199](https://github.com/BelfordZ/open-rpc-flow/issues/199)) ([e41ccfe](https://github.com/BelfordZ/open-rpc-flow/commit/e41ccfe455a0b1af33826b75fd3cecac0b8efcf9))
+* throw when validating a trace recorded without step hashes ([#198](https://github.com/BelfordZ/open-rpc-flow/issues/198)) ([7c9860a](https://github.com/BelfordZ/open-rpc-flow/commit/7c9860ab7ab8647af1b235c26342943ee53cdcc7))
+
 ## [1.11.0](https://github.com/BelfordZ/open-rpc-flow/compare/v1.10.0...v1.11.0) (2026-09-24)
 
 

@@ -6,7 +6,7 @@ import {
   LoopResult,
   isLoopResult,
 } from '../../step-executors/types';
-import { StepExecutionContext } from '../../types';
+import { Step, StepExecutionContext } from '../../types';
 
 import { SafeExpressionEvaluator } from '../../expression-evaluator/safe-evaluator';
 import { ReferenceResolver } from '../../reference-resolver';
@@ -673,11 +673,14 @@ describe('LoopStepExecutor', () => {
       metadata: { method: 'item.process' },
     };
 
-    executeStep
-      .mockResolvedValueOnce(mockValidateResult)
-      .mockResolvedValueOnce(mockProcessResult)
-      .mockResolvedValueOnce(mockValidateResult)
-      .mockResolvedValueOnce(mockProcessResult);
+    // Name-based mock: iterations now run concurrently, so a queued
+    // mockResolvedValueOnce sequence would interleave across iterations.
+    executeStep.mockImplementation(async (stepToExecute: Step) => {
+      if (stepToExecute.name === 'validateItem') {
+        return mockValidateResult;
+      }
+      return mockProcessResult;
+    });
 
     const result = await executor.execute(step, context);
 

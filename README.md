@@ -485,6 +485,19 @@ await new FlowExecutor(flow, replay).execute();
   calls, since substituted results can legitimately alter downstream
   requests; without overrides, calls must match recorded params exactly.
 
+- **Overrides must be path-keyed.** `overrides: { fetchUser: 50 }` and
+  `overrides: { fetchUser: overrideSequence(50, 60) }` work; passing
+  `overrideSequence(50, 60)` itself as the whole `overrides` argument throws
+  a `ReplayError` at creation time, because a bare sequence would otherwise
+  silently match no path and the what-if would appear to do nothing.
+
+- **Trace shapes differ between sources.** `createRecordingHandler(...).getTrace()`
+  returns a `RecordedTrace` envelope (`{ flowName, recordedAt, steps, stepHashes? }`),
+  while the contract-driven dry run's `MockJsonRpcHandler.getTrace()` returns a bare
+  `MockedCall[]`. Only a `RecordedTrace` feeds `createReplayHandler`; a mock trace
+  lifts into one by adding `flowName` and `recordedAt` and wrapping the calls as `steps`
+  (see the `RecordedCall` type: a `MockedCall` plus `path`, `step`, `durationMs`, and `timestamp`).
+
 - **Divergence is explicit.** More replay calls than recorded, a brand-new
   execution path (e.g. an iteration that never ran during recording), a
   method mismatch, or an exhausted response script all throw `ReplayError` —
@@ -735,6 +748,47 @@ executor.updateEventOptions({
   includeResults: false,
 });
 ```
+
+### Logging
+
+`FlowExecutor` accepts a `logger` option implementing the `Logger` interface (`info`, `error`, `warn`, `debug`, `createNested`). If omitted, the executor uses a `ConsoleLogger` at the `warn` level, so normal runs are quiet and only warnings and errors reach the console.
+
+```typescript
+import { FlowExecutor, ConsoleLogger } from 'open-rpc-flow';
+
+// Default: warn level, quiet on success
+const executor = new FlowExecutor(flow, jsonRpcHandler);
+
+// Opt back into full debug output
+const noisy = new FlowExecutor(flow, jsonRpcHandler, {
+  logger: new ConsoleLogger('FlowExecutor', console, 'debug'),
+});
+```
+
+Log levels are `debug < info < warn < error`: a logger emits a message only when the message's level is at or above the configured level. Nested loggers created via `createNested` inherit the parent's level, and `setLevel` changes it at runtime:
+
+```typescript
+const logger = new ConsoleLogger('MyApp');
+logger.setLevel('error'); // silence everything below error
+```
+
+To plug in your own logger, implement the `Logger` interface:
+
+```typescript
+import { FlowExecutor, Logger } from 'open-rpc-flow';
+
+const quietLogger: Logger = {
+  info: () => {},
+  error: (...args) => console.error(...args),
+  warn: (...args) => console.warn(...args),
+  debug: () => {},
+  createNested: () => quietLogger,
+};
+
+const executor = new FlowExecutor(flow, jsonRpcHandler, { logger: quietLogger });
+```
+
+The package also ships a ready-made silent logger, `noLogger` (exported from the package index once #187 merges).
 
 ## Type Safety
 

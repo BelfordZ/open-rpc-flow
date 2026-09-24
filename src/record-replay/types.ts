@@ -111,6 +111,11 @@ export interface ReplayOptions {
    * successive call. When any override is supplied, param matching relaxes
    * to path + call order (params are not compared), because a substituted
    * response legitimately changes downstream request params.
+   *
+   * `overrides` must be a path-keyed record; passing
+   * `overrideSequence(...)` itself (not wrapped in a record) throws a
+   * {@link ReplayError} at creation time, because a bare sequence would
+   * silently match nothing.
    */
   overrides?: Record<string, unknown>;
   /**

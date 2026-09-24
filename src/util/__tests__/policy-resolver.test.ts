@@ -27,6 +27,31 @@ describe('PolicyResolver', () => {
     expect(resolver.resolveTimeout(step, StepType.Transform)).toBe(111);
   });
 
+  it('resolves top-level step.timeout for request steps', () => {
+    const step: Step = { ...baseStep, timeout: 777 };
+    const resolver = new PolicyResolver(baseFlow, logger);
+    expect(resolver.resolveTimeout(step, StepType.Request)).toBe(777);
+  });
+
+  it('prefers top-level step.timeout over nested policies.timeout.timeout', () => {
+    const step: Step = {
+      ...baseStep,
+      timeout: 50,
+      policies: { timeout: { timeout: 5000 } },
+    };
+    const flow: Flow = {
+      ...baseFlow,
+      policies: {
+        step: {
+          request: { timeout: { timeout: 6000 } },
+          timeout: { timeout: 7000 },
+        } as any,
+      },
+    };
+    const resolver = new PolicyResolver(flow, logger);
+    expect(resolver.resolveTimeout(step, StepType.Request)).toBe(50);
+  });
+
   it('resolves per-stepType policy', () => {
     const flow: Flow = {
       ...baseFlow,

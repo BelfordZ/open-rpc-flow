@@ -5,6 +5,13 @@
 
 * update readme ([#59](https://github.com/BelfordZ/open-rpc-flow/issues/59)) ([7f5d691](https://github.com/BelfordZ/open-rpc-flow/commit/7f5d6915880bb02c6bbe6e93f6f98abc95cc5c39))
 
+## [1.9.0](https://github.com/BelfordZ/open-rpc-flow/compare/v1.8.0...v1.9.0) (2026-09-24)
+
+
+### Features
+
+* add durable checkpoints via exportState/importState ([#179](https://github.com/BelfordZ/open-rpc-flow/issues/179)) ([f358799](https://github.com/BelfordZ/open-rpc-flow/commit/f35879918ee5c6f7d0c1a3f29d77232425830521))
+
 ## [1.8.0](https://github.com/BelfordZ/open-rpc-flow/compare/v1.7.1...v1.8.0) (2026-09-24)
 
 

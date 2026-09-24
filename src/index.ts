@@ -84,6 +84,7 @@ export {
   DependencyResolvedEvent,
   FlowEventOptions,
 } from './util/flow-executor-events';
+export { NoLogger, noLogger } from './util/no-logger';
 
 // Export error handling related types
 export {

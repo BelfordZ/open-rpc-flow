@@ -5,6 +5,13 @@
 
 * update readme ([#59](https://github.com/BelfordZ/open-rpc-flow/issues/59)) ([7f5d691](https://github.com/BelfordZ/open-rpc-flow/commit/7f5d6915880bb02c6bbe6e93f6f98abc95cc5c39))
 
+## [1.11.2](https://github.com/BelfordZ/open-rpc-flow/compare/v1.11.1...v1.11.2) (2026-09-24)
+
+
+### Bug Fixes
+
+* implement branch termination for bare stop steps ([#203](https://github.com/BelfordZ/open-rpc-flow/issues/203)) ([7c17207](https://github.com/BelfordZ/open-rpc-flow/commit/7c1720712b13d2700d3ea4805afa150fa16150af))
+
 ## [1.11.1](https://github.com/BelfordZ/open-rpc-flow/compare/v1.11.0...v1.11.1) (2026-09-24)
 
 

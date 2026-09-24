@@ -134,6 +134,125 @@ describe('DependencyResolver', () => {
     expect(resolver.getDependencies('notifyIfAdmin')).toEqual(['getUser']);
   });
 
+  it('correctly identifies dependencies in switch condition steps', () => {
+    const flow: Flow = {
+      name: 'Test Flow',
+      description: 'Test flow for switch step dependencies',
+      steps: [
+        {
+          name: 'getUser',
+          request: {
+            method: 'user.get',
+            params: { id: 1 },
+          },
+        },
+        {
+          name: 'getOrder',
+          request: {
+            method: 'order.get',
+            params: { id: 2 },
+          },
+        },
+        {
+          name: 'routeByRole',
+          condition: {
+            switch: '${getUser.role}',
+            cases: {
+              admin: {
+                name: 'notifyAdmin',
+                request: {
+                  method: 'notification.send',
+                  params: { userId: '${getUser.id}' },
+                },
+              },
+              user: [
+                {
+                  name: 'logUser',
+                  request: {
+                    method: 'log.write',
+                    params: { orderId: '${getOrder.id}' },
+                  },
+                },
+              ],
+            },
+            default: {
+              name: 'notifyDefault',
+              request: {
+                method: 'notification.send',
+                params: {},
+              },
+            },
+          },
+        },
+      ],
+    };
+
+    const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
+    expect(resolver.getDependencies('routeByRole')).toEqual(
+      expect.arrayContaining(['getUser', 'getOrder']),
+    );
+  });
+
+  it('identifies dependencies in switch default step lists and missing cases', () => {
+    const flow: Flow = {
+      name: 'Test Flow',
+      description: 'Test flow for switch default dependencies',
+      steps: [
+        {
+          name: 'getUser',
+          request: {
+            method: 'user.get',
+            params: { id: 1 },
+          },
+        },
+        {
+          name: 'route',
+          condition: {
+            switch: '${getUser.role}',
+            cases: {
+              admin: {
+                name: 'notifyAdmin',
+                request: { method: 'notification.send', params: {} },
+              },
+            },
+            default: [
+              {
+                name: 'logDefault',
+                request: {
+                  method: 'log.write',
+                  params: { userId: '${getUser.id}' },
+                },
+              },
+            ],
+          },
+        },
+        {
+          name: 'routeNoDefault',
+          condition: {
+            switch: '${getUser.role}',
+            cases: {
+              admin: {
+                name: 'notifyAdmin2',
+                request: { method: 'notification.send', params: {} },
+              },
+            },
+          },
+        },
+        {
+          name: 'routeNoCases',
+          condition: {
+            switch: '${getUser.role}',
+          } as unknown as Flow['steps'][number]['condition'],
+        },
+      ],
+    };
+
+    const resolver = new DependencyResolver(flow, expressionEvaluator, testLogger);
+    expect(resolver.getDependencies('route')).toEqual(expect.arrayContaining(['getUser']));
+    expect(resolver.getDependencies('routeNoDefault')).toEqual(['getUser']);
+    expect(resolver.getDependencies('routeNoCases')).toEqual(['getUser']);
+  });
+
   it('detects circular dependencies', () => {
     const flow: Flow = {
       name: 'Test Flow',

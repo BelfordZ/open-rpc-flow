@@ -1,5 +1,12 @@
 import { Step, StepExecutionContext, ExecutionContextData } from '../types';
-import { StepExecutor, StepExecutionResult, StepType, ConditionStep } from './types';
+import {
+  StepExecutor,
+  StepExecutionResult,
+  StepType,
+  ConditionStep,
+  SwitchCondition,
+  isSwitchCondition,
+} from './types';
 import { Logger } from '../util/logger';
 import { getDataType } from '../util/type-utils';
 import { ValidationError, ExecutionError } from '../errors/base';
@@ -46,10 +53,11 @@ export class ConditionStepExecutor implements StepExecutor {
     }
 
     const conditionStep: ConditionStep = step;
+    const condition = conditionStep.condition;
 
     this.logger.debug('Evaluating condition', {
       stepName: step.name,
-      condition: conditionStep.condition.if,
+      condition,
     });
 
     // Get the timeout for the condition step
@@ -66,8 +74,18 @@ export class ConditionStepExecutor implements StepExecutor {
     // Promise for the condition logic
     const conditionPromise = (async () => {
       try {
+        if (isSwitchCondition(condition)) {
+          if ('if' in condition) {
+            throw new ValidationError(
+              `Condition step "${step.name}" cannot define both "if" and "switch"; they are mutually exclusive.`,
+              { stepName: step.name },
+            );
+          }
+          return await this.executeSwitch(step, condition, context, extraContext, abortController);
+        }
+
         const conditionValue = context.expressionEvaluator.evaluate(
-          conditionStep.condition.if,
+          condition.if,
           extraContext,
           step,
         );
@@ -91,9 +109,9 @@ export class ConditionStepExecutor implements StepExecutor {
         };
 
         const branch = conditionValue
-          ? { name: 'then' as const, step: conditionStep.condition.then }
-          : conditionStep.condition.else
-            ? { name: 'else' as const, step: conditionStep.condition.else }
+          ? { name: 'then' as const, step: condition.then }
+          : condition.else
+            ? { name: 'else' as const, step: condition.else }
             : undefined;
 
         if (branch) {
@@ -115,7 +133,7 @@ export class ConditionStepExecutor implements StepExecutor {
           metadata: {
             branchTaken,
             conditionValue,
-            condition: conditionStep.condition.if,
+            condition: condition.if,
             timestamp: new Date().toISOString(),
           },
         };
@@ -149,5 +167,73 @@ export class ConditionStepExecutor implements StepExecutor {
         clearTimeout(timeoutId);
       }
     }
+  }
+
+  /**
+   * Evaluates a switch condition and executes the matching case.
+   *
+   * The switch expression is evaluated like `if` is. Case keys are strings;
+   * a non-string value matches the key equal to its `String()` coercion
+   * (mirroring JavaScript property-access semantics). When no case matches,
+   * the optional `default` runs; with neither, the step is skipped exactly
+   * like an if/then without else.
+   */
+  private async executeSwitch(
+    step: ConditionStep,
+    condition: SwitchCondition,
+    context: StepExecutionContext,
+    extraContext: ExecutionContextData,
+    abortController: AbortController,
+  ): Promise<StepExecutionResult> {
+    const switchValue = context.expressionEvaluator.evaluate(condition.switch, extraContext, step);
+
+    this.logger.debug('Switch evaluated', {
+      stepName: step.name,
+      switchValue,
+    });
+
+    const nestedContext = {
+      ...extraContext,
+      _nestedStep: true,
+      _parentStep: step.name,
+    };
+
+    const cases = condition.cases ?? {};
+    const key = typeof switchValue === 'string' ? switchValue : String(switchValue);
+    const hasCase = Object.prototype.hasOwnProperty.call(cases, key);
+    const matched = hasCase ? cases[key] : condition.default;
+
+    let value: StepExecutionResult | StepExecutionResult[] | undefined;
+    let branchTaken: string;
+    if (matched !== undefined) {
+      branchTaken = hasCase ? key : 'default';
+      const caseSteps = Array.isArray(matched) ? matched : [matched];
+      this.logger.debug(`Executing switch case "${branchTaken}"`, { stepName: step.name });
+      const results: StepExecutionResult[] = [];
+      for (const caseStep of caseSteps) {
+        results.push(await this.executeStep(caseStep, nestedContext, abortController.signal));
+      }
+      value = Array.isArray(matched) ? results : results[0];
+    } else {
+      branchTaken = 'none';
+      this.logger.debug('No switch case matched; skipping', { stepName: step.name });
+    }
+
+    this.logger.debug('Switch execution completed', {
+      stepName: step.name,
+      branchTaken,
+      switchValue,
+    });
+
+    return {
+      type: StepType.Condition,
+      result: value,
+      metadata: {
+        branchTaken,
+        conditionValue: switchValue,
+        condition: condition.switch,
+        timestamp: new Date().toISOString(),
+      },
+    };
   }
 }

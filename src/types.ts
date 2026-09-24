@@ -138,6 +138,29 @@ export interface Flow {
   policies?: FlowPolicies;
 }
 
+/**
+ * Classic if/then/else condition branch.
+ */
+export interface IfCondition {
+  if: string;
+  then: Step;
+  else?: Step;
+}
+
+/**
+ * Switch condition: evaluates an expression and executes the case whose
+ * key matches the value, or `default` when nothing matches.
+ *
+ * Case keys are strings; a non-string switch value matches the case key
+ * equal to its `String()` coercion (so `42` matches `"42"`, `true` matches
+ * `"true"`), mirroring JavaScript property-access semantics.
+ */
+export interface SwitchCondition {
+  switch: string;
+  cases: Record<string, Step | Step[]>;
+  default?: Step | Step[];
+}
+
 export interface Step {
   name: string;
   description?: string;
@@ -157,11 +180,7 @@ export interface Step {
     step?: Step;
     steps?: Step[];
   };
-  condition?: {
-    if: string;
-    then: Step;
-    else?: Step;
-  };
+  condition?: IfCondition | SwitchCondition;
   transform?: {
     input?: string | any[];
     operations: TransformOperation[];

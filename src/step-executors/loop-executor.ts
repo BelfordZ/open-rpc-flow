@@ -489,7 +489,13 @@ export class LoopStepExecutor implements StepExecutor {
     const stepResults: StepExecutionResult[] = [];
     for (const stepToExecute of innerSteps) {
       try {
-        stepResults.push(await this.executeStep(stepToExecute, iterationContext, signal));
+        const result = await this.executeStep(stepToExecute, iterationContext, signal);
+        stepResults.push(result);
+        // Publish the inner step's result into this iteration's scope so a
+        // later sibling step can reference it (e.g. `${fetchDetail.result}`).
+        // Each iteration gets its own context object, so parallel iterations
+        // cannot clobber each other's sibling results. (Issue #185.)
+        iterationContext[stepToExecute.name] = result;
       } catch (error) {
         if (!(error instanceof StopBranch)) {
           throw error;

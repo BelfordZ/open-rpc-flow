@@ -206,7 +206,7 @@ export class ConditionStepExecutor implements StepExecutor {
       switchValue,
     });
 
-    const nestedContext = {
+    const nestedContext: ExecutionContextData = {
       ...extraContext,
       _nestedStep: true,
       _parentStep: step.name,
@@ -226,7 +226,16 @@ export class ConditionStepExecutor implements StepExecutor {
       const results: StepExecutionResult[] = [];
       for (const caseStep of caseSteps) {
         try {
-          results.push(await this.executeStep(caseStep, nestedContext, abortController.signal));
+          const caseResult = await this.executeStep(
+            caseStep,
+            nestedContext,
+            abortController.signal,
+          );
+          results.push(caseResult);
+          // Publish the case step's result into this branch's scope so a later
+          // sibling case step can reference it (e.g. `${silverA.result}`).
+          // (Issue #185.)
+          nestedContext[caseStep.name] = caseResult;
         } catch (error) {
           if (!(error instanceof StopBranch)) {
             throw error;

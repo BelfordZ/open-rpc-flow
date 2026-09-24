@@ -149,9 +149,16 @@ export class DependencyResolver {
       // Add dependencies from the loop's "over" expression
       this.extractReferences(step.loop.over).forEach((dep) => deps.add(dep));
 
+      // Names of steps nested anywhere inside this loop's subtree. References
+      // to them resolve against the loop-local results at runtime, so they
+      // must not become top-level dependencies of the enclosing step.
+      const nestedStepNames = this.collectNestedStepNames(step);
+
       const collectLoopStepDependencies = () => {
         if (step.loop.step) {
-          this.findStepDependencies(step.loop.step, logger).forEach((dep) => deps.add(dep));
+          this.findStepDependencies(step.loop.step, logger)
+            .filter((dep) => !nestedStepNames.has(dep))
+            .forEach((dep) => deps.add(dep));
         }
       };
 
@@ -171,7 +178,9 @@ export class DependencyResolver {
         logger.debug('handling loop steps');
         this.withLoopVars(step.loop.as, () => {
           for (const subStep of step.loop.steps!) {
-            this.findStepDependencies(subStep, logger).forEach((dep) => deps.add(dep));
+            this.findStepDependencies(subStep, logger)
+              .filter((dep) => !nestedStepNames.has(dep))
+              .forEach((dep) => deps.add(dep));
           }
         });
       }
@@ -180,6 +189,14 @@ export class DependencyResolver {
     // Extract references from condition steps
     if (isConditionStep(step)) {
       logger.debug('handling condition step');
+      // Names of steps nested anywhere inside this condition's branches. Like
+      // loop sub-steps, they resolve against branch-local results at runtime.
+      const nestedStepNames = this.collectNestedStepNames(step);
+      const addBranchDependencies = (branchStep: Step): void => {
+        this.findStepDependencies(branchStep, logger)
+          .filter((dep) => !nestedStepNames.has(dep))
+          .forEach((dep) => deps.add(dep));
+      };
       const condition = step.condition;
       if (isSwitchCondition(condition)) {
         this.extractReferences(condition.switch).forEach((dep) => deps.add(dep));
@@ -193,15 +210,15 @@ export class DependencyResolver {
           );
         }
         for (const caseStep of caseSteps) {
-          this.findStepDependencies(caseStep, logger).forEach((dep) => deps.add(dep));
+          addBranchDependencies(caseStep);
         }
       } else {
         this.extractReferences(condition.if).forEach((dep) => deps.add(dep));
         if (condition.then) {
-          this.findStepDependencies(condition.then, logger).forEach((dep) => deps.add(dep));
+          addBranchDependencies(condition.then);
         }
         if (condition.else) {
-          this.findStepDependencies(condition.else, logger).forEach((dep) => deps.add(dep));
+          addBranchDependencies(condition.else);
         }
       }
     }
@@ -209,7 +226,10 @@ export class DependencyResolver {
     // Extract references from delay steps
     if (isDelayStep(step)) {
       logger.debug('handling delay step');
-      this.findStepDependencies(step.delay.step, logger).forEach((dep) => deps.add(dep));
+      const nestedStepNames = this.collectNestedStepNames(step);
+      this.findStepDependencies(step.delay.step, logger)
+        .filter((dep) => !nestedStepNames.has(dep))
+        .forEach((dep) => deps.add(dep));
     }
 
     // Extract references from request steps
@@ -250,6 +270,59 @@ export class DependencyResolver {
 
     logger.debug(`Found dependencies: ${Array.from(deps).join(', ')}`);
     return Array.from(deps);
+  }
+
+  /**
+   * Collects the names of every step nested inside a step's subtree:
+   * loop.steps / loop.step, switch cases / default, then / else branches,
+   * and delay.step, recursively. References to these names resolve against
+   * the branch-local results at runtime, so they must not be treated as
+   * top-level dependencies of the enclosing step.
+   */
+  private collectNestedStepNames(step: Step): Set<string> {
+    const names = new Set<string>();
+    const visit = (current: Step): void => {
+      if (isLoopStep(current)) {
+        if (current.loop.steps) {
+          for (const subStep of current.loop.steps) {
+            names.add(subStep.name);
+            visit(subStep);
+          }
+        } else if (current.loop.step) {
+          names.add(current.loop.step.name);
+          visit(current.loop.step);
+        }
+      } else if (isConditionStep(current)) {
+        const condition = current.condition;
+        const branches: Step[] = [];
+        if (isSwitchCondition(condition)) {
+          for (const caseValue of Object.values(condition.cases ?? {})) {
+            branches.push(...(Array.isArray(caseValue) ? caseValue : [caseValue]));
+          }
+          if (condition.default !== undefined) {
+            branches.push(
+              ...(Array.isArray(condition.default) ? condition.default : [condition.default]),
+            );
+          }
+        } else {
+          if (condition.then) {
+            branches.push(condition.then);
+          }
+          if (condition.else) {
+            branches.push(condition.else);
+          }
+        }
+        for (const branch of branches) {
+          names.add(branch.name);
+          visit(branch);
+        }
+      } else if (isDelayStep(current)) {
+        names.add(current.delay.step.name);
+        visit(current.delay.step);
+      }
+    };
+    visit(step);
+    return names;
   }
 
   /**

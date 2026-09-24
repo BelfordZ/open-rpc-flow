@@ -756,13 +756,25 @@ describe('getReplayReport', () => {
 });
 
 describe('validateTraceForFlow', () => {
-  it('passes when digests match or the trace carries none', () => {
-    expect(() => validateTraceForFlow(makeTrace(), {})).not.toThrow();
+  it('passes when digests match', () => {
     const hashed: RecordedTrace = {
       ...makeTrace(),
       stepHashes: { getUser: 'abc', greet: 'def' },
     };
     expect(() => validateTraceForFlow(hashed, { getUser: 'abc', greet: 'def' })).not.toThrow();
+  });
+
+  it('throws ReplayError with a helpful message when the trace has no stepHashes', () => {
+    expect(() => validateTraceForFlow(makeTrace(), {})).toThrow(
+      /recorded without step hashes.*getTrace\(flowName, stepHashes\)/,
+    );
+    expect(() => validateTraceForFlow(makeTrace(), {})).toThrow(ReplayError);
+  });
+
+  it('throws ReplayError with a helpful message when the trace itself is missing', () => {
+    expect(() => validateTraceForFlow(undefined as unknown as RecordedTrace, {})).toThrow(
+      /recorded without step hashes/,
+    );
   });
 
   it('throws ReplayError naming the stale steps', () => {

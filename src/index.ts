@@ -95,11 +95,16 @@ export {
   createReplayHandler,
   detectContractDrift,
   isRecordedError,
+  overrideSequence,
+  validateTraceForFlow,
   ReplayError,
+  ReplaySequence,
   RecordedCall,
   RecordedError,
   RecordedTrace,
   ReplayOptions,
+  ReplayReport,
+  ReplayHandler,
   DriftReport,
 } from './record-replay';
 

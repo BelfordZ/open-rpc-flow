@@ -216,6 +216,15 @@ export interface JsonRpcHandlerOptions {
   signal?: AbortSignal;
 
   /**
+   * Execution path of the flow step making this call, e.g. `'fetchUsers'`
+   * or `'processUsers[2].fetchUser'` for a sub-step inside a loop iteration.
+   * Set by FlowExecutor for calls made by flow steps; absent when the handler
+   * is used directly. Recording and replay handlers use it to attribute
+   * calls to steps (see `src/record-replay/`).
+   */
+  stepPath?: string;
+
+  /**
    * Additional options specific to the JsonRpcHandler implementation
    */
   [key: string]: any;

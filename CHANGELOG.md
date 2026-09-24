@@ -5,6 +5,19 @@
 
 * update readme ([#59](https://github.com/BelfordZ/open-rpc-flow/issues/59)) ([7f5d691](https://github.com/BelfordZ/open-rpc-flow/commit/7f5d6915880bb02c6bbe6e93f6f98abc95cc5c39))
 
+## [1.12.0](https://github.com/BelfordZ/open-rpc-flow/compare/v1.11.2...v1.12.0) (2026-09-24)
+
+
+### Features
+
+* add log levels to ConsoleLogger defaulting to warn ([#201](https://github.com/BelfordZ/open-rpc-flow/issues/201)) ([20cbdd0](https://github.com/BelfordZ/open-rpc-flow/commit/20cbdd0815f1b29c70448f2e8daed3f5341b1b00))
+* validate replay overrides shape and document record/replay flow ([#200](https://github.com/BelfordZ/open-rpc-flow/issues/200)) ([0b85052](https://github.com/BelfordZ/open-rpc-flow/commit/0b85052aaf9645ad3295474ef8db1ad9ef47ae3f))
+
+
+### Bug Fixes
+
+* resolve sibling inner-step references in loops and switch branches ([#202](https://github.com/BelfordZ/open-rpc-flow/issues/202)) ([86f488e](https://github.com/BelfordZ/open-rpc-flow/commit/86f488ee433e92587d67561433683c583b3c3a6c))
+
 ## [1.11.2](https://github.com/BelfordZ/open-rpc-flow/compare/v1.11.1...v1.11.2) (2026-09-24)
 
 

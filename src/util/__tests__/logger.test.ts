@@ -1,4 +1,4 @@
-import { ConsoleLogger, TestLogger } from '../logger';
+import { ConsoleLogger, TestLogger, defaultLogger } from '../logger';
 import { NoLogger, noLogger } from '../no-logger';
 
 describe('ConsoleLogger', () => {
@@ -26,18 +26,18 @@ describe('ConsoleLogger', () => {
 
   it('logs messages without prefix', () => {
     const logger = new ConsoleLogger();
-    logger.info('test message');
-    expect(mockConsole.info).toHaveBeenCalledWith('test message');
+    logger.warn('test message');
+    expect(mockConsole.warn).toHaveBeenCalledWith('test message');
   });
 
   it('logs messages with prefix', () => {
     const logger = new ConsoleLogger('TestPrefix');
-    logger.info('test message');
-    expect(mockConsole.info).toHaveBeenCalledWith('[TestPrefix] test message');
+    logger.warn('test message');
+    expect(mockConsole.warn).toHaveBeenCalledWith('[TestPrefix] test message');
   });
 
-  it('handles all log levels', () => {
-    const logger = new ConsoleLogger('Test');
+  it('logs all levels when level is debug', () => {
+    const logger = new ConsoleLogger('Test', mockConsole as unknown as Console, 'debug');
     logger.info('info message');
     logger.error('error message');
     logger.warn('warn message');
@@ -49,6 +49,67 @@ describe('ConsoleLogger', () => {
     expect(mockConsole.warn).toHaveBeenCalledWith('[Test] warn message');
     expect(mockConsole.info).toHaveBeenCalledWith('[Test] info message', { extra: true });
     expect(mockConsole.debug).toHaveBeenCalledWith('[Test] debug message');
+  });
+
+  it('defaults to warn level, suppressing debug and info', () => {
+    const logger = new ConsoleLogger('Test');
+    logger.debug('debug message');
+    logger.info('info message');
+    logger.warn('warn message');
+    logger.error('error message');
+
+    expect(mockConsole.debug).not.toHaveBeenCalled();
+    expect(mockConsole.info).not.toHaveBeenCalled();
+    expect(mockConsole.warn).toHaveBeenCalledWith('[Test] warn message');
+    expect(mockConsole.error).toHaveBeenCalledWith('[Test] error message');
+  });
+
+  it('reports the configured level via getLevel', () => {
+    expect(new ConsoleLogger().getLevel()).toBe('warn');
+    expect(new ConsoleLogger('Test', mockConsole as unknown as Console, 'debug').getLevel()).toBe(
+      'debug',
+    );
+  });
+
+  it('setLevel changes filtering at runtime', () => {
+    const logger = new ConsoleLogger('Test');
+    logger.debug('suppressed');
+    expect(mockConsole.debug).not.toHaveBeenCalled();
+
+    logger.setLevel('debug');
+    expect(logger.getLevel()).toBe('debug');
+    logger.debug('visible');
+    expect(mockConsole.debug).toHaveBeenCalledWith('[Test] visible');
+
+    logger.setLevel('error');
+    logger.warn('suppressed now');
+    expect(mockConsole.warn).not.toHaveBeenCalled();
+    logger.error('still visible');
+    expect(mockConsole.error).toHaveBeenCalledWith('[Test] still visible');
+  });
+
+  it('nested loggers inherit the parent level', () => {
+    const logger = new ConsoleLogger('Parent', mockConsole as unknown as Console, 'error');
+    const nested = logger.createNested('Child');
+    expect(nested.getLevel()).toBe('error');
+
+    nested.warn('suppressed');
+    nested.error('visible');
+    expect(mockConsole.warn).not.toHaveBeenCalled();
+    expect(mockConsole.error).toHaveBeenCalledWith('[Parent:Child] visible');
+  });
+
+  it('positional console argument still works for backward compatibility', () => {
+    const logger = new ConsoleLogger('Test', mockConsole as unknown as Console);
+    logger.info('info message');
+    expect(mockConsole.info).not.toHaveBeenCalled();
+    logger.warn('warn message');
+    expect(mockConsole.warn).toHaveBeenCalledWith('[Test] warn message');
+  });
+
+  it('defaultLogger is a ConsoleLogger at warn level', () => {
+    expect(defaultLogger).toBeInstanceOf(ConsoleLogger);
+    expect(defaultLogger.getLevel()).toBe('warn');
   });
 
   it('forwards metadata for error and warn logs', () => {
@@ -67,15 +128,15 @@ describe('ConsoleLogger', () => {
   it('creates nested loggers with combined prefix', () => {
     const logger = new ConsoleLogger('Parent');
     const nested = logger.createNested('Child');
-    nested.info('test message');
-    expect(mockConsole.info).toHaveBeenCalledWith('[Parent:Child] test message');
+    nested.warn('test message');
+    expect(mockConsole.warn).toHaveBeenCalledWith('[Parent:Child] test message');
   });
 
   it('creates nested loggers from unprefixed logger', () => {
     const logger = new ConsoleLogger();
     const nested = logger.createNested('Child');
-    nested.info('test message');
-    expect(mockConsole.info).toHaveBeenCalledWith('[Child] test message');
+    nested.warn('test message');
+    expect(mockConsole.warn).toHaveBeenCalledWith('[Child] test message');
   });
 });
 

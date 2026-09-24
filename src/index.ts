@@ -14,6 +14,16 @@ export {
 } from './step-executors';
 export { FlowExecutor, FlowExecutorOptions, DEFAULT_RETRY_POLICY } from './flow-executor';
 export {
+  FlowCheckpoint,
+  CheckpointStepError,
+  CheckpointStepStatus,
+  CheckpointError,
+  CHECKPOINT_VERSION,
+  hashFlow,
+  hashStep,
+  validateCheckpoint,
+} from './checkpoint';
+export {
   validateFlow,
   FlowDiagnostic,
   FlowDiagnosticCode,

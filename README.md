@@ -366,6 +366,52 @@ const retriedResults = await executor.retry();
 See [**src/examples/resume-retry-example.ts**](src/examples/resume-retry-example.ts) for a
 complete, runnable example that shows how to snapshot and restore state.
 
+#### Durable Checkpoints
+
+For resume across processes or machines, export a versioned, JSON-serializable
+checkpoint and import it into a fresh executor later:
+
+```typescript
+const executor = new FlowExecutor(flow, jsonRpcHandler);
+try {
+  await executor.execute();
+} catch {
+  // Persist this JSON — new process, new machine, hours later…
+  await db.save('run-123', JSON.stringify(executor.exportState()));
+}
+
+// …later, possibly in a different process:
+const executor2 = new FlowExecutor(flow, jsonRpcHandler);
+executor2.importState(JSON.parse(await db.load('run-123')));
+await executor2.execute(); // skips completed steps, re-runs the failed step
+```
+
+- `exportState()` returns a `FlowCheckpoint`: deeply isolated from executor
+  internals and JSON-normalized, so the persisted form is exactly what imports.
+  Step results and context must be JSON-serializable — functions, `Map`s,
+  `BigInt`s, and circular references throw a `CheckpointError`
+  (`CHECKPOINT_NOT_SERIALIZABLE`) naming the offending path instead of
+  silently corrupting the snapshot.
+- `importState()` validates the checkpoint and reconciles it with the current
+  flow per step: unchanged steps keep their recorded progress and stay
+  skipped, steps added after export simply run, and a recorded step whose
+  definition changed is treated as fixed — its recorded results are discarded
+  so it re-runs, along with the steps that depend on it. A recorded step that
+  no longer exists is dropped with a warning. An unsupported `version` still
+  throws a `CheckpointError` instead of silently misbehaving.
+- **Observability:** importing logs what reconciliation did (info for changed
+  steps and their invalidated dependents, warnings for removed steps or a
+  renamed flow). The resumed `execute()` logs one info line naming the
+  completed steps it skips and the failed step it re-runs, so a resumed run is
+  auditable without per-step noise.
+- **Versioning:** checkpoints are versioned (`CHECKPOINT_VERSION`, currently
+  2). The schema moved from one flow-wide digest to a digest per step, so
+  checkpoints exported by older versions are rejected with
+  `CHECKPOINT_VERSION_MISMATCH` — re-run to export a fresh checkpoint.
+- **Idempotency warning:** resuming re-runs the failed step and every step that
+  never completed. Steps that already succeeded are never re-run — make sure
+  re-executed steps are safe to run again.
+
 ##### Error Events
 
 Listen for error events during flow execution:

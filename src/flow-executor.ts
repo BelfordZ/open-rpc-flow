@@ -37,6 +37,14 @@ import {
 } from './errors/base';
 import { JsonRpcRequestError } from './step-executors/types';
 import { PolicyResolver } from './util/policy-resolver';
+import {
+  assertJsonSerializable,
+  CHECKPOINT_VERSION,
+  CheckpointStepStatus,
+  FlowCheckpoint,
+  hashStep,
+  validateCheckpoint,
+} from './checkpoint';
 
 /**
  * Default retry policy
@@ -104,6 +112,13 @@ export class FlowExecutor {
   private stepCorrelationIds!: Map<string, string>;
   private correlationPrefix!: string;
   private isPaused: boolean;
+
+  /**
+   * Set by importState(). The next run entry point (execute/resume/retry/
+   * resumeFrom) must preserve the imported state instead of starting fresh.
+   * Consumed (cleared) by initializeRunState().
+   */
+  private pendingImportedState = false;
 
   constructor(
     private flow: Flow,
@@ -225,6 +240,10 @@ export class FlowExecutor {
    */
   private initializeRunState(options: { clearResults: boolean; clearStatus: boolean }): void {
     this.isPaused = false;
+    // An imported checkpoint is honored by exactly one run entry point: once
+    // any of execute()/resume()/retry()/resumeFrom() starts, the flag is
+    // consumed so a later execute() goes back to fresh-run semantics.
+    this.pendingImportedState = false;
     this.globalAbortController = new AbortController();
     // Bump the epoch so in-flight steps from a superseded run can detect that
     // their state was cleared and must not write into the fresh state.
@@ -322,6 +341,227 @@ export class FlowExecutor {
     this.lastFailedStepName = null;
     this.rebuildExecutionContext();
     this.rebuildStepExecutors();
+  }
+
+  /**
+   * Export a durable checkpoint of the executor's current progress.
+   *
+   * The checkpoint is versioned, deeply isolated from executor internals,
+   * and JSON-normalized: it deep-equals `JSON.parse(JSON.stringify(snapshot))`,
+   * so persisting it as JSON and reading it back loses nothing.
+   *
+   * Serialization discipline: step results and context must be
+   * JSON-serializable. Values that `JSON.stringify` silently corrupts
+   * (functions, symbols, BigInts, Maps, Sets, Promises, binary buffers,
+   * circular references) make `exportState()` throw a `CheckpointError`
+   * (`CHECKPOINT_NOT_SERIALIZABLE`) naming the offending path — fail fast
+   * here instead of persisting a checkpoint that imports as something
+   * different. `undefined` is dropped from objects (`null` in arrays),
+   * `Date`s become ISO strings, and class instances lose their prototype;
+   * convert such values to plain data before exporting if that matters.
+   *
+   * @returns a {@link FlowCheckpoint} safe to persist with `JSON.stringify`.
+   */
+  exportState(): FlowCheckpoint {
+    const stepStatus: Record<string, CheckpointStepStatus> = {};
+    for (const [stepName, status] of this.stepStatus) {
+      stepStatus[stepName] = {
+        status: status.status,
+        // Errors are stored as plain data, never Error instances. `stack`
+        // may be undefined; the JSON normalization below drops it.
+        ...(status.error !== undefined
+          ? { error: { message: status.error.message, stack: status.error.stack } }
+          : {}),
+      };
+    }
+    const raw: FlowCheckpoint = {
+      version: CHECKPOINT_VERSION,
+      flowName: this.flow.name,
+      stepHashes: Object.fromEntries(this.flow.steps.map((step) => [step.name, hashStep(step)])),
+      exportedAt: new Date().toISOString(),
+      context: this.context as Record<string, unknown>,
+      stepResults: Object.fromEntries(this.stepResults),
+      stepStatus,
+      lastFailedStepName: this.lastFailedStepName,
+    };
+    assertJsonSerializable(raw);
+    // JSON-normalize: the returned snapshot is deeply isolated from executor
+    // internals and is exactly what a JSON persist/restore round trip yields.
+    return JSON.parse(JSON.stringify(raw)) as FlowCheckpoint;
+  }
+
+  /**
+   * Import a checkpoint previously produced by {@link exportState} (or its
+   * JSON round-tripped form: a plain object, or a JSON string).
+   *
+   * The imported state is deep-cloned into the executor, so later mutations
+   * of the caller's object cannot affect the run. The next `execute()` call
+   * becomes a resume: steps with recorded successes are skipped, the failed
+   * step (if any) is re-run, and steps that never ran execute normally.
+   *
+   * Flow edits are reconciled per step instead of rejected (the "run, fix,
+   * re-run" loop): the checkpoint records a digest of each step definition,
+   * and on import each recorded step is compared against this executor's
+   * flow —
+   * - unchanged steps keep their recorded results and stay skipped;
+   * - steps added after export have no recorded progress and run normally;
+   * - a recorded step whose definition changed is treated as fixed: its
+   *   recorded results are discarded so it re-runs, and its transitive
+   *   dependents are discarded too (they consumed the old definition's
+   *   output);
+   * - a recorded step that no longer exists is dropped with a warning.
+   *
+   * Compatibility checks (all failures throw instead of silently misbehaving):
+   * - the checkpoint must be well-formed (`ValidationError` otherwise);
+   * - its `version` must match (`CheckpointError` with
+   *   `CHECKPOINT_VERSION_MISMATCH` otherwise).
+   *
+   * Idempotency warning: resuming re-runs the failed step and every step
+   * that never completed. Steps that already succeeded are never re-run.
+   * Make sure re-executed steps are safe to run again.
+   *
+   * A checkpoint exported while paused imports unpaused: the new executor
+   * simply continues from the recorded progress.
+   */
+  importState(snapshot: unknown): void {
+    let candidate: unknown = snapshot;
+    if (typeof candidate === 'string') {
+      try {
+        candidate = JSON.parse(candidate);
+      } catch {
+        throw new ValidationError('Invalid checkpoint: string is not valid JSON', {
+          actualType: 'string',
+        });
+      }
+    }
+    const checkpoint = validateCheckpoint(candidate);
+
+    if (checkpoint.flowName !== this.flow.name) {
+      this.logger.warn(
+        `Checkpoint flow name '${checkpoint.flowName}' differs from flow '${this.flow.name}'. ` +
+          `Step definitions are compared per step, so importing anyway.`,
+      );
+    }
+
+    // The checkpoint is JSON-shaped by construction, but a hand-built object
+    // could smuggle in functions or Maps; enforce serializability symmetrically.
+    assertJsonSerializable(checkpoint);
+    // Deep-clone through JSON: the executor must not alias the caller's object.
+    const isolated = JSON.parse(JSON.stringify(checkpoint)) as FlowCheckpoint;
+
+    this.context = Object.freeze({ ...isolated.context });
+    this.stepResults.clear();
+    for (const [stepName, result] of Object.entries(isolated.stepResults)) {
+      this.stepResults.set(stepName, result);
+    }
+    this.stepStatus.clear();
+    for (const [stepName, status] of Object.entries(isolated.stepStatus)) {
+      this.stepStatus.set(stepName, {
+        status: status.status,
+        ...(status.error !== undefined ? { error: rehydrateCheckpointError(status.error) } : {}),
+      });
+    }
+    // Reconcile the imported progress against this executor's (possibly
+    // edited) flow before anything below treats a status entry as current.
+    this.reconcileImportedSteps(isolated.stepHashes);
+    // Defensive: a result without a status entry counts as a success, mirroring
+    // the completed-step detection in runFromIndex().
+    for (const stepName of this.stepResults.keys()) {
+      if (!this.stepStatus.has(stepName)) {
+        this.stepStatus.set(stepName, { status: 'success' });
+      }
+    }
+    this.lastFailedStepName = isolated.lastFailedStepName;
+    // Self-heal a semantic inconsistency that only hand-built checkpoints can
+    // have: lastFailedStepName must name a step whose status is 'failed'.
+    // Otherwise retry() would re-run (and clear downstream of) a step that
+    // actually succeeded.
+    if (
+      this.lastFailedStepName !== null &&
+      this.stepStatus.get(this.lastFailedStepName)?.status !== 'failed'
+    ) {
+      this.lastFailedStepName = null;
+    }
+    // Arm the next execute() to resume from this state instead of clearing it.
+    this.pendingImportedState = true;
+    this.rebuildExecutionContext();
+    this.rebuildStepExecutors();
+  }
+
+  /**
+   * Reconcile imported step progress against this executor's flow, which may
+   * have been edited since the checkpoint was exported. Recorded results for
+   * steps whose definition changed (or that no longer exist) are discarded
+   * so those steps re-run, along with their transitive dependents — the rest
+   * of the recorded progress is kept untouched.
+   *
+   * @param checkpointHashes per-step digests recorded in the checkpoint.
+   */
+  private reconcileImportedSteps(checkpointHashes: Record<string, string>): void {
+    const currentHashes = new Map<string, string>();
+    for (const step of this.flow.steps) {
+      currentHashes.set(step.name, hashStep(step));
+    }
+
+    // Direct dependents per step, from the current flow's dependency graph.
+    const dependentsByStep = new Map<string, Set<string>>();
+    for (const node of this.dependencyResolver.getDependencyGraph().nodes) {
+      dependentsByStep.set(node.name, new Set(node.dependents));
+    }
+    const transitiveDependents = (root: string): Set<string> => {
+      const seen = new Set<string>();
+      const queue = [...(dependentsByStep.get(root) ?? [])];
+      while (queue.length > 0) {
+        const name = queue.shift() as string;
+        if (seen.has(name)) {
+          continue;
+        }
+        seen.add(name);
+        queue.push(...(dependentsByStep.get(name) ?? []));
+      }
+      return seen;
+    };
+
+    const invalidated = new Set<string>();
+    const drop = (stepName: string): void => {
+      if (invalidated.has(stepName)) {
+        return;
+      }
+      invalidated.add(stepName);
+      this.stepResults.delete(stepName);
+      this.stepStatus.delete(stepName);
+    };
+
+    const removed: string[] = [];
+    const changed: string[] = [];
+    for (const [stepName, recordedHash] of Object.entries(checkpointHashes)) {
+      const currentHash = currentHashes.get(stepName);
+      if (currentHash === undefined) {
+        removed.push(stepName);
+        drop(stepName);
+      } else if (currentHash !== recordedHash) {
+        changed.push(stepName);
+        drop(stepName);
+        for (const dependent of transitiveDependents(stepName)) {
+          drop(dependent);
+        }
+      }
+    }
+
+    if (removed.length > 0) {
+      this.logger.warn(
+        `Checkpoint reconciliation: dropped recorded progress for removed step(s) ` +
+          `${removed.join(', ')}; they will not be skipped on resume.`,
+      );
+    }
+    if (changed.length > 0) {
+      const rerun = [...invalidated].filter((name) => !removed.includes(name));
+      this.logger.info(
+        `Checkpoint reconciliation: step definition(s) changed for ${changed.join(', ')}; ` +
+          `discarded their recorded progress so they re-run, along with dependent step(s) ` +
+          `${rerun.filter((name) => !changed.includes(name)).join(', ') || '(none)'}.`,
+      );
+    }
   }
 
   /**
@@ -906,17 +1146,52 @@ export class FlowExecutor {
   }
 
   /**
-   * Execute the flow and return all step results
+   * Execute the flow and return all step results.
+   *
+   * Normally this starts a fresh run, clearing prior results and status.
+   * After {@link importState}, the next `execute()` instead resumes from the
+   * imported checkpoint: completed steps are skipped and the failed step (if
+   * any) is re-run. The resume behavior applies to exactly one `execute()`
+   * call; subsequent calls go back to fresh-run semantics. Resuming logs an
+   * info line naming the skipped steps and the failed step being re-run.
    */
   async execute(options?: { signal?: AbortSignal }): Promise<Map<string, any>> {
     const priorAbortReason = this.globalAbortController?.signal.aborted
       ? this.globalAbortController.signal.reason
       : null;
-    this.initializeRunState({ clearResults: true, clearStatus: true });
+    // importState() arms the flag; initializeRunState() consumes it.
+    const resumeImported = this.pendingImportedState;
+    this.initializeRunState({ clearResults: !resumeImported, clearStatus: !resumeImported });
+    if (resumeImported) {
+      this.logCheckpointResume();
+    }
     if (priorAbortReason !== null && priorAbortReason !== undefined) {
       this.globalAbortController.abort(priorAbortReason);
     }
     return this.runFromIndex(0, options);
+  }
+
+  /**
+   * Log what a checkpoint resume will do: which recorded-completed steps are
+   * skipped and which failed step (if any) is re-run. One line, so a resumed
+   * run is auditable without per-step noise.
+   */
+  private logCheckpointResume(): void {
+    const skippedSteps: string[] = [];
+    for (const step of this.flow.steps) {
+      const completed =
+        this.stepStatus.get(step.name)?.status === 'success' || this.stepResults.has(step.name);
+      if (completed) {
+        skippedSteps.push(step.name);
+      }
+    }
+    const skippedSummary = skippedSteps.length > 0 ? skippedSteps.join(', ') : '(none)';
+    const failedSummary = this.lastFailedStepName
+      ? `re-running failed step '${this.lastFailedStepName}'`
+      : 'no failed step recorded';
+    this.logger.info(
+      `Resuming from checkpoint: skipping completed step(s): ${skippedSummary}; ${failedSummary}.`,
+    );
   }
 
   /**
@@ -1067,4 +1342,19 @@ export class FlowExecutor {
   private generateCorrelationId(stepName: string): string {
     return `${this.correlationPrefix}-${stepName}-${Math.random().toString(36).slice(2, 8)}`;
   }
+}
+
+/**
+ * Rehydrate a checkpoint's plain-data error back into an `Error` instance so
+ * the executor's internal `stepStatus` map keeps its `error?: Error` type
+ * invariant. The original error class is not preserved — only the message
+ * and stack survive the JSON round trip — which is fine: the step re-runs on
+ * resume and the recorded error is informational.
+ */
+function rehydrateCheckpointError(stored: { message: string; stack?: string }): Error {
+  const error = new Error(stored.message);
+  if (stored.stack !== undefined) {
+    error.stack = stored.stack;
+  }
+  return error;
 }

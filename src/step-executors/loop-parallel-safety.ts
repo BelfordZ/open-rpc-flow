@@ -19,8 +19,10 @@ export interface ParallelSafetyDecision {
  * the loop body — nested steps of any kind plus the loop's own `condition`
  * expression — contains:
  *
- * 1. A `stop` step. Stopping aborts the whole flow through the shared
- *    AbortController, so its effect depends on iteration timing.
+ * 1. A `stop` step. Stopping reaches beyond the current step — a bare stop
+ *    terminates the rest of the iteration's body, and `endWorkflow: true`
+ *    aborts the whole flow through the shared AbortController — so its
+ *    effect depends on iteration timing.
  * 2. A reference rooted at the loop step's own name (e.g.
  *    `${processItems.result.value[0]}`): a self-dependency / fold pattern,
  *    since the loop's result only exists once the loop completes. (The loop
@@ -41,7 +43,7 @@ export function canRunLoopInParallel(loopStep: LoopStep): ParallelSafetyDecision
     if ('stop' in step) {
       return {
         parallel: false,
-        reason: `loop body contains a stop step ('${step.name}'), which aborts the whole flow`,
+        reason: `loop body contains a stop step ('${step.name}'), whose control-flow effect depends on iteration timing`,
       };
     }
     collectReferencePaths(step, references);

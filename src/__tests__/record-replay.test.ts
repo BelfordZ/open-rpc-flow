@@ -732,6 +732,42 @@ describe('overrideSequence (failure injection)', () => {
   });
 });
 
+describe('createReplayHandler overrides shape validation', () => {
+  it('throws a helpful error when overrides is a bare overrideSequence(...)', () => {
+    expect(() =>
+      createReplayHandler(makeTrace(), { overrides: overrideSequence('a', 'b') as never }),
+    ).toThrow(
+      /`overrides` must be a path-keyed record like { getPrice: overrideSequence\(50\) } — did you pass overrideSequence\(\.\.\.\) directly\?/,
+    );
+  });
+
+  it('throws a ReplayError for a bare overrideSequence(...)', () => {
+    let thrown: unknown;
+    try {
+      createReplayHandler(makeTrace(), { overrides: overrideSequence('a') as never });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(ReplayError);
+  });
+
+  it('still accepts path-keyed plain-value overrides', async () => {
+    const replay = createReplayHandler(makeTrace(), { overrides: { getUser: { name: 'zed' } } });
+    await expect(
+      replay(makeRequest('getUser', { id: 1 }), { stepPath: 'getUser' }),
+    ).resolves.toEqual({ name: 'zed' });
+  });
+
+  it('still accepts path-keyed sequence overrides', async () => {
+    const replay = createReplayHandler(makeTrace(), {
+      overrides: { getUser: overrideSequence({ name: 'one' }, { name: 'two' }) },
+    });
+    await expect(
+      replay(makeRequest('getUser', { id: 1 }), { stepPath: 'getUser' }),
+    ).resolves.toEqual({ name: 'one' });
+  });
+});
+
 describe('getReplayReport', () => {
   it('reports consumed counts and unconsumed entries', async () => {
     const replay = createReplayHandler(makeTrace());

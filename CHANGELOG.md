@@ -5,6 +5,15 @@
 
 * update readme ([#59](https://github.com/BelfordZ/open-rpc-flow/issues/59)) ([7f5d691](https://github.com/BelfordZ/open-rpc-flow/commit/7f5d6915880bb02c6bbe6e93f6f98abc95cc5c39))
 
+## [1.8.0](https://github.com/BelfordZ/open-rpc-flow/compare/v1.7.1...v1.8.0) (2026-09-24)
+
+
+### Features
+
+* add switch statement support to condition steps ([#176](https://github.com/BelfordZ/open-rpc-flow/issues/176)) ([928580c](https://github.com/BelfordZ/open-rpc-flow/commit/928580cc596b5fed21f863598e62ad9d37a9d573))
+* cache dependency graph in DependencyResolver ([#174](https://github.com/BelfordZ/open-rpc-flow/issues/174)) ([0e868e4](https://github.com/BelfordZ/open-rpc-flow/commit/0e868e4de2921765ef14d2cf2653a85da2ad5c6f))
+* execute independent loop iterations in parallel ([#178](https://github.com/BelfordZ/open-rpc-flow/issues/178)) ([2576e86](https://github.com/BelfordZ/open-rpc-flow/commit/2576e865bc76be8264e735a0f5b503cb37ab2afe))
+
 ## [1.7.1](https://github.com/BelfordZ/open-rpc-flow/compare/v1.7.0...v1.7.1) (2026-09-19)
 
 

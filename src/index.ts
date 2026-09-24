@@ -84,6 +84,7 @@ export {
   DependencyResolvedEvent,
   FlowEventOptions,
 } from './util/flow-executor-events';
+export { NoLogger, noLogger } from './util/no-logger';
 
 // Export error handling related types
 export {
@@ -117,3 +118,6 @@ export {
 
 import metaSchemaContent from '../meta-schema.json';
 export const metaSchema = metaSchemaContent;
+
+// Logger utilities: pass a `logger` option to FlowExecutor to control output.
+export { ConsoleLogger, Logger, LogLevel } from './util/logger';

@@ -11,10 +11,25 @@ export interface Logger {
   createNested(prefix: string): Logger;
 }
 
+/**
+ * Log severity levels, ordered from most to least verbose.
+ * A `ConsoleLogger` emits a message only when the message's level is at or
+ * above its configured level.
+ */
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+const LOG_LEVEL_SEVERITY: Record<LogLevel, number> = {
+  debug: 0,
+  info: 1,
+  warn: 2,
+  error: 3,
+};
+
 export class ConsoleLogger implements Logger {
   constructor(
     private prefix?: string,
     private _console: Console = console,
+    private level: LogLevel = 'warn',
   ) {}
 
   info(message: string, data?: unknown) {
@@ -33,7 +48,24 @@ export class ConsoleLogger implements Logger {
     this.log('debug', message, data);
   }
 
-  private log(level: 'info' | 'error' | 'warn' | 'debug', message: string, data?: unknown) {
+  /**
+   * The minimum level this logger emits. Messages below it are dropped.
+   */
+  getLevel(): LogLevel {
+    return this.level;
+  }
+
+  /**
+   * Raise or lower the level at runtime, e.g. to opt back into debug output.
+   */
+  setLevel(level: LogLevel): void {
+    this.level = level;
+  }
+
+  private log(level: LogLevel, message: string, data?: unknown) {
+    if (LOG_LEVEL_SEVERITY[level] < LOG_LEVEL_SEVERITY[this.level]) {
+      return;
+    }
     const formattedMessage = this.prefix ? `[${this.prefix}] ${message}` : message;
     if (data !== undefined) {
       this._console[level](formattedMessage, data);
@@ -44,7 +76,7 @@ export class ConsoleLogger implements Logger {
 
   createNested(prefix: string): ConsoleLogger {
     const combinedPrefix = this.prefix ? `${this.prefix}:${prefix}` : prefix;
-    return new ConsoleLogger(combinedPrefix, this._console);
+    return new ConsoleLogger(combinedPrefix, this._console, this.level);
   }
 }
 

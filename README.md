@@ -77,6 +77,23 @@ const apiAggregationFlow: Flow = {
 
 ### 4. Stop Flow Execution
 
+A `stop` step halts execution. There are two forms:
+
+- `stop: { endWorkflow: true }` — aborts the entire workflow immediately.
+  `flow:aborted` is emitted and the steps that never run are reported as
+  skipped.
+- `stop: {}` (or `endWorkflow: false`) — terminates only the current branch
+  and lets the flow continue gracefully:
+  - inside a `switch` case: the rest of that case is skipped; execution
+    continues after the switch step;
+  - inside a `loop.steps` body: the rest of the current iteration is
+    skipped; the loop continues with the next iteration;
+  - at the top level: the remaining steps are skipped and the flow completes
+    normally — it is _not_ aborted.
+
+The stop step itself is reported as complete (`step:complete`); every step
+that never runs because of the stop is reported as skipped (`step:skip`).
+
 Demonstrates halting a flow when a condition is met. See the full example here:
 
 [**src/examples/06-stop-flow.json**](src/examples/06-stop-flow.json)
@@ -494,6 +511,9 @@ await new FlowExecutor(flow, replay).execute();
 - **Stale steps are detectable.** `validateTraceForFlow(trace, stepHashes)`
   throws a `ReplayError` naming any recorded step whose definition changed
   since recording, using the same per-step digests as durable checkpoints.
+  Pass the digests via `getTrace(flowName, stepHashes)` when recording —
+  validating a trace recorded without them throws, since there is nothing to
+  compare against.
 
 #### Contract-Driven Dry Runs
 
@@ -728,6 +748,47 @@ executor.updateEventOptions({
   includeResults: false,
 });
 ```
+
+### Logging
+
+`FlowExecutor` accepts a `logger` option implementing the `Logger` interface (`info`, `error`, `warn`, `debug`, `createNested`). If omitted, the executor uses a `ConsoleLogger` at the `warn` level, so normal runs are quiet and only warnings and errors reach the console.
+
+```typescript
+import { FlowExecutor, ConsoleLogger } from 'open-rpc-flow';
+
+// Default: warn level, quiet on success
+const executor = new FlowExecutor(flow, jsonRpcHandler);
+
+// Opt back into full debug output
+const noisy = new FlowExecutor(flow, jsonRpcHandler, {
+  logger: new ConsoleLogger('FlowExecutor', console, 'debug'),
+});
+```
+
+Log levels are `debug < info < warn < error`: a logger emits a message only when the message's level is at or above the configured level. Nested loggers created via `createNested` inherit the parent's level, and `setLevel` changes it at runtime:
+
+```typescript
+const logger = new ConsoleLogger('MyApp');
+logger.setLevel('error'); // silence everything below error
+```
+
+To plug in your own logger, implement the `Logger` interface:
+
+```typescript
+import { FlowExecutor, Logger } from 'open-rpc-flow';
+
+const quietLogger: Logger = {
+  info: () => {},
+  error: (...args) => console.error(...args),
+  warn: (...args) => console.warn(...args),
+  debug: () => {},
+  createNested: () => quietLogger,
+};
+
+const executor = new FlowExecutor(flow, jsonRpcHandler, { logger: quietLogger });
+```
+
+The package also ships a ready-made silent logger, `noLogger` (exported from the package index once #187 merges).
 
 ## Type Safety
 

@@ -28,6 +28,7 @@ import { randomUUID } from 'crypto';
 import { RetryPolicy } from './errors/recovery';
 import { ErrorCode } from './errors/codes';
 import { TimeoutError } from './errors/timeout-error';
+import { StopBranch } from './errors/stop-branch';
 import {
   ExecutionError,
   FlowError,
@@ -65,7 +66,12 @@ export const DEFAULT_RETRY_POLICY: RetryPolicy = {
  * Options for the FlowExecutor
  */
 export interface FlowExecutorOptions {
-  /** Logger instance to use */
+  /**
+   * Logger instance to use. Defaults to a `ConsoleLogger` at the `warn`
+   * level, so normal runs only emit warnings and errors. Pass
+   * `new ConsoleLogger('FlowExecutor', console, 'debug')` to opt back into
+   * full output, or a `Logger` of your own to redirect it entirely.
+   */
   logger?: Logger;
   /** Event emitter options */
   eventOptions?: Partial<FlowEventOptions>;
@@ -291,8 +297,14 @@ export class FlowExecutor {
         this.logger,
         (step, iteration, totalIterations) =>
           this.events.emitStepProgress(step, iteration, totalIterations),
+        (step, reason) => this.emitNestedStepSkip(step, reason),
       ),
-      new ConditionStepExecutor(this.executeStep.bind(this), this.logger, this.policyResolver),
+      new ConditionStepExecutor(
+        this.executeStep.bind(this),
+        this.logger,
+        this.policyResolver,
+        (step, reason) => this.emitNestedStepSkip(step, reason),
+      ),
       new TransformStepExecutor(
         this.expressionEvaluator,
         this.referenceResolver,
@@ -905,6 +917,39 @@ export class FlowExecutor {
               this.events.emitStepAborted(step, 'reset');
               return;
             }
+            if (error instanceof StopBranch) {
+              // A bare `stop: {}` terminated its branch: graceful early exit,
+              // not an abort and not a failure (issue #188). The stop step
+              // itself completed (step:complete); every step that will never
+              // run is reported as skipped (step:skip). The flow then
+              // completes normally — deliberately no flow:aborted, unlike
+              // `endWorkflow: true`.
+              const branchStopReason = `Branch terminated by stop step "${error.stepName}"`;
+              if (error.stepName === step.name) {
+                this.stepResults.set(step.name, error.result);
+                this.stepStatus.set(step.name, { status: 'success' });
+                completed.add(step.name);
+                this.events.emitStepComplete(step, error.result, stepStartTime, correlationId);
+              } else {
+                // A nested stop terminated a branch inside this step, so the
+                // step itself produced no result.
+                markSkipped(step.name, branchStopReason);
+              }
+              stopScheduling = true;
+              stopReason = branchStopReason;
+              for (const stepName of orderedStepNames) {
+                if (
+                  completed.has(stepName) ||
+                  failed.has(stepName) ||
+                  skipped.has(stepName) ||
+                  inFlight.has(stepName)
+                ) {
+                  continue;
+                }
+                markSkipped(stepName, branchStopReason);
+              }
+              return;
+            }
             const reason = this.globalAbortController.signal.reason;
             const isPause = this.isPaused || reason === 'paused';
             if (this.globalAbortController.signal.aborted && isPause) {
@@ -1263,6 +1308,19 @@ export class FlowExecutor {
 
       return result;
     } catch (error: any) {
+      if (error instanceof StopBranch) {
+        // Internal control-flow signal, not a failure: a bare stop step ran
+        // and terminated its branch (issue #188). The stop step itself is
+        // reported as complete here when it ran nested — the top-level run
+        // loop reports top-level stop steps — and the signal propagates
+        // untouched to the enclosing branch boundary. It is never wrapped
+        // in an ExecutionError and never retried.
+        if (isNested && error.stepName === step.name) {
+          this.events.emitStepComplete(step, error.result, stepStartTime, correlationId);
+        }
+        throw error;
+      }
+
       const errorMessage = error.message || String(error);
       this.logger.error(`Step execution failed: ${step.name}`, { error: errorMessage });
 
@@ -1329,6 +1387,18 @@ export class FlowExecutor {
       }
     }
     return undefined;
+  }
+
+  /**
+   * Emit step:skip for a nested step that will never run because a bare
+   * stop step terminated its branch (issue #188). Wired into the loop and
+   * condition executors, which report the remaining steps of a terminated
+   * branch through this callback.
+   */
+  private emitNestedStepSkip(step: Step, reason: string): void {
+    const correlationId = this.generateCorrelationId(step.name);
+    this.stepCorrelationIds.set(step.name, correlationId);
+    this.events.emitStepSkip(step, reason, correlationId);
   }
 
   /**

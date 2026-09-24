@@ -5,6 +5,13 @@
 
 * update readme ([#59](https://github.com/BelfordZ/open-rpc-flow/issues/59)) ([7f5d691](https://github.com/BelfordZ/open-rpc-flow/commit/7f5d6915880bb02c6bbe6e93f6f98abc95cc5c39))
 
+## [1.11.0](https://github.com/BelfordZ/open-rpc-flow/compare/v1.10.0...v1.11.0) (2026-09-24)
+
+
+### Features
+
+* add MockJsonRpcHandler for contract-driven dry runs ([#173](https://github.com/BelfordZ/open-rpc-flow/issues/173)) ([358c6d6](https://github.com/BelfordZ/open-rpc-flow/commit/358c6d6809e5ec6c58ce7d8a3f7956a7b6c45ca7))
+
 ## [1.10.0](https://github.com/BelfordZ/open-rpc-flow/compare/v1.9.0...v1.10.0) (2026-09-24)
 
 

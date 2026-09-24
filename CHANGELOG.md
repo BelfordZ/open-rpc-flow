@@ -5,6 +5,13 @@
 
 * update readme ([#59](https://github.com/BelfordZ/open-rpc-flow/issues/59)) ([7f5d691](https://github.com/BelfordZ/open-rpc-flow/commit/7f5d6915880bb02c6bbe6e93f6f98abc95cc5c39))
 
+## [1.10.0](https://github.com/BelfordZ/open-rpc-flow/compare/v1.9.0...v1.10.0) (2026-09-24)
+
+
+### Features
+
+* add record & replay with what-if overrides and contract drift detection ([#177](https://github.com/BelfordZ/open-rpc-flow/issues/177)) ([16dee03](https://github.com/BelfordZ/open-rpc-flow/commit/16dee034dfcd7de82a6cb7ef3deab5adc2001829))
+
 ## [1.9.0](https://github.com/BelfordZ/open-rpc-flow/compare/v1.8.0...v1.9.0) (2026-09-24)
 
 

@@ -468,6 +468,19 @@ await new FlowExecutor(flow, replay).execute();
   calls, since substituted results can legitimately alter downstream
   requests; without overrides, calls must match recorded params exactly.
 
+- **Overrides must be path-keyed.** `overrides: { fetchUser: 50 }` and
+  `overrides: { fetchUser: overrideSequence(50, 60) }` work; passing
+  `overrideSequence(50, 60)` itself as the whole `overrides` argument throws
+  a `ReplayError` at creation time, because a bare sequence would otherwise
+  silently match no path and the what-if would appear to do nothing.
+
+- **Trace shapes differ between sources.** `createRecordingHandler(...).getTrace()`
+  returns a `RecordedTrace` envelope (`{ flowName, recordedAt, steps, stepHashes? }`),
+  while the contract-driven dry run's `MockJsonRpcHandler.getTrace()` returns a bare
+  `MockedCall[]`. Only a `RecordedTrace` feeds `createReplayHandler`; a mock trace
+  lifts into one by adding `flowName` and `recordedAt` and wrapping the calls as `steps`
+  (see the `RecordedCall` type: a `MockedCall` plus `path`, `step`, `durationMs`, and `timestamp`).
+
 - **Divergence is explicit.** More replay calls than recorded, a brand-new
   execution path (e.g. an iteration that never ran during recording), a
   method mismatch, or an exhausted response script all throw `ReplayError` —

@@ -149,6 +149,15 @@ export function createReplayHandler(trace: RecordedTrace, opts: ReplayOptions = 
   }
 
   const overrides = opts.overrides ?? {};
+  // The sharp edge: `overrideSequence(...)` is a *value* for one path, not
+  // the top-level `overrides` argument. A bare sequence would silently match
+  // no path (its keys are numeric), so fail loudly with a hint instead.
+  if (overrides instanceof ReplaySequence) {
+    throw new ReplayError(
+      '`overrides` must be a path-keyed record like { getPrice: overrideSequence(50) } ' +
+        '— did you pass overrideSequence(...) directly?',
+    );
+  }
   const hasOverrides = Object.keys(overrides).length > 0;
   // Remaining per-path sequence overrides; sequences are spent in order and
   // never fall back to recorded entries once exhausted (explicit scripts

@@ -13,7 +13,7 @@
  * pairs) only match by-name requests, and by-position examples only match
  * by-position requests. No cross-shape matching is attempted.
  */
-import type { JsonRpcRequest } from '../types';
+import type { JsonRpcHandlerOptions, JsonRpcRequest } from '../types';
 import type { OpenRpcDocument, OpenRpcMethodDescriptor } from '../flow-doctor';
 import { generateFromSchema } from './generate';
 import { mulberry32 } from './prng';
@@ -172,12 +172,19 @@ export class MockJsonRpcHandler {
     }
     const trace: MockedCall[] = [];
 
-    const handle = async (request: JsonRpcRequest): Promise<unknown> => {
+    const handle = async (
+      request: JsonRpcRequest,
+      options?: JsonRpcHandlerOptions,
+    ): Promise<unknown> => {
       const method = methods.get(request.method);
       // Unknown methods mock as null rather than throwing: a dry run never
       // crashes, and Flow Doctor (#151) flags unknown methods statically.
       const result = method ? mockResult(method, request.params, rand) : null;
-      trace.push({ method: request.method, params: request.params, result });
+      // Attribution for the trace: when the executor tags the call with its
+      // execution path (JsonRpcHandlerOptions.stepPath, #177), record it so
+      // dry-run traces carry the same path tagging as recorded traces.
+      const path = options?.stepPath ?? request.method;
+      trace.push({ path, method: request.method, params: request.params, result });
       return result;
     };
 

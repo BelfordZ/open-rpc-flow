@@ -17,9 +17,17 @@ export interface MockJsonRpcHandlerOptions {
 /**
  * A single mocked JSON-RPC call, as recorded in the dry-run trace.
  * Deliberately minimal and JSON-serializable: issue #153 (record/replay)
- * reuses this shape.
+ * reuses this shape, lifting it into a `RecordedCall` by adding `step`,
+ * `durationMs`, and `timestamp` (the `step` name derives from `path`).
  */
 export interface MockedCall {
+  /**
+   * Execution path of the step that made this call, e.g. `'fetchUsers'` or
+   * `'processUsers[2].fetchUser'`. Taken from
+   * `JsonRpcHandlerOptions.stepPath` when the executor supplies it (#177);
+   * falls back to the method name for direct handler use.
+   */
+  path: string;
   /** The JSON-RPC method that was called. */
   method: string;
   /** The params the flow sent. */

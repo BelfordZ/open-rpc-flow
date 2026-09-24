@@ -508,21 +508,40 @@ describe('MockJsonRpcHandler determinism and trace', () => {
   it('records method, params, and result for every call', async () => {
     const { handler } = await call('getUser', { id: 2 });
     expect(handler.getTrace()).toEqual([
-      { method: 'getUser', params: { id: 2 }, result: { id: 2, name: 'Grace' } },
+      { path: 'getUser', method: 'getUser', params: { id: 2 }, result: { id: 2, name: 'Grace' } },
     ]);
+  });
+
+  it('records the executor-supplied stepPath as the trace path', async () => {
+    const handler = MockJsonRpcHandler.fromOpenRpc(testDocument, { seed: 1 });
+    await handler(
+      { jsonrpc: '2.0', method: 'getUser', params: { id: 1 }, id: 1 },
+      {
+        stepPath: 'processUsers[2].fetchUser',
+      },
+    );
+    expect(handler.getTrace()[0].path).toBe('processUsers[2].fetchUser');
+  });
+
+  it('falls back to the method name when no stepPath is supplied', async () => {
+    const handler = MockJsonRpcHandler.fromOpenRpc(testDocument, { seed: 1 });
+    await handler({ jsonrpc: '2.0', method: 'getUser', params: { id: 1 }, id: 1 });
+    expect(handler.getTrace()[0].path).toBe('getUser');
   });
 
   it('returns a copy from getTrace', async () => {
     const { handler } = await call('getUser', { id: 1 });
     const trace = handler.getTrace();
-    trace.push({ method: 'x', params: {}, result: null });
+    trace.push({ path: 'x', method: 'x', params: {}, result: null });
     expect(handler.getTrace()).toHaveLength(1);
   });
 
   it('mocks unknown methods as null instead of throwing', async () => {
     const { handler, result } = await call('nope', { a: 1 });
     expect(result).toBeNull();
-    expect(handler.getTrace()).toEqual([{ method: 'nope', params: { a: 1 }, result: null }]);
+    expect(handler.getTrace()).toEqual([
+      { path: 'nope', method: 'nope', params: { a: 1 }, result: null },
+    ]);
   });
 
   it('tolerates a document without a methods array', async () => {
@@ -573,10 +592,12 @@ describe('MockJsonRpcHandler with FlowExecutor', () => {
     const trace = handler.getTrace();
     expect(trace).toHaveLength(2);
     expect(trace[0]).toEqual({
+      path: 'fetchUser',
       method: 'getUser',
       params: { id: 1 },
       result: { id: 1, name: 'Ada' },
     });
+    expect(trace[1].path).toBe('countThings');
     expect(trace[1].method).toBe('getCount');
     expect(trace[1].params).toEqual({ owner: 'Ada' });
   });

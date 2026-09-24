@@ -481,6 +481,9 @@ await new FlowExecutor(flow, replay).execute();
 - **Stale steps are detectable.** `validateTraceForFlow(trace, stepHashes)`
   throws a `ReplayError` naming any recorded step whose definition changed
   since recording, using the same per-step digests as durable checkpoints.
+  Pass the digests via `getTrace(flowName, stepHashes)` when recording —
+  validating a trace recorded without them throws, since there is nothing to
+  compare against.
 
 #### Contract-Driven Dry Runs
 

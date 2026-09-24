@@ -15,11 +15,14 @@ import { ReplayError } from './types';
 /**
  * Validate a recorded trace against current step-definition digests.
  *
- * Throws {@link ReplayError} naming the stale steps when a step recorded in
- * the trace has a different digest now — replaying it would serve calls the
- * flow no longer makes, so re-record instead. Steps absent from the current
- * map (removed steps) are ignored: their recorded groups simply go
- * unconsumed, which `getReplayReport()` surfaces.
+ * Throws {@link ReplayError} when the trace was recorded without step hashes
+ * (`getTrace(flowName)` without the optional `stepHashes` argument): there is
+ * nothing to compare against, so a silent pass would claim validation that
+ * never happened. Throws {@link ReplayError} naming the stale steps when a
+ * step recorded in the trace has a different digest now — replaying it would
+ * serve calls the flow no longer makes, so re-record instead. Steps absent
+ * from the current map (removed steps) are ignored: their recorded groups
+ * simply go unconsumed, which `getReplayReport()` surfaces.
  */
 export function validateTraceForFlow(
   trace: RecordedTrace,
@@ -27,7 +30,11 @@ export function validateTraceForFlow(
 ): void {
   const recorded = trace?.stepHashes;
   if (!recorded) {
-    return;
+    throw new ReplayError(
+      'Cannot validate a trace recorded without step hashes: there is nothing to ' +
+        'compare the current flow against. Record hashes with getTrace(flowName, stepHashes) ' +
+        'to enable stale-trace detection.',
+    );
   }
   const stale: string[] = [];
   for (const [name, digest] of Object.entries(recorded)) {

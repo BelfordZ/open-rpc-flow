@@ -21,7 +21,7 @@
     "lint:fix": "eslint . --ext .ts --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "posttest": "jest-it-up"
+    "coverage:bump": "jest-it-up"
   },
   "keywords": [
     "json-rpc",

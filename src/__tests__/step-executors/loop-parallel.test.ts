@@ -653,3 +653,277 @@ describe('canRunLoopInParallel', () => {
     expect(canRunLoopInParallel(step).parallel).toBe(true);
   });
 });
+
+describe('LoopStepExecutor nested and composed loops', () => {
+  let context: StepExecutionContext;
+  let stepResults: Map<string, any>;
+  let testLogger: TestLogger;
+
+  const groups = [
+    { id: 'g1', members: [{ id: 'm1' }, { id: 'm2' }] },
+    { id: 'g2', members: [{ id: 'm3' }, { id: 'm4' }] },
+  ];
+
+  beforeEach(() => {
+    testLogger = new TestLogger('LoopStepExecutor');
+    stepResults = new Map();
+    const referenceResolver = new ReferenceResolver(stepResults, {}, testLogger);
+    const expressionEvaluator = new SafeExpressionEvaluator(testLogger, referenceResolver);
+    context = {
+      referenceResolver,
+      expressionEvaluator,
+      stepResults,
+      context: {},
+      logger: noLogger,
+    };
+    stepResults.set('groups', groups);
+  });
+
+  afterEach(() => {
+    testLogger.clear();
+  });
+
+  function makeMemberLoop(body: Step): Step {
+    return {
+      name: 'processMembers',
+      loop: { over: '${group.members}', as: 'member', step: body },
+    };
+  }
+
+  /**
+   * Builds an outer LoopStepExecutor whose loop-typed body steps are executed
+   * for real by an inner LoopStepExecutor, so nesting behavior is exercised
+   * end to end instead of mocked away.
+   */
+  function makeNestingExecutor(
+    innerBody: (step: Step, ctx: ExecutionContextData) => Promise<StepExecutionResult>,
+    otherBody?: (step: Step, ctx: ExecutionContextData) => Promise<StepExecutionResult>,
+  ): { executor: LoopStepExecutor; innerExecuteStep: jest.Mock } {
+    const innerExecuteStep: jest.Mock = jest.fn(innerBody);
+    const innerExecutor = new LoopStepExecutor(innerExecuteStep, testLogger);
+    const outerExecuteStep: jest.Mock = jest.fn(
+      async (step: Step, ctx: ExecutionContextData, signal?: AbortSignal) => {
+        if ('loop' in step) {
+          return innerExecutor.execute(step, context, ctx, signal);
+        }
+        if (otherBody) {
+          return otherBody(step, ctx);
+        }
+        throw new Error(`unexpected step ${(step as { name?: string }).name}`);
+      },
+    );
+    return { executor: new LoopStepExecutor(outerExecuteStep, testLogger), innerExecuteStep };
+  }
+
+  function resultIds(results: StepExecutionResult[]): unknown[] {
+    return results.map((r) => (r.result as { id: unknown }).id);
+  }
+
+  async function waitForCalls(mock: jest.Mock, count: number): Promise<void> {
+    for (let i = 0; i < 50 && mock.mock.calls.length < count; i++) {
+      await flush();
+    }
+  }
+
+  it('runs inner loops concurrently inside a parallel outer loop', async () => {
+    const gates: Array<() => void> = [];
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const { executor, innerExecuteStep } = makeNestingExecutor(async (_step, ctx) => {
+      const member = (ctx.member as { id: string }).id;
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise<void>((resolve) => {
+        gates.push(resolve);
+      });
+      inFlight--;
+      return { type: StepType.Request, result: { id: member } };
+    });
+
+    const outer: LoopStep = {
+      name: 'processGroups',
+      loop: {
+        over: '${groups}',
+        as: 'group',
+        step: makeMemberLoop(makeRequestBody({ id: '${member.id}' })),
+      },
+    };
+    const promise = executor.execute(outer, context);
+    await waitForCalls(innerExecuteStep, 4);
+
+    // 2 groups x 2 members: every inner iteration in flight at once.
+    expect(innerExecuteStep).toHaveBeenCalledTimes(4);
+    expect(maxInFlight).toBe(4);
+
+    gates.forEach((release) => release());
+    const result = await promise;
+
+    expect(result.metadata?.parallel).toBe(true);
+    const innerLoops = result.result.value as StepExecutionResult[];
+    expect(innerLoops).toHaveLength(2);
+    for (const inner of innerLoops) {
+      expect(inner.metadata?.parallel).toBe(true);
+    }
+    expect(resultIds(innerLoops[0].result.value as StepExecutionResult[])).toEqual(['m1', 'm2']);
+    expect(resultIds(innerLoops[1].result.value as StepExecutionResult[])).toEqual(['m3', 'm4']);
+  });
+
+  it('keeps a vetoed inner loop sequential inside a parallel outer loop', async () => {
+    const trackers = new Map<string, { inFlight: number; max: number }>();
+    const { executor } = makeNestingExecutor(async (_step, ctx) => {
+      const groupId = (ctx.group as { id: string }).id;
+      const member = (ctx.member as { id: string }).id;
+      let tracker = trackers.get(groupId);
+      if (!tracker) {
+        tracker = { inFlight: 0, max: 0 };
+        trackers.set(groupId, tracker);
+      }
+      tracker.inFlight++;
+      tracker.max = Math.max(tracker.max, tracker.inFlight);
+      await flush();
+      tracker.inFlight--;
+      return { type: StepType.Request, result: { id: member } };
+    });
+
+    // The inner loop folds over its own result, so it is vetoed to sequential.
+    // The veto must not propagate to the outer loop.
+    const innerBody = makeRequestBody({
+      id: '${member.id}',
+      prev: '${processMembers.result.value[0]}',
+    });
+    const outer: LoopStep = {
+      name: 'processGroups',
+      loop: {
+        over: '${groups}',
+        as: 'group',
+        step: makeMemberLoop(innerBody),
+      },
+    };
+    const result = await executor.execute(outer, context);
+
+    // Outer stayed parallel...
+    expect(result.metadata?.parallel).toBe(true);
+    // ...while each inner loop ran its own iterations strictly sequentially.
+    expect(trackers.get('g1')?.max).toBe(1);
+    expect(trackers.get('g2')?.max).toBe(1);
+
+    const innerLoops = result.result.value as StepExecutionResult[];
+    expect(innerLoops).toHaveLength(2);
+    for (const inner of innerLoops) {
+      expect(inner.metadata?.parallel).toBe(false);
+    }
+    expect(resultIds(innerLoops[0].result.value as StepExecutionResult[])).toEqual(['m1', 'm2']);
+    expect(resultIds(innerLoops[1].result.value as StepExecutionResult[])).toEqual(['m3', 'm4']);
+  });
+
+  it('runs a parallel inner loop inside a vetoed sequential outer loop', async () => {
+    const gates: Array<() => void> = [];
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const { executor, innerExecuteStep } = makeNestingExecutor(
+      async (_step, ctx) => {
+        const member = (ctx.member as { id: string }).id;
+        inFlight++;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise<void>((resolve) => {
+          gates.push(resolve);
+        });
+        inFlight--;
+        return { type: StepType.Request, result: { id: member } };
+      },
+      async () => ({ type: StepType.Request, result: {} }),
+    );
+
+    // The tally step reads cross-iteration history, vetoing the outer loop.
+    // The inner loop subtree is clean, so it stays parallel.
+    const outer: LoopStep = {
+      name: 'processGroups',
+      loop: {
+        over: '${groups}',
+        as: 'group',
+        steps: [
+          makeMemberLoop(makeRequestBody({ id: '${member.id}' })),
+          {
+            name: 'tally',
+            request: { method: 'noop', params: { n: '${metadata.iteration.length}' } },
+          } as Step,
+        ],
+      },
+    };
+    const promise = executor.execute(outer, context);
+    await waitForCalls(innerExecuteStep, 2);
+
+    // Outer is sequential: only the first group's inner loop has started,
+    // and its 2 members run concurrently.
+    expect(innerExecuteStep).toHaveBeenCalledTimes(2);
+    expect(maxInFlight).toBe(2);
+    gates.splice(0).forEach((release) => release());
+
+    await waitForCalls(innerExecuteStep, 4);
+    expect(innerExecuteStep).toHaveBeenCalledTimes(4);
+    // Still 2: the outer iterations never overlapped.
+    expect(maxInFlight).toBe(2);
+    gates.splice(0).forEach((release) => release());
+
+    const result = await promise;
+    expect(result.metadata?.parallel).toBe(false);
+
+    const iterations = result.result.value as StepExecutionResult[];
+    expect(iterations).toHaveLength(2);
+    const innerOf = (n: number): StepExecutionResult =>
+      (iterations[n].result.value as StepExecutionResult[])[0];
+    expect(innerOf(0).metadata?.parallel).toBe(true);
+    expect(innerOf(1).metadata?.parallel).toBe(true);
+    expect(resultIds(innerOf(0).result.value as StepExecutionResult[])).toEqual(['m1', 'm2']);
+    expect(resultIds(innerOf(1).result.value as StepExecutionResult[])).toEqual(['m3', 'm4']);
+  });
+
+  it('chains a parallel loop into a sequential loop over its results', async () => {
+    stepResults.set('items', [{ id: 1 }, { id: 2 }, { id: 3 }]);
+    const seenA: number[] = [];
+    const seenB: number[] = [];
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const executeStep: jest.Mock = jest.fn(async (_step: Step, ctx: ExecutionContextData) => {
+      const id = ((ctx.item ?? ctx.phase) as { id: number }).id;
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await flush();
+      inFlight--;
+      if (ctx.phase) {
+        seenB.push(id);
+      } else {
+        seenA.push(id);
+      }
+      return { type: StepType.Request, result: { id } };
+    });
+    const executor = new LoopStepExecutor(executeStep, testLogger);
+
+    const loopA = makeItemLoop('phase1', makeRequestBody({ id: '${item.id}' }));
+    const resultA = await executor.execute(loopA, context);
+    expect(resultA.metadata?.parallel).toBe(true);
+    expect([...seenA].sort()).toEqual([1, 2, 3]);
+
+    stepResults.set(
+      'phase1out',
+      (resultA.result.value as StepExecutionResult[]).map((r) => r.result),
+    );
+
+    inFlight = 0;
+    maxInFlight = 0;
+    const loopB: LoopStep = {
+      name: 'phase2',
+      loop: {
+        over: '${phase1out}',
+        as: 'phase',
+        step: makeRequestBody({ id: '${phase.id}', n: '${metadata.iteration.length}' }),
+      },
+    };
+    const resultB = await executor.execute(loopB, context);
+
+    expect(resultB.metadata?.parallel).toBe(false);
+    expect(maxInFlight).toBe(1);
+    expect(seenB).toEqual([1, 2, 3]);
+    expect(resultIds(resultB.result.value as StepExecutionResult[])).toEqual([1, 2, 3]);
+  });
+});

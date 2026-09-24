@@ -284,6 +284,20 @@ Iterate over collections with batch processing:
 }
 ```
 
+#### Parallel iterations
+
+Loop iterations run concurrently by default. The engine automatically falls
+back to sequential execution when the body depends on ordering:
+
+- reading `metadata.iteration` (the current iteration index),
+- referencing the loop's own accumulated result,
+- or containing a `stop` step.
+
+Results are always collected in iteration order, regardless of completion
+order, and each iteration gets an isolated context (`${item}`,
+`metadata.current`, etc.). Nested loops decide independently, so an inner
+loop can run sequentially inside a parallel outer loop and vice versa.
+
 ## Expression Evaluation
 
 The engine supports dynamic expressions using the `${...}` syntax:

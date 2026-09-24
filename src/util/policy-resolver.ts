@@ -85,11 +85,24 @@ export class PolicyResolver {
 
   /**
    * Helper to resolve timeout policy (returns the timeout number or a sensible default)
+   *
+   * Precedence order:
+   * 0. overrides.timeout
+   * 1. step.timeout (documented top-level per-step form)
+   * 2. step.policies.timeout.timeout
+   * 3. flow.policies.step[stepType].timeout.timeout
+   * 4. flow.policies.step.timeout.timeout
+   * 5. fallback/default
    */
   resolveTimeout(step: Step, stepType: StepType): number {
     // Resolve step timeouts without using flow-level global timeout.
     if (this.overrides && this.overrides.timeout !== undefined) {
       return (this.overrides.timeout as { timeout?: number })?.timeout ?? DEFAULT_TIMEOUTS.global;
+    }
+    // The documented top-level `timeout` field on a step takes precedence
+    // over the nested `policies.timeout.timeout` form.
+    if (step.timeout !== undefined) {
+      return step.timeout;
     }
     if (step.policies?.timeout?.timeout !== undefined) {
       return step.policies.timeout.timeout;

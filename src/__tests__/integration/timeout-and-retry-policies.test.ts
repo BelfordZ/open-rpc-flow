@@ -186,6 +186,72 @@ describe('Timeout and Retry Policies', () => {
         });
       });
 
+      it('should respect top-level step.timeout on a request step', async () => {
+        // The documented per-step form (issue #186): timeout directly on the step
+        const shortTimeout = 50;
+
+        const flow: Flow = {
+          name: 'top-level-step-timeout-test',
+          description: 'Test top-level timeout on a request step',
+          steps: [
+            {
+              name: 'slowOperation',
+              timeout: shortTimeout,
+              request: {
+                method: 'slow',
+                params: [],
+              },
+            },
+          ],
+        };
+
+        // Create mock handler that takes longer than the timeout
+        const mockHandler = createMockHandler({ delay: shortTimeout * 2 });
+
+        // Create executor with the flow and handler
+        const executor = new FlowExecutor(flow, mockHandler, testLogger);
+
+        // Execute and expect timeout error
+        jest.advanceTimersByTime(shortTimeout);
+        await expectError(executor.execute(), {
+          errorClass: ExecutionError,
+          messageIncludes: 'timed out',
+        });
+      });
+
+      it('should prefer top-level step.timeout over policies.timeout.timeout', async () => {
+        const shortTimeout = 50;
+
+        const flow: Flow = {
+          name: 'top-level-step-timeout-precedence-test',
+          description: 'Top-level timeout beats the nested policies form',
+          steps: [
+            {
+              name: 'slowOperation',
+              timeout: shortTimeout,
+              policies: { timeout: { timeout: shortTimeout * 100 } },
+              request: {
+                method: 'slow',
+                params: [],
+              },
+            },
+          ],
+        };
+
+        // Handler slower than the top-level timeout but well within the policies timeout
+        const mockHandler = createMockHandler({ delay: shortTimeout * 2 });
+
+        // Create executor with the flow and handler
+        const executor = new FlowExecutor(flow, mockHandler, testLogger);
+
+        // Execute and expect timeout error from the top-level timeout winning
+        jest.advanceTimersByTime(shortTimeout);
+        await expectError(executor.execute(), {
+          errorClass: ExecutionError,
+          messageIncludes: 'timed out',
+        });
+      });
+
       it('should allow a step to complete within its timeout', async () => {
         // Create a timeout longer than the operation needs
         const timeout = 500;

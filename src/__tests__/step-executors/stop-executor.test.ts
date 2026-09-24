@@ -1,4 +1,5 @@
 import { StopStepExecutor } from '../../step-executors/stop-executor';
+import { StopBranch } from '../../errors/stop-branch';
 import { noLogger } from '../../util/logger';
 import { createMockContext } from '../test-utils';
 
@@ -25,7 +26,7 @@ describe('StopStepExecutor', () => {
     expect(result.metadata?.endWorkflow).toBe(true);
   });
 
-  it('should stop the current branch when endWorkflow is false', async () => {
+  it('should throw StopBranch when endWorkflow is false', async () => {
     const step = {
       name: 'stopStep',
       stop: {
@@ -34,25 +35,31 @@ describe('StopStepExecutor', () => {
     };
 
     const context = createMockContext();
-    const result = await executor.execute(step, context);
+    const error = await executor.execute(step, context).catch((e) => e);
 
-    expect(result.type).toBe('stop');
-    expect(result.result.endWorkflow).toBe(false);
-    expect(result.metadata?.endWorkflow).toBe(false);
+    expect(error).toBeInstanceOf(StopBranch);
+    expect(error.stepName).toBe('stopStep');
+    // The signal carries the result the step would have returned, so the
+    // branch boundary can report the stop step as complete.
+    expect(error.result.type).toBe('stop');
+    expect(error.result.result.endWorkflow).toBe(false);
+    expect(error.result.metadata?.endWorkflow).toBe(false);
   });
 
-  it('should default to stopping the current branch when endWorkflow is not provided', async () => {
+  it('should throw StopBranch by default when endWorkflow is not provided', async () => {
     const step = {
       name: 'stopStep',
       stop: {},
     };
 
     const context = createMockContext();
-    const result = await executor.execute(step, context);
+    const error = await executor.execute(step, context).catch((e) => e);
 
-    expect(result.type).toBe('stop');
-    expect(result.result.endWorkflow).toBe(false);
-    expect(result.metadata?.endWorkflow).toBe(false);
+    expect(error).toBeInstanceOf(StopBranch);
+    expect(error.stepName).toBe('stopStep');
+    expect(error.result.type).toBe('stop');
+    expect(error.result.result.endWorkflow).toBe(false);
+    expect(error.result.metadata?.endWorkflow).toBe(false);
   });
 
   it('should throw an error for invalid step type', async () => {

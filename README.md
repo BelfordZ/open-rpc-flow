@@ -198,6 +198,48 @@ You can reset context between runs:
 executor.setContext({ minValue: 20 });
 ```
 
+### Runtime Inputs
+
+`flow.context` is static. For values that change on every run — a user ID, a
+date range, a feature flag — pass them to `execute()` instead:
+
+```typescript
+const results = await executor.execute({ userId: 'u-42', minValue: 10 });
+```
+
+Inside the flow, input is addressable as `${input.<key>}` in any reference or
+expression, alongside step results and `context`:
+
+```typescript
+{
+  name: 'getOrders',
+  request: {
+    method: 'orders.list',
+    params: { userId: '${input.userId}' },
+  },
+},
+{
+  name: 'notify',
+  condition: {
+    // Operators go outside ${...}, like every other expression here.
+    if: '${input.minValue} > 0',
+    then: { name: 'send', request: { method: 'notify.send', params: {} } },
+  },
+},
+```
+
+Notes:
+
+- `execute()` with no arguments still works; input defaults to empty.
+- Input is deep-cloned and frozen per run: mutating your object afterwards
+  can't affect the run, and steps should treat `${input.*}` as read-only.
+- It must be JSON-serializable — it travels inside checkpoints, so
+  `exportState()`/`importState()` resume with the same input.
+- `input` is not a step dependency: steps that only reference `${input.*}`
+  don't wait on each other.
+- The pre-existing `execute({ signal })` form keeps working; combine both as
+  `execute(input, { signal })`.
+
 ## Flow Definition
 
 A flow consists of a series of steps that can include:

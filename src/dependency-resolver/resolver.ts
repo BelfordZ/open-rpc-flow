@@ -13,7 +13,7 @@ import { StepNotFoundError, UnknownDependencyError, CircularDependencyError } fr
 
 export class DependencyResolver {
   private logger: Logger;
-  private internalVars = new Set(['context', 'metadata']);
+  private internalVars = new Set(['context', 'metadata', 'input']);
   private loopVars = new Set<string>();
   /**
    * Cached dependency graph. Built lazily on first use and reused by every

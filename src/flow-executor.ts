@@ -8,6 +8,7 @@ import {
   JsonRpcHandler,
   ExecutionContextData,
   PolicyOverrides,
+  FlowInput,
 } from './types';
 import {
   StepExecutor,
@@ -92,6 +93,47 @@ export interface FlowExecutorOptions {
 }
 
 /**
+ * Per-run options for {@link FlowExecutor.execute}.
+ */
+export interface ExecuteOptions {
+  /**
+   * External AbortSignal wired to the run. Aborting it with the reason
+   * `'paused'` pauses the flow (resumable via `exportState`/`importState`);
+   * any other abort reason cancels the run.
+   */
+  signal?: AbortSignal;
+}
+
+/**
+ * Split `execute()`'s arguments into runtime input and run options.
+ *
+ * `execute()` accepts the input positionally — `execute({ userId: 1 })` — but
+ * the pre-input signature `execute({ signal })` keeps working: a first
+ * argument carrying a `signal` property (an AbortSignal, or an explicit
+ * `undefined`) is treated as the options object for backward compatibility.
+ */
+function normalizeExecuteArgs(
+  input?: FlowInput | ExecuteOptions | null,
+  options?: ExecuteOptions,
+): { input: FlowInput | null | undefined; options: ExecuteOptions } {
+  if (options === undefined && isExecuteOptions(input)) {
+    return { input: undefined, options: input };
+  }
+  return { input: input as FlowInput | null | undefined, options: options ?? {} };
+}
+
+function isExecuteOptions(value: unknown): value is ExecuteOptions {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+  if (!Object.prototype.hasOwnProperty.call(value, 'signal')) {
+    return false;
+  }
+  const signal = (value as { signal?: unknown }).signal;
+  return signal === undefined || signal instanceof AbortSignal;
+}
+
+/**
  * Main executor for JSON-RPC flows
  */
 export class FlowExecutor {
@@ -101,6 +143,12 @@ export class FlowExecutor {
   public events: FlowExecutorEvents;
 
   private context: ExecutionContextData;
+  /**
+   * Runtime input for the current run, addressable as `${input.<key>}`.
+   * Set by `execute(input)` (deep-cloned and frozen); restored from the
+   * checkpoint by `importState()` so a resumed run sees the same input.
+   */
+  private flowInput: FlowInput = {};
   private stepResults: Map<string, unknown>;
   private stepStatus: Map<string, { status: 'success' | 'failed'; error?: Error }>;
   private lastFailedStepName: string | null;
@@ -204,7 +252,12 @@ export class FlowExecutor {
     }
 
     // Initialize shared execution context
-    this.referenceResolver = new ReferenceResolver(this.stepResults, this.context, this.logger);
+    this.referenceResolver = new ReferenceResolver(
+      this.stepResults,
+      this.context,
+      this.logger,
+      this.flowInput,
+    );
     this.expressionEvaluator = new SafeExpressionEvaluator(this.logger, this.referenceResolver);
     this.dependencyResolver = new DependencyResolver(
       this.flow,
@@ -271,7 +324,12 @@ export class FlowExecutor {
   }
 
   private rebuildExecutionContext(): void {
-    this.referenceResolver = new ReferenceResolver(this.stepResults, this.context, this.logger);
+    this.referenceResolver = new ReferenceResolver(
+      this.stepResults,
+      this.context,
+      this.logger,
+      this.flowInput,
+    );
     this.expressionEvaluator = new SafeExpressionEvaluator(this.logger, this.referenceResolver);
     this.dependencyResolver = new DependencyResolver(
       this.flow,
@@ -393,6 +451,7 @@ export class FlowExecutor {
       stepHashes: Object.fromEntries(this.flow.steps.map((step) => [step.name, hashStep(step)])),
       exportedAt: new Date().toISOString(),
       context: this.context as Record<string, unknown>,
+      input: this.flowInput,
       stepResults: Object.fromEntries(this.stepResults),
       stepStatus,
       lastFailedStepName: this.lastFailedStepName,
@@ -463,6 +522,10 @@ export class FlowExecutor {
     const isolated = JSON.parse(JSON.stringify(checkpoint)) as FlowCheckpoint;
 
     this.context = Object.freeze({ ...isolated.context });
+    // The input travels with the checkpoint so a resumed run sees the same
+    // `${input.*}` values. Checkpoints exported before input existed have no
+    // `input` field; they resume with empty input.
+    this.flowInput = Object.freeze({ ...((isolated.input ?? {}) as Record<string, unknown>) });
     this.stepResults.clear();
     for (const [stepName, result] of Object.entries(isolated.stepResults)) {
       this.stepResults.set(stepName, result);
@@ -593,6 +656,8 @@ export class FlowExecutor {
     // Restore the flow's declared initial context (frozen, per immutable
     // context); initializeRunState rebuilds the resolvers against it below.
     this.context = Object.freeze({ ...(this.flow.context || {}) });
+    // A reset returns the executor to pristine state: no run input either.
+    this.flowInput = {};
     this.initializeRunState({ clearResults: true, clearStatus: true });
   }
 
@@ -610,7 +675,7 @@ export class FlowExecutor {
   /**
    * Resume execution after the last completed step
    */
-  async resume(options?: { signal?: AbortSignal }): Promise<Map<string, any>> {
+  async resume(options?: ExecuteOptions): Promise<Map<string, any>> {
     this.initializeRunState({ clearResults: false, clearStatus: false });
     const orderedSteps = this.dependencyResolver.getExecutionOrder();
     this.ensureStatusFromResults(orderedSteps);
@@ -622,10 +687,7 @@ export class FlowExecutor {
   /**
    * Resume execution from a specific step and clear results for that step and any downstream steps
    */
-  async resumeFrom(
-    stepName: string,
-    options?: { signal?: AbortSignal },
-  ): Promise<Map<string, any>> {
+  async resumeFrom(stepName: string, options?: ExecuteOptions): Promise<Map<string, any>> {
     this.initializeRunState({ clearResults: false, clearStatus: false });
     const orderedSteps = this.dependencyResolver.getExecutionOrder();
     this.ensureStatusFromResults(orderedSteps);
@@ -645,7 +707,7 @@ export class FlowExecutor {
   /**
    * Retry execution starting from the last failed step
    */
-  async retry(options?: { signal?: AbortSignal }): Promise<Map<string, any>> {
+  async retry(options?: ExecuteOptions): Promise<Map<string, any>> {
     this.initializeRunState({ clearResults: false, clearStatus: false });
     const orderedSteps = this.dependencyResolver.getExecutionOrder();
     this.ensureStatusFromResults(orderedSteps);
@@ -1200,13 +1262,34 @@ export class FlowExecutor {
    * any) is re-run. The resume behavior applies to exactly one `execute()`
    * call; subsequent calls go back to fresh-run semantics. Resuming logs an
    * info line naming the skipped steps and the failed step being re-run.
+   *
+   * @param input runtime input for this run, addressable in any `${...}`
+   * reference or expression as `${input.<key>}`. It is deep-cloned and frozen,
+   * so the caller's object cannot affect the run and steps should treat it as
+   * read-only. It must be JSON-serializable: it travels inside checkpoints.
+   * Omit it (or pass nothing) for a run with empty input. For backward
+   * compatibility, `execute({ signal })` is still treated as the options
+   * object; use `execute(input, { signal })` to combine both.
+   * @param options per-run options (currently just `signal`).
    */
-  async execute(options?: { signal?: AbortSignal }): Promise<Map<string, any>> {
+  async execute(
+    input?: FlowInput | ExecuteOptions | null,
+    options?: ExecuteOptions,
+  ): Promise<Map<string, any>> {
     const priorAbortReason = this.globalAbortController?.signal.aborted
       ? this.globalAbortController.signal.reason
       : null;
     // importState() arms the flag; initializeRunState() consumes it.
     const resumeImported = this.pendingImportedState;
+    const { input: normalizedInput, options: execOptions } = normalizeExecuteArgs(input, options);
+    // An explicit input argument always wins. Otherwise a checkpoint resume
+    // keeps the input the checkpoint was exported with; a fresh run starts
+    // with empty input.
+    if (normalizedInput !== undefined) {
+      this.setFlowInput(normalizedInput);
+    } else if (!resumeImported) {
+      this.setFlowInput({});
+    }
     this.initializeRunState({ clearResults: !resumeImported, clearStatus: !resumeImported });
     if (resumeImported) {
       this.logCheckpointResume();
@@ -1214,7 +1297,27 @@ export class FlowExecutor {
     if (priorAbortReason !== null && priorAbortReason !== undefined) {
       this.globalAbortController.abort(priorAbortReason);
     }
-    return this.runFromIndex(0, options);
+    return this.runFromIndex(0, execOptions);
+  }
+
+  /**
+   * Validate, deep-clone, and freeze the run input.
+   */
+  private setFlowInput(input: FlowInput | null): void {
+    if (typeof input !== 'object' || input === null || Array.isArray(input)) {
+      throw new ValidationError('Flow input must be a non-null object', {
+        inputType: Array.isArray(input) ? 'array' : typeof input,
+      });
+    }
+    let cloned: FlowInput;
+    try {
+      cloned = JSON.parse(JSON.stringify(input)) as FlowInput;
+    } catch {
+      throw new ValidationError('Flow input must be JSON-serializable (no circular references)', {
+        flowName: this.flow.name,
+      });
+    }
+    this.flowInput = Object.freeze(cloned);
   }
 
   /**

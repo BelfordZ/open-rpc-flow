@@ -547,6 +547,35 @@ const trace = handler.getTrace(); // one { path, method, params, result } per ca
   executor supplies it — the same shape record/replay traces use, so a
   dry-run trace lifts directly into replay tooling.
 
+#### HTTP JSON-RPC Handler
+
+Talk to a real endpoint: `HttpJsonRpcHandler` POSTs JSON-RPC 2.0 requests
+over HTTP and resolves with the response's `result`.
+
+```typescript
+import { HttpJsonRpcHandler } from '@open-rpc/flow-executor';
+
+const handler = HttpJsonRpcHandler.create({
+  url: 'https://api.example.com/rpc',
+  headers: { Authorization: 'Bearer s3cret' }, // static headers, sent every call
+});
+await new FlowExecutor(flow, handler).execute();
+```
+
+- **Deliberately barebones** (issue #195): a URL, static headers, an
+  injectable `fetchImpl`, basic non-2xx handling, and invalid-JSON handling.
+  No retries, batching, WebSockets/SSE, auth refresh, or connection
+  controls — and no plan to grow this into a robust transport layer.
+- **Error contract:** a JSON-RPC error envelope throws
+  `JsonRpcRequestError` (passed through the request executor unwrapped, so
+  the step surfaces the endpoint's code/message); non-2xx statuses, invalid
+  JSON, malformed envelopes, and network failures throw `ExecutionError`
+  with `ErrorCode.NETWORK_ERROR`. Aborts propagate untouched so step
+  timeouts still become `TimeoutError`.
+- **Testable without network:** pass `fetchImpl` to inject a stub
+  (defaults to `globalThis.fetch` on Node 18+), and the caller's
+  `AbortSignal` is forwarded to `fetch`.
+
 ##### Error Events
 
 Listen for error events during flow execution:

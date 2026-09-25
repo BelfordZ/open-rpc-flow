@@ -39,6 +39,11 @@ export {
   MockedCall,
   generateFromSchema,
 } from './mock-handler';
+export {
+  HttpJsonRpcHandler,
+  HttpJsonRpcHandlerFn,
+  HttpJsonRpcHandlerOptions,
+} from './http-handler';
 export { SafeExpressionEvaluator } from './expression-evaluator/safe-evaluator';
 export {
   ReferenceResolver,

@@ -42,6 +42,10 @@ export {
   MockJsonRpcHandlerFn,
   MockJsonRpcHandlerOptions,
   MockedCall,
+  ChaosConfig,
+  ChaosErrorDescriptor,
+  ChaosOutcome,
+  ChaosScript,
   generateFromSchema,
 } from './mock-handler';
 export {

@@ -588,6 +588,30 @@ const trace = handler.getTrace(); // one { path, method, params, result } per ca
   call, each tagged with the calling step's execution `path` when the
   executor supplies it — the same shape record/replay traces use, so a
   dry-run trace lifts directly into replay tooling.
+- **Chaos injection:** pass `chaos` to script deterministic failures and
+  latency per method — the harness for testing retry policies, timeouts,
+  and error-handling paths without flaky hand-rolled handlers. Each method
+  maps to a FIFO outcome script consumed one entry per call; exhausted
+  scripts (and unlisted methods) fall back to normal mocks.
+
+```typescript
+const handler = MockJsonRpcHandler.fromOpenRpc(openrpcDocument, {
+  seed: 42,
+  chaos: {
+    getUser: [
+      { latencyMs: 50, error: { code: -32000, message: 'flaky' } },
+      'success', // behave normally for this call, then keep mocking
+    ],
+  },
+});
+```
+
+Outcomes compose: `latencyMs` applies first (abort-aware, so executor
+step timeouts fire deterministically), then `error` throws a
+`JsonRpcRequestError` or `malformed: true` throws a transport-level
+`NETWORK_ERROR`. Calls that fail via chaos throw before the trace is
+recorded. Scripts are validated up front — unknown keys, bad latencies,
+and `error` combined with `malformed` throw `ValidationError`.
 
 #### HTTP JSON-RPC Handler
 

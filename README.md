@@ -637,6 +637,59 @@ const trace = handler.getTrace(); // one { path, method, params, result } per ca
   call, each tagged with the calling step's execution `path` when the
   executor supplies it — the same shape record/replay traces use, so a
   dry-run trace lifts directly into replay tooling.
+- **Chaos injection:** pass `chaos` to script deterministic failures and
+  latency per method — the harness for testing retry policies, timeouts,
+  and error-handling paths without flaky hand-rolled handlers. Each method
+  maps to a FIFO outcome script consumed one entry per call; exhausted
+  scripts (and unlisted methods) fall back to normal mocks.
+
+```typescript
+const handler = MockJsonRpcHandler.fromOpenRpc(openrpcDocument, {
+  seed: 42,
+  chaos: {
+    getUser: [
+      { latencyMs: 50, error: { code: -32000, message: 'flaky' } },
+      'success', // behave normally for this call, then keep mocking
+    ],
+  },
+});
+```
+
+Outcomes compose: `latencyMs` applies first (abort-aware, so executor
+step timeouts fire deterministically), then `error` throws a
+`JsonRpcRequestError` or `malformed: true` throws a transport-level
+`NETWORK_ERROR`. Calls that fail via chaos throw before the trace is
+recorded. Scripts are validated up front — unknown keys, bad latencies,
+and `error` combined with `malformed` throw `ValidationError`.
+
+#### HTTP JSON-RPC Handler
+
+Talk to a real endpoint: `HttpJsonRpcHandler` POSTs JSON-RPC 2.0 requests
+over HTTP and resolves with the response's `result`.
+
+```typescript
+import { HttpJsonRpcHandler } from '@open-rpc/flow-executor';
+
+const handler = HttpJsonRpcHandler.create({
+  url: 'https://api.example.com/rpc',
+  headers: { Authorization: 'Bearer s3cret' }, // static headers, sent every call
+});
+await new FlowExecutor(flow, handler).execute();
+```
+
+- **Deliberately barebones** (issue #195): a URL, static headers, an
+  injectable `fetchImpl`, basic non-2xx handling, and invalid-JSON handling.
+  No retries, batching, WebSockets/SSE, auth refresh, or connection
+  controls — and no plan to grow this into a robust transport layer.
+- **Error contract:** a JSON-RPC error envelope throws
+  `JsonRpcRequestError` (passed through the request executor unwrapped, so
+  the step surfaces the endpoint's code/message); non-2xx statuses, invalid
+  JSON, malformed envelopes, and network failures throw `ExecutionError`
+  with `ErrorCode.NETWORK_ERROR`. Aborts propagate untouched so step
+  timeouts still become `TimeoutError`.
+- **Testable without network:** pass `fetchImpl` to inject a stub
+  (defaults to `globalThis.fetch` on Node 18+), and the caller's
+  `AbortSignal` is forwarded to `fetch`.
 
 ##### Error Events
 

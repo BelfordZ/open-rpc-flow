@@ -50,8 +50,17 @@ export {
   MockJsonRpcHandlerFn,
   MockJsonRpcHandlerOptions,
   MockedCall,
+  ChaosConfig,
+  ChaosErrorDescriptor,
+  ChaosOutcome,
+  ChaosScript,
   generateFromSchema,
 } from './mock-handler';
+export {
+  HttpJsonRpcHandler,
+  HttpJsonRpcHandlerFn,
+  HttpJsonRpcHandlerOptions,
+} from './http-handler';
 export { SafeExpressionEvaluator } from './expression-evaluator/safe-evaluator';
 export {
   ReferenceResolver,

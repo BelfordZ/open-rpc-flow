@@ -5,6 +5,14 @@
 
 * update readme ([#59](https://github.com/BelfordZ/open-rpc-flow/issues/59)) ([7f5d691](https://github.com/BelfordZ/open-rpc-flow/commit/7f5d6915880bb02c6bbe6e93f6f98abc95cc5c39))
 
+## [1.14.0](https://github.com/BelfordZ/open-rpc-flow/compare/v1.13.0...v1.14.0) (2026-09-25)
+
+
+### Features
+
+* add deterministic chaos injection to MockJsonRpcHandler ([#210](https://github.com/BelfordZ/open-rpc-flow/issues/210)) ([6342bfc](https://github.com/BelfordZ/open-rpc-flow/commit/6342bfc8e490ebff16ee12d61faeb2e8c19168db))
+* add minimal HTTP JSON-RPC handler ([#209](https://github.com/BelfordZ/open-rpc-flow/issues/209)) ([d3491b0](https://github.com/BelfordZ/open-rpc-flow/commit/d3491b01d93bfd55a8fa0c9f48d3826cc1dc0a5d))
+
 ## [1.13.0](https://github.com/BelfordZ/open-rpc-flow/compare/v1.12.0...v1.13.0) (2026-09-25)
 
 

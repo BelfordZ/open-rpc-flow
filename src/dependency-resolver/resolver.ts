@@ -293,11 +293,14 @@ export class DependencyResolver {
     // the parent step ran, so any steps they reference must already be
     // complete: those references are dependencies of the parent step.
     if (step.onError && typeof step.onError === 'object') {
-      if (step.onError.fallback !== undefined) {
+      const fallback = step.onError.fallback;
+      if (fallback !== undefined) {
         // Stringify to catch `${...}` nested inside object/array fallbacks.
-        this.extractReferences(JSON.stringify(step.onError.fallback)).forEach((dep) =>
-          deps.add(dep),
-        );
+        // `${error}` is recovery-scoped (the caught failure summary), not a
+        // step reference — same treatment as the nested step below.
+        this.withLoopVars('error', () => {
+          this.extractReferences(JSON.stringify(fallback)).forEach((dep) => deps.add(dep));
+        });
       }
       const recoveryStep = step.onError.step;
       if (recoveryStep && typeof recoveryStep === 'object') {

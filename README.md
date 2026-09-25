@@ -410,11 +410,11 @@ const flow = {
   steps: [
     // 1. Static or resolved fallback value
     { name: 'price', request: { method: 'getPrice', params: {} }, onError: { fallback: 0 } },
-    // 2. Fallback resolved against input / context / completed steps
+    // 2. Fallback resolved against input / context / completed steps, plus `${error}`
     {
       name: 'price2',
       request: { method: 'getPrice', params: {} },
-      onError: { fallback: '${input.defaultPrice}' },
+      onError: { fallback: 'last known: ${input.defaultPrice} (${error.code})' },
     },
     // 3. One nested recovery step, with `${error}` ({ name, message, code? }) in scope
     {
@@ -442,7 +442,10 @@ Notes:
   becomes the parent's recovered result; if it fails, the parent fails for
   real with the original failure as `cause`.
 - Steps referenced by the fallback or the recovery step become dependencies
-  of the parent, so they complete first.
+  of the parent, so they complete first. `${error}` itself is
+  recovery-scoped, not a step reference: it resolves to the caught failure
+  (`{ name, message, code? }`) in both `fallback` and the nested recovery
+  step, shadowing any step literally named `error`.
 
 ### Resume, Retry, and State Seeding
 

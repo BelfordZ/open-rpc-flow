@@ -51,7 +51,8 @@ export interface StepErrorInfo {
  * exhausted. Exactly one recovery strategy may be set:
  * - `fallback`: the step recovers with this value as its result. May be a
  *   static JSON value or a `${...}` expression resolved at recovery time
- *   against the normal reference scope (input, context, completed steps).
+ *   against the normal reference scope (input, context, completed steps)
+ *   plus `${error}` (the caught {@link StepErrorInfo}).
  * - `step`: a single nested recovery step to run when the parent fails.
  *   Its `name` is required; it resolves references against the normal scope
  *   plus `${error}` (the caught {@link StepErrorInfo}), and its `.result`

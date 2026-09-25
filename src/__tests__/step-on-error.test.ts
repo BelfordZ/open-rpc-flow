@@ -15,7 +15,8 @@ import type { OpenRpcDocument } from '../flow-doctor/types';
  * A step that fails after retries are exhausted can recover instead of
  * failing the flow:
  * - `onError: { fallback }` — the fallback value (resolved against the
- *   normal input/context/completed-step scope) becomes the step's result;
+ *   normal input/context/completed-step scope, plus `${error}`) becomes
+ *   the step's result;
  * - `onError: { step }` — one nested recovery step runs with `${error}`
  *   in scope; its `.result` becomes the parent's recovered result;
  * - `onError: {}` — the error summary itself becomes the result.
@@ -245,6 +246,113 @@ describe('per-step error recovery with onError (issue #193)', () => {
       expect(results.get('slow')!.result).toBe('timed-out-fallback');
       expect(results.get('slow')!.error).toMatchObject({ name: 'ExecutionError' });
       expect((results.get('slow')!.error as StepErrorInfo).message).toContain('timed out');
+    });
+
+    it('resolves ${error} in a string fallback against the caught failure', async () => {
+      const flow: Flow = {
+        name: 'error-fallback',
+        description: 'error fallback',
+        steps: [
+          {
+            name: 'risky',
+            request: { method: 'risky', params: {} },
+            onError: { fallback: 'failed (${error.name}): ${error.message} [${error.code}]' },
+          },
+        ],
+      };
+      const handler = handlerFor({
+        risky: () => {
+          throw codedError('boom', 'NETWORK_ERROR');
+        },
+      });
+      const results = await new FlowExecutor(flow, handler, { logger: testLogger() }).execute();
+
+      const recovered = results.get('risky')!;
+      // The message/code are the wrapped ExecutionError's, as with the
+      // nested recovery step's ${error}.
+      expect(recovered.result).toContain('ExecutionError');
+      expect(recovered.result).toContain('boom');
+      expect(recovered.result).toContain('NETWORK_ERROR');
+    });
+
+    it('resolves the whole ${error} object as a fallback', async () => {
+      const flow: Flow = {
+        name: 'error-object-fallback',
+        description: 'error object fallback',
+        steps: [
+          {
+            name: 'risky',
+            request: { method: 'risky', params: {} },
+            onError: { fallback: '${error}' },
+          },
+        ],
+      };
+      const handler = handlerFor({
+        risky: () => {
+          throw codedError('boom', 'NETWORK_ERROR');
+        },
+      });
+      const results = await new FlowExecutor(flow, handler, { logger: testLogger() }).execute();
+
+      expect(results.get('risky')!.result).toMatchObject({
+        name: 'ExecutionError',
+        code: 'NETWORK_ERROR',
+      });
+      expect((results.get('risky')!.result as StepErrorInfo).message).toContain('boom');
+    });
+
+    it('resolves ${error} nested inside an object fallback', async () => {
+      const flow: Flow = {
+        name: 'error-nested-fallback',
+        description: 'error nested fallback',
+        steps: [
+          {
+            name: 'risky',
+            request: { method: 'risky', params: {} },
+            onError: {
+              fallback: { reason: '${error.message}', code: '${error.code}', static: true },
+            },
+          },
+        ],
+      };
+      const handler = handlerFor({
+        risky: () => {
+          throw codedError('boom', 'NETWORK_ERROR');
+        },
+      });
+      const results = await new FlowExecutor(flow, handler, { logger: testLogger() }).execute();
+
+      const recovered = results.get('risky')!.result as Record<string, unknown>;
+      expect(recovered.static).toBe(true);
+      expect(recovered.code).toBe('NETWORK_ERROR');
+      expect(String(recovered.reason)).toContain('boom');
+    });
+
+    it('${error} in a fallback shadows a step literally named "error"', async () => {
+      const flow: Flow = {
+        name: 'error-shadow-fallback',
+        description: 'error shadow fallback',
+        steps: [
+          { name: 'error', request: { method: 'ok', params: {} } },
+          {
+            name: 'risky',
+            request: { method: 'risky', params: {} },
+            onError: { fallback: '${error.message}' },
+          },
+        ],
+      };
+      const handler = handlerFor({
+        ok: () => 'fine',
+        risky: () => {
+          throw new Error('boom');
+        },
+      });
+      const results = await new FlowExecutor(flow, handler, { logger: testLogger() }).execute();
+
+      // The recovery-scoped ${error} wins over the step named 'error',
+      // exactly as it does for the nested recovery step.
+      expect(results.get('error')!.result).toBe('fine');
+      expect(String(results.get('risky')!.result)).toContain('boom');
     });
   });
 
@@ -679,6 +787,23 @@ describe('onError dependency resolution (issue #193)', () => {
     expect(newResolver(flow).getDependencies('risky')).toEqual(['base']);
   });
 
+  it('ignores ${error} in fallback references', async () => {
+    const flow: Flow = {
+      name: 'deps-fallback-error',
+      description: 'deps fallback error',
+      steps: [
+        { name: 'base', request: { method: 'base', params: {} } },
+        {
+          name: 'risky',
+          request: { method: 'risky', params: {} },
+          onError: { fallback: '${base.result} failed: ${error.message}' },
+        },
+      ],
+    };
+    // `${error}` is recovery-local; only the real step reference becomes a dep.
+    expect(newResolver(flow).getDependencies('risky')).toEqual(['base']);
+  });
+
   it('resolves downstream references to the nested recovery step name onto the parent', async () => {
     const flow: Flow = {
       name: 'deps-remap',
@@ -770,12 +895,45 @@ describe('Flow Doctor onError validation (issue #193)', () => {
     ).toEqual([]);
   });
 
-  it('flags ${error} used in the parent scope as an unknown reference', () => {
+  it('accepts ${error} in a fallback', () => {
     const flow = makeFlow([
       {
         name: 'risky',
         request: { method: 'm', params: {} },
-        onError: { fallback: '${error.code}' },
+        onError: { fallback: 'failed: ${error.message} [${error.code}]' },
+      },
+    ]);
+    const diagnostics = validateFlow(flow, doctorDocument);
+    // `${error}` is recovery-scoped in the fallback — no unknown-reference diagnostic.
+    expect(
+      diagnostics.filter(
+        (d) => d.code === FlowDiagnosticCode.UNKNOWN_STEP_REFERENCE && d.step === 'risky',
+      ),
+    ).toEqual([]);
+  });
+
+  it('still flags genuinely unknown references inside a fallback', () => {
+    const flow = makeFlow([
+      {
+        name: 'risky',
+        request: { method: 'm', params: {} },
+        onError: { fallback: '${error.code} ${nope.result}' },
+      },
+    ]);
+    const diagnostics = validateFlow(flow, doctorDocument);
+    const flagged = diagnostics.filter(
+      (d) => d.code === FlowDiagnosticCode.UNKNOWN_STEP_REFERENCE && d.step === 'risky',
+    );
+    expect(flagged).toHaveLength(1);
+    expect(flagged[0].message).toContain("'nope'");
+  });
+
+  it('flags ${error} used in step params as an unknown reference', () => {
+    const flow = makeFlow([
+      {
+        name: 'risky',
+        request: { method: 'm', params: { e: '${error.code}' } },
+        onError: { fallback: 0 },
       },
     ]);
     const diagnostics = validateFlow(flow, doctorDocument);

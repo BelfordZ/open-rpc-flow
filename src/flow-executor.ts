@@ -1546,11 +1546,12 @@ export class FlowExecutor {
     }
 
     // A `${...}` fallback resolves at recovery time against the normal scope
-    // (input, context, completed step results); static values pass through.
-    // With neither `fallback` nor `step`, the error info itself becomes the
-    // step's result.
+    // (input, context, completed step results) plus `${error}` holding the
+    // caught failure summary — the same scope the nested recovery step gets.
+    // Static values pass through. With neither `fallback` nor `step`, the
+    // error info itself becomes the step's result.
     const recoveredValue = hasFallback
-      ? this.referenceResolver.resolveReferences(onError.fallback, {})
+      ? this.referenceResolver.resolveReferences(onError.fallback, { error: errorInfo })
       : errorInfo;
     return this.buildRecoveredEnvelope(step, recoveredValue, errorInfo);
   }

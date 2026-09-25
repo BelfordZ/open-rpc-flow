@@ -395,6 +395,58 @@ const executor = new FlowExecutor(flow, jsonRpcHandler, {
 });
 ```
 
+#### Per-Step Error Recovery with `onError`
+
+When a step fails after its retries are exhausted, `onError` recovers it
+instead of failing the flow. The recovered step keeps `success` status; its
+result envelope carries the caught failure as `error`, so downstream steps
+can discriminate with `${step.error}`. Recovery never trips flow-level
+`onFailure: 'abort-flow'`, and the parent emits `step:error` then
+`step:recovered` (never `step:complete`).
+
+```typescript
+const flow = {
+  name: 'resilient',
+  steps: [
+    // 1. Static or resolved fallback value
+    { name: 'price', request: { method: 'getPrice', params: {} }, onError: { fallback: 0 } },
+    // 2. Fallback resolved against input / context / completed steps, plus `${error}`
+    {
+      name: 'price2',
+      request: { method: 'getPrice', params: {} },
+      onError: { fallback: 'last known: ${input.defaultPrice} (${error.code})' },
+    },
+    // 3. One nested recovery step, with `${error}` ({ name, message, code? }) in scope
+    {
+      name: 'price3',
+      request: { method: 'getPrice', params: {} },
+      onError: {
+        step: {
+          name: 'logFailure',
+          request: { method: 'log', params: { reason: '${error.message}' } },
+        },
+      },
+    },
+    // 4. Bare `onError: {}` — the error summary itself becomes the result
+    { name: 'price4', request: { method: 'getPrice', params: {} }, onError: {} },
+  ],
+};
+```
+
+Notes:
+
+- `fallback` and `step` are mutually exclusive; unknown keys are rejected by
+  Flow Doctor (`INVALID_ON_ERROR`) and fail fast at recovery time.
+- The nested recovery step runs once, with its own policies (timeout,
+  retries) honored. It cannot declare its own `onError`. Its `.result`
+  becomes the parent's recovered result; if it fails, the parent fails for
+  real with the original failure as `cause`.
+- Steps referenced by the fallback or the recovery step become dependencies
+  of the parent, so they complete first. `${error}` itself is
+  recovery-scoped, not a step reference: it resolves to the caught failure
+  (`{ name, message, code? }`) in both `fallback` and the nested recovery
+  step, shadowing any step literally named `error`.
+
 ### Resume, Retry, and State Seeding
 
 You can safely seed context and prior step results before calling `resume()` or `retry()`.

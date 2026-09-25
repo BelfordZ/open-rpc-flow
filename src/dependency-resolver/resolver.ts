@@ -115,11 +115,31 @@ export class DependencyResolver {
 
     logger.debug(`Initialized graph with ${graph.size} steps`);
 
+    // Map nested onError recovery step names (issue #193) to their parent
+    // step: a downstream step referencing `${recoveryStep.result}` must run
+    // after the parent, since the recovery step only executes as part of
+    // the parent's recovery. A name that is also a top-level step keeps its
+    // existing meaning (checked via graph.has below).
+    const recoveryStepParents = new Map<string, string>();
+    for (const step of this.flow.steps) {
+      const onError = step.onError;
+      const recoveryStep =
+        onError && typeof onError === 'object' ? (onError as { step?: unknown }).step : undefined;
+      if (
+        recoveryStep &&
+        typeof recoveryStep === 'object' &&
+        typeof (recoveryStep as { name?: unknown }).name === 'string'
+      ) {
+        recoveryStepParents.set((recoveryStep as { name: string }).name, step.name);
+      }
+    }
+
     // Add dependencies for each step
     for (const step of this.flow.steps) {
       const deps = this.findStepDependencies(step, logger);
       for (const dep of deps) {
-        if (!graph.has(dep)) {
+        const resolvedDep = graph.has(dep) ? dep : recoveryStepParents.get(dep);
+        if (resolvedDep === undefined || !graph.has(resolvedDep)) {
           const availableSteps = Array.from(graph.keys());
           throw new UnknownDependencyError(
             `Step '${step.name}' depends on unknown step '${dep}'`,
@@ -128,7 +148,7 @@ export class DependencyResolver {
             availableSteps,
           );
         }
-        graph.get(step.name)?.add(dep);
+        graph.get(step.name)?.add(resolvedDep);
       }
       this.logger.debug(`Added dependency: ${step.name} -> ${deps.join(', ')}`);
     }
@@ -264,6 +284,32 @@ export class DependencyResolver {
               this.extractReferences(op.using).forEach((dep) => deps.add(dep));
             }
           }
+        });
+      }
+    }
+
+    // Extract references from onError recovery config (issue #193). The
+    // fallback and the nested recovery step resolve at recovery time, after
+    // the parent step ran, so any steps they reference must already be
+    // complete: those references are dependencies of the parent step.
+    if (step.onError && typeof step.onError === 'object') {
+      const fallback = step.onError.fallback;
+      if (fallback !== undefined) {
+        // Stringify to catch `${...}` nested inside object/array fallbacks.
+        // `${error}` is recovery-scoped (the caught failure summary), not a
+        // step reference — same treatment as the nested step below.
+        this.withLoopVars('error', () => {
+          this.extractReferences(JSON.stringify(fallback)).forEach((dep) => deps.add(dep));
+        });
+      }
+      const recoveryStep = step.onError.step;
+      if (recoveryStep && typeof recoveryStep === 'object') {
+        // The recovery-scoped `error` variable and the recovery step's own
+        // name are not top-level dependencies.
+        this.withLoopVars('error', () => {
+          this.findStepDependencies(recoveryStep, logger)
+            .filter((dep) => dep !== recoveryStep.name)
+            .forEach((dep) => deps.add(dep));
         });
       }
     }

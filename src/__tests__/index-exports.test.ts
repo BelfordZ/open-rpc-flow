@@ -3,6 +3,7 @@ import * as pathAccessor from '../path-accessor';
 import * as dependencyResolver from '../dependency-resolver';
 import * as packageIndex from '../index';
 import { NoLogger, noLogger } from '../util/logger';
+import type { OnErrorConfig, StepErrorInfo, StepRecoveredEvent } from '../index';
 
 describe('index module re-exports', () => {
   it('exposes step executor exports', () => {
@@ -33,6 +34,17 @@ describe('index module re-exports', () => {
     // default logger.
     expect(packageIndex.NoLogger).toBe(NoLogger);
     expect(packageIndex.noLogger).toBe(noLogger);
+  });
+
+  it('exposes onError recovery types and the step:recovered event (issue #193)', () => {
+    // Types are compile-time only; assert the value exports exist and the
+    // event enum carries the new member.
+    expect(packageIndex.FlowEventType.STEP_RECOVERED).toBe('step:recovered');
+    // Compile-time check that the types are re-exported from the index.
+    const config: OnErrorConfig = { fallback: 0 };
+    const info: StepErrorInfo = { name: 'Error', message: 'x' };
+    const event: StepRecoveredEvent | undefined = undefined;
+    expect([config, info, event]).toBeDefined();
   });
 
   it('noLogger from the package index is a functional silent Logger', () => {

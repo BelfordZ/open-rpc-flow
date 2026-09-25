@@ -1,5 +1,13 @@
 /* istanbul ignore file */
-export { Flow, Step, JsonRpcRequest, StepExecutionContext, FlowInput } from './types';
+export {
+  Flow,
+  Step,
+  JsonRpcRequest,
+  StepExecutionContext,
+  FlowInput,
+  OnErrorConfig,
+  StepErrorInfo,
+} from './types';
 export {
   StepExecutor,
   StepExecutionResult,
@@ -95,6 +103,7 @@ export {
   FlowPausedEvent,
   StepRetryEvent,
   StepTimeoutEvent,
+  StepRecoveredEvent,
   DependencyResolvedEvent,
   FlowEventOptions,
 } from './util/flow-executor-events';

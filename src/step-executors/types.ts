@@ -1,4 +1,4 @@
-import { Step, ErrorData, IfCondition, SwitchCondition } from '../types';
+import { Step, ErrorData, StepErrorInfo, IfCondition, SwitchCondition } from '../types';
 import { StepExecutionContext } from '../types';
 import { RetryPolicy } from '../errors/recovery';
 
@@ -37,7 +37,11 @@ export class JsonRpcRequestError extends Error {
  */
 export interface StepExecutionResult<T = any> {
   result?: T;
-  error?: ErrorData;
+  /**
+   * JSON-RPC error payload for request steps, or the caught failure summary
+   * ({@link StepErrorInfo}) for steps recovered via `onError`.
+   */
+  error?: ErrorData | StepErrorInfo;
   type: StepType;
   metadata?: Record<string, any>;
 }

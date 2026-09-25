@@ -188,8 +188,9 @@ interface ScopedStep {
 }
 
 /**
- * Yields every step in the flow, including steps nested in loops and
- * condition branches, along with the loop variables in scope.
+ * Yields every step in the flow, including steps nested in loops,
+ * condition branches, and `onError` recovery steps, along with the loop
+ * variables in scope. Recovery steps additionally see `${error}`.
  */
 function* walkSteps(steps: Step[], scopeVars: string[]): Generator<ScopedStep> {
   for (const step of steps) {
@@ -225,7 +226,24 @@ function* walkSteps(steps: Step[], scopeVars: string[]): Generator<ScopedStep> {
       }
       yield* walkSteps(branches, scopeVars);
     }
+    // A nested onError recovery step (issue #193) is validated with the
+    // normal scope plus `${error}` holding the caught failure summary.
+    const onError = step.onError;
+    const recoveryStep =
+      onError && typeof onError === 'object' ? (onError as { step?: unknown }).step : undefined;
+    if (recoveryStep && typeof recoveryStep === 'object') {
+      yield* walkSteps([recoveryStep as Step], [...scopeVars, 'error']);
+    }
   }
+}
+
+/**
+ * A reference-carrying string found in a step, tagged with whether it sits
+ * inside `onError.fallback` (where `${error}` is in scope).
+ */
+interface ReferenceString {
+  text: string;
+  inErrorFallback: boolean;
 }
 
 /**
@@ -237,39 +255,51 @@ function* walkSteps(steps: Step[], scopeVars: string[]): Generator<ScopedStep> {
  * - `method`: request method names are sent literally (never interpolated),
  *   so `${...}` there is reported as UNKNOWN_METHOD, not as a step reference.
  * - Nested step subtrees (`loop.step`, `loop.steps`, `condition.then`,
- *   `condition.else`, `condition.cases`, `condition.default`): nested steps are
- *   validated separately with their own scope (e.g. loop variables); scanning
- *   them here would double-report.
+ *   `condition.else`, `condition.cases`, `condition.default`, `onError.step`):
+ *   nested steps are validated separately with their own scope (e.g. loop
+ *   variables, or `${error}` for recovery steps); scanning them here would
+ *   double-report.
+ * Note: `onError.fallback` IS scanned here, in the parent step's scope — plus
+ * `${error}`, which is recovery-scoped for the fallback (issue #193). Only
+ * the nested recovery step subtree is excluded.
  */
-function* referenceStrings(step: Step): Generator<string> {
+function* referenceStrings(step: Step): Generator<ReferenceString> {
   const EXCLUDED_KEYS = new Set(['name', 'description', 'method']);
   interface Frame {
     key?: string;
     parentKey?: string;
     value: unknown;
+    inErrorFallback: boolean;
   }
-  const stack: Frame[] = [{ value: step }];
+  const stack: Frame[] = [{ value: step, inErrorFallback: false }];
   while (stack.length > 0) {
-    const { key, parentKey, value } = stack.pop() as Frame;
+    const { key, parentKey, value, inErrorFallback } = stack.pop() as Frame;
     // Don't descend into nested steps; they are validated with their own scope.
     if (
       (parentKey === 'loop' && (key === 'step' || key === 'steps')) ||
       (parentKey === 'condition' &&
-        (key === 'then' || key === 'else' || key === 'cases' || key === 'default'))
+        (key === 'then' || key === 'else' || key === 'cases' || key === 'default')) ||
+      (parentKey === 'onError' && key === 'step')
     ) {
       continue;
     }
+    const inFallback = inErrorFallback || (parentKey === 'onError' && key === 'fallback');
     if (typeof value === 'string') {
       if (!EXCLUDED_KEYS.has(key as string) && value.includes('${')) {
-        yield value;
+        yield { text: value, inErrorFallback: inFallback };
       }
     } else if (Array.isArray(value)) {
       for (const item of value) {
-        stack.push({ key, parentKey, value: item });
+        stack.push({ key, parentKey, value: item, inErrorFallback: inFallback });
       }
     } else if (value !== null && typeof value === 'object') {
       for (const [entryKey, entryValue] of Object.entries(value)) {
-        stack.push({ key: entryKey, parentKey: key, value: entryValue });
+        stack.push({
+          key: entryKey,
+          parentKey: key,
+          value: entryValue,
+          inErrorFallback: inFallback,
+        });
       }
     }
   }
@@ -407,13 +437,17 @@ export function validateFlow(flow: Flow, openrpcDocument: OpenRpcDocument): Flow
     // stepName always comes from the same walk that built stepByName.
     const step = stepByName.get(stepName) as Step;
     const knownNames = new Set([...stepNames, ...scopeVars]);
-    for (const value of referenceStrings(step)) {
-      for (const path of extractReferencePaths(value)) {
+    // `${error}` is recovery-scoped inside onError.fallback (issue #193),
+    // mirroring the runtime scope; elsewhere it is not a valid reference.
+    const fallbackKnownNames = new Set([...knownNames, 'error']);
+    for (const { text, inErrorFallback } of referenceStrings(step)) {
+      for (const path of extractReferencePaths(text)) {
         const base = referenceBase(path);
         if (base.length === 0 || SPECIAL_VARIABLES.has(base)) {
           continue;
         }
-        if (!knownNames.has(base)) {
+        const known = inErrorFallback ? fallbackKnownNames : knownNames;
+        if (!known.has(base)) {
           const suggestion = didYouMean(base, stepNames);
           diagnostics.push({
             step: stepName,
@@ -464,6 +498,59 @@ export function validateFlow(flow: Flow, openrpcDocument: OpenRpcDocument): Flow
     }
   };
 
+  const checkOnError = (step: Step): void => {
+    const onError = step.onError;
+    if (onError === undefined) {
+      return;
+    }
+    const invalid = (message: string): void => {
+      diagnostics.push({
+        step: step.name,
+        severity: 'error',
+        code: FlowDiagnosticCode.INVALID_ON_ERROR,
+        message,
+      });
+    };
+    if (onError === null || typeof onError !== 'object' || Array.isArray(onError)) {
+      invalid(`Step '${step.name}' has an invalid onError: expected an object.`);
+      return;
+    }
+    const record = onError as Record<string, unknown>;
+    const unknownKeys = Object.keys(record).filter((key) => key !== 'fallback' && key !== 'step');
+    if (unknownKeys.length > 0) {
+      invalid(
+        `Step '${step.name}' has unknown onError key(s): ${unknownKeys.join(', ')}. ` +
+          `Allowed keys are 'fallback' and 'step'.`,
+      );
+    }
+    // Explicit key presence decides: `{ fallback: undefined, step: {...} }`
+    // is invalid even though the fallback carries no value.
+    const hasFallback = Object.prototype.hasOwnProperty.call(record, 'fallback');
+    const hasRecoveryStep = Object.prototype.hasOwnProperty.call(record, 'step');
+    if (hasFallback && hasRecoveryStep) {
+      invalid(`Step '${step.name}' onError cannot set both 'fallback' and 'step'.`);
+    }
+    if (hasRecoveryStep) {
+      const recoveryStep = record.step as Record<string, unknown> | null;
+      if (
+        recoveryStep === null ||
+        typeof recoveryStep !== 'object' ||
+        Array.isArray(recoveryStep)
+      ) {
+        invalid(`Step '${step.name}' onError.step must be a step object.`);
+      } else {
+        if (typeof recoveryStep.name !== 'string' || recoveryStep.name.length === 0) {
+          invalid(`Step '${step.name}' onError.step must have a name.`);
+        }
+        if (recoveryStep.onError !== undefined) {
+          invalid(
+            `Step '${step.name}' onError.step must not declare its own onError (one level only).`,
+          );
+        }
+      }
+    }
+  };
+
   for (const { step, scopeVars } of scopedSteps) {
     if (isRequestStep(step)) {
       const methodName = step.request.method;
@@ -487,6 +574,7 @@ export function validateFlow(flow: Flow, openrpcDocument: OpenRpcDocument): Flow
       }
     }
     checkReferences(step.name, scopeVars);
+    checkOnError(step);
   }
 
   return diagnostics;

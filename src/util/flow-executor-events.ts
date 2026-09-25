@@ -20,6 +20,7 @@ export enum FlowEventType {
   FLOW_PAUSED = 'flow:paused',
   STEP_RETRY = 'step:retry',
   STEP_TIMEOUT = 'step:timeout',
+  STEP_RECOVERED = 'step:recovered',
   DEPENDENCY_RESOLVED = 'dependency:resolved',
   FLOW_TIMEOUT = 'flow:timeout',
 }
@@ -178,6 +179,24 @@ export interface StepTimeoutEvent extends FlowEvent {
   stepType: StepType;
   timeout: number;
   duration: number;
+}
+
+/**
+ * Step recovered event: emitted when a step fails but recovers via its
+ * `onError` configuration instead of failing the flow (issue #193).
+ * Always follows a `step:error` for the same step; `step:complete` is not
+ * emitted for recovered steps.
+ */
+export interface StepRecoveredEvent extends FlowEvent {
+  type: FlowEventType.STEP_RECOVERED;
+  stepName: string;
+  stepType: StepType;
+  /** The recovered result envelope (carries the caught failure as `error`). */
+  result: StepExecutionResult;
+  /** The original failure that triggered recovery. */
+  error: Error;
+  duration: number;
+  correlationId: string;
 }
 
 /**
@@ -457,6 +476,34 @@ export class FlowExecutorEvents extends EventEmitter {
       timeout,
       duration,
     } as StepTimeoutEvent);
+  }
+
+  /**
+   * Emit step recovered event: a step failed but recovered via its `onError`
+   * configuration. Emitted after `step:error` for the same step.
+   */
+  emitStepRecovered(
+    step: Step,
+    result: StepExecutionResult,
+    error: Error,
+    startTime: number,
+    correlationId: string,
+  ): void {
+    if (!this.options.emitStepEvents) return;
+
+    const stepType = getStepType(step);
+    const resultData = this.options.includeResults ? result : { type: result.type };
+
+    this.emit(FlowEventType.STEP_RECOVERED, {
+      timestamp: Date.now(),
+      type: FlowEventType.STEP_RECOVERED,
+      stepName: step.name,
+      stepType,
+      result: resultData,
+      error,
+      duration: Date.now() - startTime,
+      correlationId,
+    } as StepRecoveredEvent);
   }
 
   /**

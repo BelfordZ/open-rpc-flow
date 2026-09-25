@@ -57,6 +57,12 @@ export interface FlowCheckpoint {
   exportedAt: string;
   /** Deep-cloned execution context. */
   context: Record<string, unknown>;
+  /**
+   * Deep-cloned runtime input (`execute(input)`), so a resumed run resolves
+   * the same `${input.*}` values. Absent on checkpoints exported before
+   * runtime input existed; import treats a missing field as empty input.
+   */
+  input: Record<string, unknown>;
   /** Deep-cloned step results keyed by step name. */
   stepResults: Record<string, unknown>;
   /** Per-step status keyed by step name. */

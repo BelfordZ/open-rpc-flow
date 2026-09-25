@@ -17,7 +17,7 @@ import {
  * Special variables the expression evaluator resolves without a step name.
  * Mirrors SafeExpressionEvaluator's special-variable list.
  */
-const SPECIAL_VARIABLES = new Set(['item', 'context', 'acc']);
+const SPECIAL_VARIABLES = new Set(['item', 'context', 'acc', 'input']);
 
 /**
  * Extracts the inner paths of every `${...}` reference in a string,

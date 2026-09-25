@@ -1,5 +1,5 @@
 /* istanbul ignore file */
-export { Flow, Step, JsonRpcRequest, StepExecutionContext } from './types';
+export { Flow, Step, JsonRpcRequest, StepExecutionContext, FlowInput } from './types';
 export {
   StepExecutor,
   StepExecutionResult,
@@ -12,7 +12,12 @@ export {
   DelayStepExecutor,
   StopStepExecutor,
 } from './step-executors';
-export { FlowExecutor, FlowExecutorOptions, DEFAULT_RETRY_POLICY } from './flow-executor';
+export {
+  FlowExecutor,
+  FlowExecutorOptions,
+  ExecuteOptions,
+  DEFAULT_RETRY_POLICY,
+} from './flow-executor';
 export {
   FlowCheckpoint,
   CheckpointStepError,

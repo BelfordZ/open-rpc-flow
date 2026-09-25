@@ -139,6 +139,20 @@ export interface Flow {
 }
 
 /**
+ * Runtime input supplied to `FlowExecutor.execute(input)`.
+ *
+ * Unlike `flow.context` (static, declared on the flow), input is provided
+ * fresh on every run and is addressable in any `${...}` reference or
+ * expression as `${input.<key>}` — e.g. `${input.userId}`. The executor
+ * deep-clones the input, so later mutations of the caller's object cannot
+ * affect the run; it is also frozen, so steps should treat it as read-only.
+ *
+ * Input must be JSON-serializable: it travels inside checkpoints
+ * (`exportState`/`importState`), which are pure JSON.
+ */
+export type FlowInput = Record<string, unknown>;
+
+/**
  * Classic if/then/else condition branch.
  */
 export interface IfCondition {

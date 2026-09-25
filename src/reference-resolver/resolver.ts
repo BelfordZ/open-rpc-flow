@@ -16,6 +16,7 @@ export class ReferenceResolver {
     private stepResults: Map<string, any>,
     private context: Record<string, any>,
     logger: Logger,
+    private input: Record<string, unknown> = {},
   ) {
     this.logger = logger.createNested('ReferenceResolver');
     this.logger.debug('Initialized with context keys:', Object.keys(this.context));
@@ -240,6 +241,7 @@ export class ReferenceResolver {
         ...Object.keys(extraContext),
         ...Array.from(this.stepResults.keys()),
         'context',
+        'input',
       ];
 
       this.logger.debug('Available references:', availableReferences);
@@ -253,6 +255,9 @@ export class ReferenceResolver {
       } else if (source === 'context') {
         this.logger.debug('Using global context');
         value = this.context;
+      } else if (source === 'input') {
+        this.logger.debug('Using run input');
+        value = this.input;
       } else {
         this.logger.warn('Reference not found:', source);
         throw new UnknownReferenceError(

@@ -58,6 +58,11 @@ export function validateCheckpoint(value: unknown): FlowCheckpoint {
   if (!isPlainObject(candidate.context)) {
     problems.push(`context must be an object, got ${describe(candidate.context)}`);
   }
+  // `input` is optional for backward compatibility: checkpoints exported
+  // before runtime input existed simply have no `input` field.
+  if (candidate.input !== undefined && !isPlainObject(candidate.input)) {
+    problems.push(`input must be an object, got ${describe(candidate.input)}`);
+  }
   if (!isPlainObject(candidate.stepResults)) {
     problems.push(`stepResults must be an object, got ${describe(candidate.stepResults)}`);
   }

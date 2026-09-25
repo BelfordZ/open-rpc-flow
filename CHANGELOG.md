@@ -5,6 +5,13 @@
 
 * update readme ([#59](https://github.com/BelfordZ/open-rpc-flow/issues/59)) ([7f5d691](https://github.com/BelfordZ/open-rpc-flow/commit/7f5d6915880bb02c6bbe6e93f6f98abc95cc5c39))
 
+## [1.13.0](https://github.com/BelfordZ/open-rpc-flow/compare/v1.12.0...v1.13.0) (2026-09-25)
+
+
+### Features
+
+* add runtime flow inputs via execute(input) ([#207](https://github.com/BelfordZ/open-rpc-flow/issues/207)) ([d48db44](https://github.com/BelfordZ/open-rpc-flow/commit/d48db44a54b8ffb2a669908e89454a962d4ab06e))
+
 ## [1.12.0](https://github.com/BelfordZ/open-rpc-flow/compare/v1.11.2...v1.12.0) (2026-09-24)
 
 

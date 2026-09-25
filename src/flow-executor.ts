@@ -9,6 +9,8 @@ import {
   ExecutionContextData,
   PolicyOverrides,
   FlowInput,
+  getStepType,
+  StepErrorInfo,
 } from './types';
 import {
   StepExecutor,
@@ -131,6 +133,40 @@ function isExecuteOptions(value: unknown): value is ExecuteOptions {
   }
   const signal = (value as { signal?: unknown }).signal;
   return signal === undefined || signal instanceof AbortSignal;
+}
+
+/**
+ * Summarize a caught step failure as JSON-serializable {@link StepErrorInfo}.
+ */
+function toStepErrorInfo(error: unknown): StepErrorInfo {
+  const name = error instanceof Error ? error.name || 'Error' : 'Error';
+  const message = error instanceof Error ? error.message : String(error);
+  const rawCode =
+    error !== null && typeof error === 'object' && 'code' in error
+      ? (error as { code?: unknown }).code
+      : undefined;
+  const info: StepErrorInfo = { name, message };
+  if (typeof rawCode === 'string' || typeof rawCode === 'number') {
+    info.code = rawCode;
+  }
+  return info;
+}
+
+/**
+ * Find a {@link TimeoutError} in the error's cause chain. Step executors
+ * wrap failures (the request executor wraps a step timeout in an
+ * ExecutionError for its retry bookkeeping), but the cause chain preserves
+ * the original timeout.
+ */
+function findTimeoutError(error: unknown): TimeoutError | undefined {
+  let current: unknown = error;
+  while (current instanceof Error) {
+    if (current instanceof TimeoutError) {
+      return current;
+    }
+    current = (current as { cause?: unknown }).cause;
+  }
+  return undefined;
 }
 
 /**
@@ -971,7 +1007,11 @@ export class FlowExecutor {
                 readyQueue.push(dependentStep);
               }
             }
-          } catch (error: any) {
+          } catch (stepError: any) {
+            // Mutable alias: recovery may substitute the error that the
+            // failure path below reports (assigning to the catch parameter
+            // directly is banned by no-ex-assign).
+            let error = stepError;
             if (runEpoch !== this.runEpoch) {
               // This step belonged to a run superseded by reset(). Its state
               // was already cleared: report the abort truthfully but write
@@ -1027,6 +1067,71 @@ export class FlowExecutor {
               stopScheduling = true;
               stopReason = String(reason);
               return;
+            }
+
+            // Per-step error recovery (issue #193). This catch block only
+            // runs after the step's retries are exhausted (retries live
+            // inside the step executors), so a step declaring `onError`
+            // recovers here instead of failing: it keeps `success` status,
+            // its result envelope carries the caught failure as `error`,
+            // dependents proceed, and flow-level `onFailure: 'abort-flow'`
+            // is never tripped by a recovered step.
+            if (step.onError !== undefined) {
+              try {
+                const recovered = await this.tryRecoverStep(step, error);
+                this.stepResults.set(step.name, recovered);
+                this.stepStatus.set(step.name, { status: 'success' });
+                completed.add(step.name);
+                if (this.lastFailedStepName === step.name) {
+                  this.lastFailedStepName = null;
+                }
+
+                const failure = error instanceof Error ? error : new Error(String(error));
+                // A timed-out step reports step:timeout even when it
+                // recovers, mirroring the failure path. The timeout hides in
+                // the cause chain behind the executor's retry wrapper.
+                const timeoutError = findTimeoutError(error);
+                if (timeoutError) {
+                  this.events.emitStepTimeout(
+                    step,
+                    timeoutError.timeout,
+                    timeoutError.executionTime,
+                  );
+                }
+                this.events.emitStepError(step, failure, stepStartTime, correlationId);
+                this.events.emitStepRecovered(
+                  step,
+                  recovered,
+                  failure,
+                  stepStartTime,
+                  correlationId,
+                );
+
+                const dependents = dependentsByStep.get(step.name)!;
+                for (const dependentName of dependents) {
+                  if (
+                    completed.has(dependentName) ||
+                    failed.has(dependentName) ||
+                    skipped.has(dependentName)
+                  ) {
+                    continue;
+                  }
+                  const remaining = inDegree.get(dependentName)! - 1;
+                  inDegree.set(dependentName, remaining);
+                  if (remaining === 0) {
+                    const dependentStep = stepsByName.get(dependentName)!;
+                    readyQueue.push(dependentStep);
+                  }
+                }
+                return;
+              } catch (recoveryError: unknown) {
+                // Recovery itself failed — an invalid onError config, or the
+                // nested recovery step failing. The parent fails for real
+                // through the normal failure path below. The recovery error
+                // retains the original failure as `cause` where applicable.
+                error =
+                  recoveryError instanceof Error ? recoveryError : new Error(String(recoveryError));
+              }
             }
 
             this.stepStatus.set(step.name, {
@@ -1341,6 +1446,134 @@ export class FlowExecutor {
     this.logger.info(
       `Resuming from checkpoint: skipping completed step(s): ${skippedSummary}; ${failedSummary}.`,
     );
+  }
+
+  /**
+   * Recover a failed step via its `onError` configuration (issue #193).
+   *
+   * Returns the recovered result envelope. Structural problems in the config
+   * fail fast with `ValidationError` (Flow Doctor's `validateFlow` reports
+   * the same problems statically). When the nested recovery step itself
+   * fails, the parent fails for real: the recovery step's error is thrown
+   * with the original error attached as `cause`.
+   */
+  private async tryRecoverStep(step: Step, error: unknown): Promise<StepExecutionResult> {
+    const onError = step.onError;
+    if (onError === null || typeof onError !== 'object' || Array.isArray(onError)) {
+      throw new ValidationError(`Step '${step.name}' has an invalid onError: expected an object`, {
+        flowName: this.flow.name,
+        stepName: step.name,
+      });
+    }
+    const unknownKeys = Object.keys(onError).filter((key) => key !== 'fallback' && key !== 'step');
+    if (unknownKeys.length > 0) {
+      throw new ValidationError(
+        `Step '${step.name}' has unknown onError key(s): ${unknownKeys.join(', ')}`,
+        { flowName: this.flow.name, stepName: step.name },
+      );
+    }
+    // Explicit key presence decides: `{ fallback: undefined, step: {...} }`
+    // is invalid even though the fallback carries no value.
+    const hasFallback = Object.prototype.hasOwnProperty.call(onError, 'fallback');
+    const hasRecoveryStep = Object.prototype.hasOwnProperty.call(onError, 'step');
+    if (hasFallback && hasRecoveryStep) {
+      throw new ValidationError(
+        `Step '${step.name}' onError cannot set both 'fallback' and 'step'`,
+        { flowName: this.flow.name, stepName: step.name },
+      );
+    }
+
+    const errorInfo = toStepErrorInfo(error);
+    this.logger.debug(`Recovering step '${step.name}' via onError`, { error: errorInfo });
+
+    if (hasRecoveryStep) {
+      const recoveryStep = onError.step as Step;
+      if (
+        recoveryStep === null ||
+        typeof recoveryStep !== 'object' ||
+        Array.isArray(recoveryStep)
+      ) {
+        throw new ValidationError(`Step '${step.name}' onError.step must be a step object`, {
+          flowName: this.flow.name,
+          stepName: step.name,
+        });
+      }
+      if (typeof recoveryStep.name !== 'string' || recoveryStep.name.length === 0) {
+        throw new ValidationError(`Step '${step.name}' onError.step must have a name`, {
+          flowName: this.flow.name,
+          stepName: step.name,
+        });
+      }
+      if (recoveryStep.onError !== undefined) {
+        throw new ValidationError(
+          `Step '${step.name}' onError.step must not declare its own onError (one level only)`,
+          { flowName: this.flow.name, stepName: step.name },
+        );
+      }
+      // The nested recovery step runs with the normal reference scope plus
+      // `${error}` holding the caught failure summary. It reuses the standard
+      // nested-step machinery, so any step type works, its own policies
+      // (timeout/retries) are honored, and its step:start/step:complete
+      // events fire under its own name.
+      const nestedContext: ExecutionContextData = {
+        _nestedStep: true,
+        _parentStep: step.name,
+        error: errorInfo,
+      };
+      let nestedResult: StepExecutionResult;
+      try {
+        nestedResult = await this.executeStep(
+          recoveryStep,
+          nestedContext,
+          this.globalAbortController.signal,
+        );
+      } catch (nestedError: unknown) {
+        if (nestedError instanceof StopBranch) {
+          // A stop inside the recovery step adopts its result, mirroring
+          // the top-level stop handling.
+          nestedResult = nestedError.result;
+        } else {
+          const failure =
+            nestedError instanceof Error ? nestedError : new Error(String(nestedError));
+          (failure as { cause?: unknown }).cause =
+            error instanceof Error ? error : new Error(String(error));
+          throw failure;
+        }
+      }
+      this.stepResults.set(recoveryStep.name, nestedResult);
+      this.stepStatus.set(recoveryStep.name, { status: 'success' });
+      return this.buildRecoveredEnvelope(step, nestedResult.result, errorInfo);
+    }
+
+    // A `${...}` fallback resolves at recovery time against the normal scope
+    // (input, context, completed step results); static values pass through.
+    // With neither `fallback` nor `step`, the error info itself becomes the
+    // step's result.
+    const recoveredValue = hasFallback
+      ? this.referenceResolver.resolveReferences(onError.fallback, {})
+      : errorInfo;
+    return this.buildRecoveredEnvelope(step, recoveredValue, errorInfo);
+  }
+
+  /**
+   * Build the result envelope for a recovered step: the recovered value as
+   * `result`, with the caught failure attached as `error` so `${step.error}`
+   * discriminates recovered steps downstream.
+   */
+  private buildRecoveredEnvelope(
+    step: Step,
+    recoveredValue: unknown,
+    errorInfo: StepErrorInfo,
+  ): StepExecutionResult {
+    return {
+      result: recoveredValue,
+      type: getStepType(step),
+      metadata: {
+        recovered: true,
+        recoveredAt: new Date().toISOString(),
+      },
+      error: errorInfo,
+    };
   }
 
   /**

@@ -31,6 +31,45 @@ export interface ErrorData {
 }
 
 /**
+ * JSON-serializable summary of a caught step failure, attached to a
+ * recovered step's result envelope as `error` and exposed to a nested
+ * recovery step as `${error}`.
+ */
+export interface StepErrorInfo {
+  /** Error class name, e.g. 'JsonRpcRequestError' or 'TimeoutError'. */
+  name: string;
+  /** Human-readable failure message. */
+  message: string;
+  /** Machine-readable code when the error carries one (string or number). */
+  code?: string | number;
+}
+
+/**
+ * Per-step error recovery configuration (issue #193).
+ *
+ * Declared on a step as `onError`, applied after the step's retries are
+ * exhausted. Exactly one recovery strategy may be set:
+ * - `fallback`: the step recovers with this value as its result. May be a
+ *   static JSON value or a `${...}` expression resolved at recovery time
+ *   against the normal reference scope (input, context, completed steps).
+ * - `step`: a single nested recovery step to run when the parent fails.
+ *   Its `name` is required; it resolves references against the normal scope
+ *   plus `${error}` (the caught {@link StepErrorInfo}), and its `.result`
+ *   becomes the parent step's result. It may declare its own `policies`
+ *   but must not declare its own `onError` (one level only).
+ * - `{}` (neither): the error info itself becomes the step's result.
+ *
+ * A recovered step keeps `success` status; its result envelope carries the
+ * caught failure as `error`, so `${stepName.error} != null` discriminates
+ * recovered steps downstream while `${stepName.result}` holds the recovered
+ * value. Recovery never triggers flow-level `onFailure: 'abort-flow'`.
+ */
+export interface OnErrorConfig {
+  fallback?: unknown;
+  step?: Step;
+}
+
+/**
  * Policies for a specific step type or as a default for all steps
  */
 export interface Policies {
@@ -206,6 +245,11 @@ export interface Step {
   stop?: {
     endWorkflow?: boolean;
   };
+  /**
+   * Per-step error recovery: what the step yields when it fails after
+   * retries are exhausted, instead of failing the flow (issue #193).
+   */
+  onError?: OnErrorConfig;
   /**
    * Optional custom metadata for this step
    */

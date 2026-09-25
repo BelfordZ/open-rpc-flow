@@ -66,6 +66,8 @@ export const FlowDiagnosticCode = {
   UNKNOWN_STEP_REFERENCE: 'UNKNOWN_STEP_REFERENCE',
   /** An expression reads a property absent from the upstream result schema. */
   UNKNOWN_RESULT_PROPERTY: 'UNKNOWN_RESULT_PROPERTY',
+  /** A step's onError recovery config is structurally invalid. */
+  INVALID_ON_ERROR: 'INVALID_ON_ERROR',
 } as const;
 
 export type FlowDiagnosticCode = (typeof FlowDiagnosticCode)[keyof typeof FlowDiagnosticCode];

@@ -5,6 +5,13 @@
 
 * update readme ([#59](https://github.com/BelfordZ/open-rpc-flow/issues/59)) ([7f5d691](https://github.com/BelfordZ/open-rpc-flow/commit/7f5d6915880bb02c6bbe6e93f6f98abc95cc5c39))
 
+## [1.15.0](https://github.com/BelfordZ/open-rpc-flow/compare/v1.14.0...v1.15.0) (2026-09-25)
+
+
+### Features
+
+* add per-step error handling with onError recovery ([#212](https://github.com/BelfordZ/open-rpc-flow/issues/212)) ([086da10](https://github.com/BelfordZ/open-rpc-flow/commit/086da107edfffd263f06fefc375e9d998587c7bc))
+
 ## [1.14.0](https://github.com/BelfordZ/open-rpc-flow/compare/v1.13.0...v1.14.0) (2026-09-25)
 
 
